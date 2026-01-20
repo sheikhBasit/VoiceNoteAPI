@@ -1,0 +1,22 @@
+fastapi
+uvicorn[standard]
+sqlalchemy[asyncio]
+asyncpg
+pgvector
+pydantic
+pydantic-settings
+celery
+redis
+python-multipart
+librosa
+soundfile
+cloudinary
+openai
+groq
+alembic
+python-dotenv
+pytest
+pytest-asyncio
+httpx
+locust  # For Load Performance
+pytest-cov
