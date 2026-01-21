@@ -18,7 +18,7 @@ class CloudinaryService:
         if not os.path.exists(self.upload_dir):
             os.makedirs(self.upload_dir)
 
-    async def upload_audio(self, processed_file_path: str, public_id: str):
+    def upload_audio(self, processed_file_path: str, public_id: str):
         """Uploads already-processed/enhanced audio from the local uploads folder."""
         try:
             # Verify file exists in uploads before proceeding
@@ -38,7 +38,7 @@ class CloudinaryService:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Cloudinary Audio Error: {str(e)}")
 
-    async def upload_compressed_image(self, original_file_path: str, task_id: str):
+    def upload_compressed_image(self, original_file_path: str, task_id: str):
         """Compresses a local image and then uploads it."""
         try:
             compressed_path = os.path.join(self.upload_dir, f"comp_{task_id}.jpg")

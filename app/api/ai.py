@@ -15,18 +15,13 @@ limiter = Limiter(key_func=get_remote_address, storage_uri="redis://redis:6379/0
 @router.post("/search", response_model=List[note_schema.NoteResponse])
 @limiter.limit("5/hour")
 async def semantic_search(query: str, user_id: str, db: Session = Depends(get_db)):
-    """
-    POST /search: Semantic Search.
-    Uses OpenAI/Groq embeddings and pgvector to find notes by 'meaning'.
-    """
-    # 1. Generate embedding for the search query
     query_vector = ai_service.generate_embedding(query)
     
-    # 2. Use pgvector's L2 distance (<->) or cosine distance (<=>) to find matches
-    # This replaces simple 'WHERE title LIKE %query%'
+    # Strictly filter by user_id and is_deleted before calculating distance
     results = db.query(models.Note).filter(
         models.Note.user_id == user_id,
-        models.Note.is_deleted == False
+        models.Note.is_deleted == False,
+        models.Note.is_encrypted == False # Assuming AI can't read encrypted notes
     ).order_by(
         models.Note.embedding.l2_distance(query_vector)
     ).limit(5).all()

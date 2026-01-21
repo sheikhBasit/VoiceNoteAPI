@@ -18,15 +18,37 @@ class NoteCreate(NoteBase):
     is_encrypted: bool = False
     comparison_notes: str = ""
 
+class NoteUpdate(BaseModel):
+    """Schema for updating notes - all fields optional"""
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    priority: Optional[Priority] = None
+    status: Optional[NoteStatus] = None
+    is_pinned: Optional[bool] = None
+    is_liked: Optional[bool] = None
+    is_archived: Optional[bool] = None
+    transcript: Optional[str] = None
+    document_urls: Optional[List[str]] = None
+    links: Optional[List[ExternalLink]] = None
+    model_config = ConfigDict(from_attributes=True)
+
 class NoteResponse(NoteBase):
     id: str
+    user_id: str
     timestamp: int
+    updated_at: int
     transcript: str
     audio_url: Optional[str]
+    raw_audio_url: Optional[str]
+    document_urls: List[str] = []
+    links: List[ExternalLink] = []
     tasks: List[TaskResponse]
     is_pinned: bool
     is_liked: bool
     is_archived: bool
+    is_deleted: bool
+    deleted_at: Optional[int] = None
+    is_encrypted: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 class NoteAIOutput(BaseModel):

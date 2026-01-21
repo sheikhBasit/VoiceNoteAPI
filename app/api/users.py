@@ -70,15 +70,67 @@ def delete_user_account(user_id: str, hard: bool = False, db: Session = Depends(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    notes = db.query(models.Note).filter(models.Note.user_id == user_id).all()
+    now = int(time.time() * 1000)
+
     if hard:
         # Hard delete will cascade to Notes and Tasks if defined in models
+        for note in notes:
+            # Delete tasks for each note
+            db.query(models.Task).filter(models.Task.note_id == note.id).delete()
+            db.delete(note)
         db.delete(db_user)
         message = "Account and all data permanently erased."
     else:
         # Soft delete logic
         db_user.is_deleted = True
-        db_user.deleted_at = int(time.time() * 1000)
+        db_user.deleted_at = now
+        for note in notes:
+            note.is_deleted = True
+            note.deleted_at = now
+            # Soft delete all tasks for this note
+            db.query(models.Task).filter(models.Task.note_id == note.id).update({
+                "is_deleted": True, "deleted_at": now
+            })
         message = "Account deactivated (Soft Delete)."
 
     db.commit()
     return {"status": "success", "message": message, "type": "hard" if hard else "soft"}
+
+
+@router.patch("/{user_id}/role")
+def update_user_role(user_id: str, role: str, db: Session = Depends(get_db)):
+    """PATCH /{user_id}/role: Explicitly update only the user role."""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.primary_role = role
+    db.commit()
+    return user_schema.UserResponse.model_validate(user)
+
+
+@router.patch("/{user_id}/restore")
+def restore_user_account(user_id: str, db: Session = Depends(get_db)):
+    """PATCH: Reactive a soft-deleted user and all their history."""
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 1. Restore User
+    db_user.is_deleted = False
+    db_user.deleted_at = None
+
+    # 2. Find all notes belonging to this user
+    notes = db.query(models.Note).filter(models.Note.user_id == user_id).all()
+    
+    for note in notes:
+        note.is_deleted = False
+        note.deleted_at = None
+        # 3. Restore tasks for each note
+        db.query(models.Task).filter(models.Task.note_id == note.id).update({
+            "is_deleted": False, 
+            "deleted_at": None
+        })
+
+    db.commit()
+    return {"message": "User account and all historical data have been reactivated."}

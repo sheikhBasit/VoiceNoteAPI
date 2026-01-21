@@ -1,91 +1,24 @@
 version: '3.8'
-
 services:
-  # Database: PostgreSQL with pgvector support
   db:
     image: ankane/pgvector:latest
     container_name: voicenote_db
-    restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-      POSTGRES_DB: ${POSTGRES_DB:-voicenote}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: voicenote
     ports:
       - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - voicenote_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
-
-  # Cache & Broker: Redis for Celery and Rate Limiting
-  redis:
-    image: redis:7-alpine
-    container_name: voicenote_redis
-    restart: always
-    ports:
-      - "6379:6379"
-    networks:
-      - voicenote_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # FastAPI Backend Service
-  api:
-    build: .
-    container_name: voicenote_api
-    restart: always
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: voicenote_pgadmin
     environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/voicenote
-      - REDIS_URL=redis://redis:6379/0
-    env_file:
-      - .env
-    volumes:
-      - .:/app
-      - uploads_data:/app/uploads
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
     ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - voicenote_network
-
-  # Celery Worker for Audio Preprocessing & AI Tasks
-  worker:
-    build: .
-    container_name: voicenote_worker
-    restart: always
-    command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=4
-    env_file:
-      - .env
-    environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/voicenote
-      - REDIS_URL=redis://redis:6379/0
-    volumes:
-      - .:/app
-      - uploads_data:/app/uploads
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - voicenote_network
-
-networks:
-  voicenote_network:
-    driver: bridge
-
-volumes:
-  postgres_data:
-  uploads_data:
+      - "5050:80"

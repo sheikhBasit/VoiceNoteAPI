@@ -22,3 +22,12 @@ celery_app.conf.update(
     task_time_limit=600, # 10-minute limit for long meetings
     worker_prefetch_multiplier=1 # One audio file per worker at a time for CPU efficiency
 )
+
+from celery.schedules import crontab
+
+celery_app.conf.beat_schedule = {
+    "scan-for-upcoming-deadlines-every-hour": {
+        "task": "check_upcoming_tasks",
+        "schedule": crontab(minute=0), # Runs at the top of every hour
+    },
+}
