@@ -1,7 +1,6 @@
-# Use an official Python runtime as a parent image
-FROM python:3.11-slim
+# Build stage
+FROM python:3.11-slim as builder
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
@@ -11,25 +10,64 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     libpq-dev \
     gcc \
+    curl \
+    wget \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
 WORKDIR /app
 
-# Install Python dependencies
+# Copy and install requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
+# Runtime stage
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    libpq5 \
+    curl \
+    wget \
+    postgresql-client \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy Python environment from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
 COPY . .
 
-# Create directory for local audio uploads
-RUN mkdir -p uploads && chmod 777 uploads
+# Create necessary directories
+RUN mkdir -p uploads scripts logs && \
+    chmod 777 uploads logs && \
+    chmod +x scripts/*.py scripts/*.sh 2>/dev/null || true
 
-# Expose the port FastAPI runs on
+# Add a healthcheck script
+COPY <<EOF /app/healthcheck.py
+import requests
+import sys
+try:
+    response = requests.get("http://localhost:8000/health", timeout=5)
+    sys.exit(0 if response.status_code == 200 else 1)
+except Exception as e:
+    print(f"Health check failed: {e}")
+    sys.exit(1)
+EOF
+
+# Expose ports
 EXPOSE 8000
 
-# Default command (will be overridden by docker-compose for worker)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command - can be overridden by docker-compose
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
