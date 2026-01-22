@@ -11,6 +11,9 @@ class UserBase(BaseModel):
     work_start_hour: int = 9
     work_end_hour: int = 17
     work_days: List[int] = [2, 3, 4, 5, 6]
+    # Admin fields (NEW)
+    is_admin: bool = False
+    admin_permissions: Optional[Dict[str, any]] = None
 
 class UserCreate(UserBase):
     token: str

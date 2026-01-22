@@ -57,6 +57,12 @@ class User(Base):
     system_prompt = Column(Text)
     jargons = Column(JSON, default=list) # Custom vocabulary for Whisper/Llama
     
+    # Admin System (NEW)
+    is_admin = Column(Boolean, default=False, index=True)
+    admin_permissions = Column(JSON, default=dict)  # Flexible permission storage
+    admin_created_at = Column(BigInteger, nullable=True)
+    admin_last_action = Column(BigInteger, nullable=True)
+    
     # App Settings
     show_floating_button = Column(Boolean, default=True)
     work_start_hour = Column(Integer, default=9)
