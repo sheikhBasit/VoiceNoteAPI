@@ -1,3 +1,13 @@
+from pydantic import BaseModel, ConfigDict
+from app.db.models import Priority, NoteStatus
+from typing import Optional, List
+
+
+class ExternalLink(BaseModel):
+    url: str
+    title: Optional[str] = None
+
+
 class NoteBase(BaseModel):
     title: str
     summary: str
@@ -42,7 +52,7 @@ class NoteResponse(NoteBase):
     raw_audio_url: Optional[str]
     document_urls: List[str] = []
     links: List[ExternalLink] = []
-    tasks: List[TaskResponse]
+    tasks: List[dict] = []  # Avoid circular import
     is_pinned: bool
     is_liked: bool
     is_archived: bool
@@ -57,4 +67,4 @@ class NoteAIOutput(BaseModel):
     summary: str
     priority: Priority
     transcript: str  # Formatted with speaker labels
-    tasks: List[TaskBase]
+    tasks: List[dict] = []  # Avoid circular import

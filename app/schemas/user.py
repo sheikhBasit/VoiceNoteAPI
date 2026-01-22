@@ -1,3 +1,9 @@
+from pydantic import BaseModel
+from app.db.models import UserRole
+from typing import Optional, List, Dict, Any
+import json
+
+
 class UserBase(BaseModel):
     id: str
     name: str
@@ -13,7 +19,7 @@ class UserBase(BaseModel):
     work_days: List[int] = [2, 3, 4, 5, 6]
     # Admin fields (NEW)
     is_admin: bool = False
-    admin_permissions: Optional[Dict[str, any]] = None
+    admin_permissions: Optional[Dict[str, Any]] = None
 
 class UserCreate(UserBase):
     token: str

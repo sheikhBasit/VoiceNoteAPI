@@ -1,3 +1,6 @@
+from pydantic import BaseModel
+
+
 class AssistantRequest(BaseModel):
     note_id: str
     question: str

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db import models
-from app.schemas import user_schema  # Assuming you have User schemas defined
+from app.schemas import user  # Fixed import
 from app.utils.users_validation import (
     validate_email, validate_work_hours, validate_work_days, 
     validate_jargons, validate_device_model, validate_system_prompt,
@@ -16,9 +16,9 @@ from slowapi.util import get_remote_address
 limiter = Limiter(key_func=get_remote_address, storage_uri="redis://redis:6379/0") 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 
-@router.post("/sync", response_model=user_schema.UserResponse)
+@router.post("/sync", response_model=dict)
 @limiter.limit("5/hour")
-def sync_user(user_data: user_schema.UserCreate, db: Session = Depends(get_db)):
+def sync_user(user_data: user.UserCreate, db: Session = Depends(get_db)):
     """
     POST /sync: Onboarding/Login. 
     Registers device ID and sets up the primary user role and system prompt.
@@ -87,7 +87,7 @@ def sync_user(user_data: user_schema.UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
     return db_user
 
-@router.get("/me", response_model=user_schema.UserResponse)
+@router.get("/me", response_model=dict)
 @limiter.limit("60/minute")
 def get_user_profile(user_id: str, db: Session = Depends(get_db)):
     """
