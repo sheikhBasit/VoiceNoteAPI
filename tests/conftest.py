@@ -6,16 +6,23 @@ from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db.session import get_db, Base
 
+import os
+
 # Use a separate test database
-TEST_DATABASE_URL = "postgresql+asyncpg://postgres:password@localhost:5432/voicenote_test"
+if os.path.exists("/.dockerenv"):
+    DEFAULT_TEST_DB = "postgresql+asyncpg://postgres:password@db:5432/voicenote_test"
+else:
+    DEFAULT_TEST_DB = "postgresql+asyncpg://postgres:password@localhost:5432/voicenote_test"
+
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", DEFAULT_TEST_DB)
+
 
 engine = create_async_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 @pytest.fixture(scope="session", autouse=True)
-def initialize_db(request):
-    """Create a fresh database schema for the test session.
-    Skip for advanced performance/security tests."""
+async def initialize_db(request):
+    """Create a fresh database schema for the test session."""
     
     # Check if this is a standalone test file
     try:
@@ -28,15 +35,23 @@ def initialize_db(request):
         'test_advanced_performance.py',
         'test_security_attacks.py',
         'test_endpoint_load.py',
+        'test_phase1_standalone.py'
     ])
     
     if is_standalone:
         yield
         return
     
-    # For regular tests, initialize DB (sync only)
-    # Note: For full DB setup, use pytest-asyncio or integrate async properly
+    # Create tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
     yield
+    
+    # Cleanup (optional, usually we want to keep it if we reuse the volume)
+    # async with engine.begin() as conn:
+    #     await conn.run_sync(Base.metadata.drop_all)
+
 
 @pytest.fixture
 async def db_session():

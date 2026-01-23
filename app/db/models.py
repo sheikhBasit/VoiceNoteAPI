@@ -150,4 +150,31 @@ class Task(Base):
 
     note = relationship("Note", back_populates="tasks")
 
+
+class ApiKey(Base):
+    """
+    API Keys table for failover key rotation.
+    Stores multiple keys per service with priority-based rotation.
+    """
+    __tablename__ = "api_keys"
+    
+    id = Column(String, primary_key=True, default=lambda: str(__import__('uuid').uuid4()))
+    service_name = Column(String(50), nullable=False)  # 'deepgram', 'groq', 'openai'
+    api_key = Column(Text, nullable=False)
+    priority = Column(Integer, default=1)  # Lower = higher priority
+    is_active = Column(Boolean, default=True)
+    rate_limit_remaining = Column(Integer, default=1000)
+    rate_limit_reset_at = Column(BigInteger, nullable=True)
+    last_used_at = Column(BigInteger, nullable=True)
+    last_error_at = Column(BigInteger, nullable=True)
+    error_count = Column(Integer, default=0)
+    created_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    notes = Column(Text, nullable=True)
+    
+    __table_args__ = (
+        # Unique constraint on service_name + priority
+        __import__('sqlalchemy').UniqueConstraint('service_name', 'priority', name='uq_service_priority'),
+    )
+
     

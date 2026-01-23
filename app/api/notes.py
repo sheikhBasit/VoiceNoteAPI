@@ -3,14 +3,23 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.db.session import get_db
 from app.db import models
-from app.schemas import note_schema
-from app.worker.tasks import process_audio_pipeline  # Your Celery task
+from app.schemas import note as note_schema
+from app.worker.task import process_voice_note_pipeline  # Celery task
 import time
 import uuid
+import os
+import asyncio
+
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.services.ai_service import AIService
+from app.services.search_service import SearchService
+from app.services.analytics_service import AnalyticsService
+from app.utils.security import verify_device_signature
+
 ai_service = AIService()
+search_service = SearchService(ai_service)
+analytics_service = AnalyticsService()
 limiter = Limiter(key_func=get_remote_address, storage_uri="redis://redis:6379/0")
 
 router = APIRouter(prefix="/api/v1/notes", tags=["Notes"])
@@ -21,9 +30,11 @@ async def process_note(
     file: UploadFile = File(...),
     user_id: str = Form(...),
     instruction: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
+    mode: Optional[str] = Form("GENERIC"), # New: Cricket/Quranic Mode
+    db: Session = Depends(get_db),
+    _sig: bool = Depends(verify_device_signature) # Security requirement
 ):
-    """POST /process: Main Upload for audio processing with validation."""
+    """POST /process: Main Upload for audio processing with validation and security."""
     # ✅ VALIDATION: File type check
     ALLOWED_EXTENSIONS = {"mp3", "wav", "m4a", "ogg", "flac"}
     file_ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
@@ -50,14 +61,21 @@ async def process_note(
     
     note_id = str(uuid.uuid4())
     # Save the file temporarily
+    if not os.path.exists("uploads"):
+        os.makedirs("uploads")
     temp_path = f"uploads/{note_id}_{file.filename}"
     with open(temp_path, "wb") as buffer:
         buffer.write(file_content)
 
-    # Trigger Celery pipeline
-    process_audio_pipeline.delay(note_id, temp_path, user_id, instruction)
+    # Trigger Celery pipeline with mode support
+    # Requirements mapping: mode is used to adjust LLM specialized vocabulary
+    user_role = db_user.primary_role.value if db_user.primary_role else "GENERIC"
+    if mode and mode != "GENERIC":
+        user_role = f"{user_role}_{mode}"
+
+    process_voice_note_pipeline.delay(note_id, temp_path, user_role)
     
-    return {"note_id": note_id, "message": "Processing started in background"}
+    return {"note_id": note_id, "message": f"Processing started in {mode} mode"}
 
 @router.get("", response_model=List[note_schema.NoteResponse])
 @limiter.limit("60/minute")
@@ -134,6 +152,9 @@ def delete_note(
 ):
     """DELETE /{note_id}: Soft or Hard delete a note and all its associated tasks.
     
+    PROTECTION: Cannot delete a Note that has "In-Progress" HIGH Priority Tasks.
+    This returns a 400 Bad Request per the redundancy check requirement.
+    
     Args:
         note_id: Note to delete
         user_id: Current user (for ownership validation)
@@ -145,6 +166,21 @@ def delete_note(
     ).first()
     if not db_note:
         raise HTTPException(status_code=403, detail="Access denied or note not found")
+    
+    # REDUNDANCY CHECK: Block deletion if note has in-progress HIGH priority tasks
+    high_priority_active_tasks = db.query(models.Task).filter(
+        models.Task.note_id == note_id,
+        models.Task.priority == models.Priority.HIGH,
+        models.Task.is_done == False,
+        models.Task.is_deleted == False
+    ).first()
+    
+    if high_priority_active_tasks:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot delete note: It contains in-progress HIGH priority tasks. "
+                   "Please complete or delete these tasks first."
+        )
     
     # Cascade to Tasks
     tasks = db.query(models.Task).filter(models.Task.note_id == note_id).all()
@@ -240,5 +276,58 @@ def restore_note(note_id: str, user_id: str, db: Session = Depends(get_db)):
     
     db.commit()
     return note_schema.NoteResponse.model_validate(db_note)
+
+@router.post("/search")
+@limiter.limit("10/minute")
+async def search_notes_hybrid(
+    query: note_schema.SearchQuery,
+    db: Session = Depends(get_db)
+):
+    """
+    POST /search: Unified V-RAG (Voice-Retrieval Augmented Generation).
+    Searches local notes first using pgvector, falls back to Web (Tavily) if needed.
+    """
+    try:
+        result = await search_service.unified_rag_search(db, query.user_id, query.query)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/dashboard", response_model=note_schema.DashboardResponse)
+def get_dashboard_metrics(user_id: str, db: Session = Depends(get_db)):
+    """
+    GET /dashboard: Provides the "Productivity Pulse" analytics.
+    Exposes Topic Heatmap, Task Velocity, and Meeting ROI.
+    """
+    try:
+        return analytics_service.get_productivity_pulse(db, user_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{note_id}/whatsapp")
+def get_whatsapp_draft(note_id: str, user_id: str, db: Session = Depends(get_db)):
+    """
+    GET /{note_id}/whatsapp: Generates a WhatsApp deep-link for the note's summary.
+    Requirement: "Voice-to-WhatsApp Draft"
+    """
+    note = db.query(models.Note).filter(
+        models.Note.id == note_id,
+        models.Note.user_id == user_id
+    ).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    text = f"NexaVoxa Note: {note.title}\n\nSummary: {note.summary}\n\nTasks:\n"
+    tasks = db.query(models.Task).filter(models.Task.note_id == note_id).all()
+    for t in tasks:
+        status_icon = "✅" if t.is_done else "⏳"
+        text += f"- {status_icon} {t.description}\n"
+    
+    import urllib.parse
+    encoded_text = urllib.parse.quote(text)
+    wa_link = f"https://wa.me/?text={encoded_text}"
+    
+    return {"whatsapp_link": wa_link, "draft": text}
+
 
     

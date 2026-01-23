@@ -68,3 +68,20 @@ class NoteAIOutput(BaseModel):
     priority: Priority
     transcript: str  # Formatted with speaker labels
     tasks: List[dict] = []  # Avoid circular import
+
+class SearchQuery(BaseModel):
+    query: str
+    user_id: str
+
+class TopicHeatmapItem(BaseModel):
+    topic: str
+    count: int
+
+class DashboardResponse(BaseModel):
+    task_velocity: float
+    completed_tasks: int
+    total_tasks: int
+    topic_heatmap: List[TopicHeatmapItem]
+    meeting_roi_hours: float
+    recent_notes_count: int
+    status: str

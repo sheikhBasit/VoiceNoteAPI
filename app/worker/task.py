@@ -3,6 +3,7 @@ import cloudinary.uploader
 from app.core.audio import preprocess_audio_pipeline
 from app.services.ai_service import AIService
 from app.services.cloudinary_service import CloudinaryService
+from app.services.calendar_service import CalendarService # New
 from app.db.session import SessionLocal
 from app.db.models import Note, Task, NoteStatus, Priority
 import os
@@ -43,17 +44,39 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         note.status = NoteStatus.DONE
         
         # 7. Map & Save Tasks (Replacing Task.kt logic)
+        extracted_tasks = []
         for t_data in analysis.tasks:
             new_task = Task(
                 note_id=note_id,
-                description=t_data.description,
-                priority=getattr(Priority, t_data.priority, Priority.MEDIUM),
-                deadline=t_data.deadline
+                description=t_data["description"] if isinstance(t_data, dict) else t_data.description,
+                priority=getattr(Priority, t_data["priority"] if isinstance(t_data, dict) else t_data.priority, Priority.MEDIUM),
+                deadline=t_data["deadline"] if isinstance(t_data, dict) else t_data.deadline
             )
             db.add(new_task)
+            extracted_tasks.append({
+                "description": new_task.description,
+                "deadline": new_task.deadline
+            })
 
         db.commit()
-        return {"status": "success", "note_id": note_id}
+
+        # 8. PROACTIVE CONFLICT DETECTION (Requirement: Standout Strategy)
+        user = db.query(Note).filter(Note.id == note_id).first().user
+        if user and extracted_tasks:
+            events = CalendarService.get_user_events(user.id)
+
+            conflicts = CalendarService.detect_conflicts(extracted_tasks, events)
+            
+            for conflict in conflicts:
+                send_push_notification.delay(
+                    user.token or "mock_token",
+                    title="📅 Schedule Conflict Alert!",
+                    body=f"Target: {conflict['task']} conflicts with '{conflict['conflicting_event']}'",
+                    data={"type": "CONFLICT", "conflict": conflict}
+                )
+
+        return {"status": "success", "note_id": note_id, "conflicts_found": len(conflicts) if 'conflicts' in locals() else 0}
+
 
     except Exception as exc:
         db.rollback()
@@ -152,3 +175,166 @@ def send_push_notification(device_token: str, title: str, body: str, data: dict)
         print(f"Data: {data}")
     except Exception as e:
         print(f"Error sending push notification: {str(e)}")
+
+
+@celery_app.task(name="hard_delete_expired_records")
+def hard_delete_expired_records():
+    """
+    30-Day Rule: Hard delete any records where is_deleted=True 
+    and updated_at is older than 30 days.
+    
+    This task runs daily at 3 AM UTC via Celery Beat.
+    """
+    db = SessionLocal()
+    try:
+        # Calculate 30 days ago in milliseconds
+        thirty_days_ms = 30 * 24 * 60 * 60 * 1000
+        cutoff_time = int(time.time() * 1000) - thirty_days_ms
+        
+        # Track deletion counts
+        deleted_counts = {"users": 0, "notes": 0, "tasks": 0}
+        
+        # Step 1: Find soft-deleted tasks older than 30 days
+        expired_tasks = db.query(Task).filter(
+            Task.is_deleted == True,
+            Task.updated_at < cutoff_time
+        ).all()
+        
+        for task in expired_tasks:
+            db.delete(task)
+            deleted_counts["tasks"] += 1
+        
+        # Step 2: Find soft-deleted notes older than 30 days
+        expired_notes = db.query(Note).filter(
+            Note.is_deleted == True,
+            Note.updated_at < cutoff_time
+        ).all()
+        
+        for note in expired_notes:
+            # Delete associated tasks first (cascade may not handle soft-deleted)
+            db.query(Task).filter(Task.note_id == note.id).delete()
+            db.delete(note)
+            deleted_counts["notes"] += 1
+        
+        # Step 3: Find soft-deleted users older than 30 days
+        from app.db.models import User
+        expired_users = db.query(User).filter(
+            User.is_deleted == True,
+            User.deleted_at < cutoff_time
+        ).all()
+        
+        for user in expired_users:
+            # Delete all user's notes and tasks
+            user_notes = db.query(Note).filter(Note.user_id == user.id).all()
+            for note in user_notes:
+                db.query(Task).filter(Task.note_id == note.id).delete()
+                db.delete(note)
+            db.delete(user)
+            deleted_counts["users"] += 1
+        
+        db.commit()
+        
+        total_deleted = sum(deleted_counts.values())
+        if total_deleted > 0:
+            print(f"🗑️  30-Day Cleanup Complete: {deleted_counts}")
+        else:
+            print("✅ 30-Day Cleanup: No expired records found")
+        
+        return {"status": "success", "deleted": deleted_counts}
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error in 30-day cleanup: {str(e)}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="reset_api_key_limits")
+def reset_api_key_limits():
+    """
+    Reset API key rate limits daily.
+    
+    This task runs daily at midnight UTC via Celery Beat.
+    """
+    db = SessionLocal()
+    try:
+        from sqlalchemy import text
+        
+        # Reset rate limits for all active API keys
+        result = db.execute(text("""
+            UPDATE api_keys 
+            SET 
+                rate_limit_remaining = 1000,
+                error_count = CASE WHEN error_count < 10 THEN 0 ELSE error_count END,
+                updated_at = EXTRACT(EPOCH FROM NOW()) * 1000
+            WHERE is_active = TRUE
+            RETURNING id
+        """))
+        
+        reset_count = result.rowcount
+        db.commit()
+        
+        print(f"🔄 API Key Limits Reset: {reset_count} keys updated")
+        return {"status": "success", "keys_reset": reset_count}
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error resetting API key limits: {str(e)}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="rotate_to_backup_key")
+def rotate_to_backup_key(service_name: str, failed_key_id: str, error_reason: str):
+    """
+    Rotate to backup API key when primary fails.
+    
+    Called when an API key hits rate limits or returns errors.
+    Must complete within 1 second as per requirements.
+    """
+    db = SessionLocal()
+    try:
+        from sqlalchemy import text
+        
+        # Mark the failed key
+        db.execute(text("""
+            UPDATE api_keys 
+            SET 
+                error_count = error_count + 1,
+                last_error_at = EXTRACT(EPOCH FROM NOW()) * 1000,
+                is_active = CASE 
+                    WHEN :error_reason LIKE '%rate limit%' THEN is_active
+                    WHEN error_count >= 5 THEN FALSE
+                    ELSE is_active
+                END
+            WHERE id = :key_id
+        """), {"key_id": failed_key_id, "error_reason": error_reason.lower()})
+        
+        # Get the next available key
+        result = db.execute(text("""
+            SELECT id, api_key FROM api_keys
+            WHERE service_name = :service
+              AND is_active = TRUE
+              AND id != :failed_key
+            ORDER BY priority ASC, error_count ASC
+            LIMIT 1
+        """), {"service": service_name, "failed_key": failed_key_id})
+        
+        next_key = result.fetchone()
+        db.commit()
+        
+        if next_key:
+            print(f"🔄 Rotated to backup key for {service_name}")
+            return {"status": "rotated", "new_key_id": str(next_key[0])}
+        else:
+            print(f"⚠️ No backup keys available for {service_name}")
+            return {"status": "no_backup", "service": service_name}
+            
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error rotating API key: {str(e)}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        db.close()

@@ -1,26 +1,63 @@
-annotated-doc==0.0.4
-annotated-types==0.7.0
-anyio==4.12.1
-click==8.3.1
-fastapi==0.128.0
-greenlet==3.3.0
-groq==0.9.0
-h11==0.16.0
-idna==3.11
-iniconfig==2.3.0
-numpy==2.4.1
-packaging==25.0
-pgvector==0.4.2
-pluggy==1.6.0
-psycopg2-binary==2.9.11
-pydantic==2.12.5
-pydantic-settings==2.12.0
-pydantic_core==2.41.5
-Pygments==2.19.2
-pytest==9.0.2
-python-dotenv==1.2.1
-SQLAlchemy==2.0.45
-starlette==0.50.0
-typing-inspection==0.4.2
-typing_extensions==4.15.0
-uvicorn==0.40.0
+# Core Framework
+fastapi
+uvicorn
+starlette
+pydantic
+pydantic-settings
+pydantic_core
+
+# Database
+SQLAlchemy
+psycopg2-binary
+asyncpg
+pgvector
+
+# AI/ML Services
+groq
+deepgram-sdk
+httpx
+sentence-transformers
+
+# Audio Processing
+librosa
+soundfile
+noisereduce
+pydub
+pyannote.audio
+torch
+
+# Image Processing
+Pillow
+cloudinary
+
+# Task Queue
+celery
+redis
+
+# Rate Limiting
+slowapi
+
+# Utilities
+python-dotenv
+python-multipart
+numpy
+annotated-doc
+annotated-types
+anyio
+click
+greenlet
+h11
+idna
+iniconfig
+packaging
+pluggy
+Pygments
+typing-inspection
+typing_extensions
+
+# Testing
+pytest<9
+pytest-asyncio
+locust
+
+

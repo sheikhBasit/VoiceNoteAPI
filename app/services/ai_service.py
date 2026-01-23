@@ -8,8 +8,8 @@ from groq import Groq
 from deepgram import DeepgramClient, PrerecordedOptions, FileSource
 from pyannote.audio import Pipeline
 import torch
-from app.core.config_ai import ai_config
-from app.schemas.note_schema import NoteAIOutput
+from app.core.config import ai_config
+from app.schemas.note import NoteAIOutput
 from app.utils.ai_service_utils import (
     retry_with_backoff,
     with_timeout,
@@ -162,8 +162,11 @@ class AIService:
                     model=ai_config.DEEPGRAM_MODEL,
                     smart_format=True,
                     diarize=True,
-                    punctuate=True
+                    punctuate=True,
+                    language="multi",  # Requirement: Polyglot Logic
+                    detect_language=True
                 )
+
                 response = await self.dg_client.listen.asyncprerecorded.v("1").transcribe_file(
                     payload, options
                 )
@@ -234,7 +237,16 @@ class AIService:
             
             # Build System Prompt dynamically
             instruction_part = f"\nUser specific instruction: {user_instruction}" if user_instruction else ""
-            system_msg = f"{ai_config.BASE_SYSTEM_PROMPT}\nUser Role context: {user_role}{instruction_part}"
+            
+            # Specialized vocabulary modes (Requirement: Standout Strategy)
+            mode_instruction = ""
+            if "CRICKET" in user_role.upper():
+                mode_instruction = "\nSPECIAL MODE: Using Cricket specialized vocabulary (wickets, crease, powerplay, etc.)"
+            elif "QURANIC" in user_role.upper():
+                mode_instruction = "\nSPECIAL MODE: Using Quranic/Religious terminology and context."
+
+            system_msg = f"{ai_config.BASE_SYSTEM_PROMPT}\nUser Role context: {user_role}{mode_instruction}{instruction_part}"
+
             
             # Phase 2: Timeout protection (30s)
             async def _do_llm_call():
@@ -285,3 +297,245 @@ class AIService:
         except Exception as e:
             self.request_tracker.end_request(request_id, success=False, error_msg=str(e))
             raise RuntimeError(f"LLM brain processing failed: {str(e)}")
+
+    async def transcribe_with_failover(self, audio_path: str) -> tuple[str, str]:
+        """
+        Dual-Engine Transcription with automatic failover.
+        
+        Primary: Deepgram Nova-3 (optimized for low-latency, native diarization)
+        Fallback: Groq Whisper-v3-Turbo (triggers on Deepgram 5xx or rate limits)
+        
+        Returns:
+            tuple: (transcript, engine_used)
+        """
+        request_id = str(uuid.uuid4())[:8]
+        
+        # Try Deepgram first (Primary)
+        try:
+            logger.info(f"[{request_id}] Attempting PRIMARY engine: Deepgram Nova-3")
+            transcript = await self.transcribe_with_deepgram(audio_path)
+            logger.info(f"[{request_id}] ✅ Deepgram transcription succeeded")
+            return transcript, "deepgram"
+            
+        except Exception as deepgram_error:
+            error_str = str(deepgram_error).lower()
+            
+            # Check if it's a 5xx error or rate limit (should failover)
+            is_server_error = any(code in error_str for code in ["500", "502", "503", "504", "5xx"])
+            is_rate_limit = any(term in error_str for term in ["rate limit", "429", "too many requests", "quota"])
+            is_timeout = "timeout" in error_str
+            
+            if is_server_error or is_rate_limit or is_timeout:
+                logger.warning(
+                    f"[{request_id}] ⚠️ Deepgram failed (failover triggered): {deepgram_error}"
+                )
+                
+                # Failover to Groq Whisper
+                try:
+                    logger.info(f"[{request_id}] Attempting FAILOVER engine: Groq Whisper")
+                    transcript = await self.transcribe_with_groq(audio_path)
+                    logger.info(f"[{request_id}] ✅ Groq failover transcription succeeded")
+                    return transcript, "groq"
+                    
+                except Exception as groq_error:
+                    logger.error(f"[{request_id}] ❌ Both engines failed. Groq error: {groq_error}")
+                    raise RuntimeError(
+                        f"All transcription engines failed. "
+                        f"Deepgram: {deepgram_error}, Groq: {groq_error}"
+                    )
+            else:
+                # Non-recoverable error (e.g., file not found), don't failover
+                logger.error(f"[{request_id}] ❌ Deepgram failed (non-recoverable): {deepgram_error}")
+                raise
+
+    def generate_embedding(self, text: str) -> list:
+        """
+        Generate 1536-dimensional vector embedding for semantic search.
+        
+        Uses OpenAI's text-embedding-3-small model via Groq-compatible endpoint
+        or falls back to a local sentence-transformers model.
+        
+        Args:
+            text: Text to generate embedding for
+            
+        Returns:
+            List of 1536 floats representing the embedding vector
+        """
+        import numpy as np
+        
+        request_id = str(uuid.uuid4())[:8]
+        
+        try:
+            self.request_tracker.start_request(
+                request_id,
+                "embedding_generation",
+                text_length=len(text)
+            )
+            
+            # Truncate text if too long (embedding models have limits)
+            max_chars = 8000
+            if len(text) > max_chars:
+                text = text[:max_chars]
+                logger.warning(f"[{request_id}] Text truncated to {max_chars} chars for embedding")
+            
+            # Clean the text
+            text = text.strip()
+            if not text:
+                logger.warning(f"[{request_id}] Empty text, returning zero vector")
+                self.request_tracker.end_request(request_id, success=True)
+                return [0.0] * 1536
+            
+            # Try OpenAI-compatible embedding via environment variable
+            openai_api_key = os.getenv("OPENAI_API_KEY")
+            
+            if openai_api_key:
+                try:
+                    import httpx
+                    
+                    response = httpx.post(
+                        "https://api.openai.com/v1/embeddings",
+                        headers={
+                            "Authorization": f"Bearer {openai_api_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": "text-embedding-3-small",
+                            "input": text
+                        },
+                        timeout=30.0
+                    )
+                    
+                    if response.status_code == 200:
+                        embedding = response.json()["data"][0]["embedding"]
+                        self.request_tracker.end_request(request_id, success=True)
+                        logger.info(f"[{request_id}] ✅ OpenAI embedding generated")
+                        return embedding
+                    else:
+                        logger.warning(f"[{request_id}] OpenAI API error: {response.status_code}")
+                        
+                except Exception as openai_error:
+                    logger.warning(f"[{request_id}] OpenAI embedding failed: {openai_error}")
+            
+            # Fallback: Use sentence-transformers locally
+            try:
+                from sentence_transformers import SentenceTransformer
+                
+                # Use a model that produces 1536-dim embeddings, or pad/truncate
+                model = SentenceTransformer('all-MiniLM-L6-v2')  # 384-dim
+                embedding_raw = model.encode(text).tolist()
+                
+                # Pad to 1536 dimensions if needed
+                if len(embedding_raw) < 1536:
+                    embedding = embedding_raw + [0.0] * (1536 - len(embedding_raw))
+                else:
+                    embedding = embedding_raw[:1536]
+                
+                self.request_tracker.end_request(request_id, success=True)
+                logger.info(f"[{request_id}] ✅ Local embedding generated (sentence-transformers)")
+                return embedding
+                
+            except ImportError:
+                logger.warning(f"[{request_id}] sentence-transformers not installed")
+            
+            # Last resort: Generate deterministic pseudo-embedding from text hash
+            logger.warning(f"[{request_id}] Using hash-based pseudo-embedding (not recommended for production)")
+            import hashlib
+            
+            # Create reproducible embedding from text
+            hash_bytes = hashlib.sha512(text.encode()).digest()
+            # Expand to 1536 floats
+            np.random.seed(int.from_bytes(hash_bytes[:4], 'big'))
+            embedding = np.random.randn(1536).tolist()
+            
+            # Normalize
+            norm = np.linalg.norm(embedding)
+            if norm > 0:
+                embedding = (np.array(embedding) / norm).tolist()
+            
+            self.request_tracker.end_request(request_id, success=True)
+            return embedding
+            
+        except Exception as e:
+            self.request_tracker.end_request(request_id, success=False, error_msg=str(e))
+            logger.error(f"[{request_id}] ❌ Embedding generation failed: {e}")
+            # Return zero vector as fallback
+            return [0.0] * 1536
+
+    async def run_full_analysis(self, audio_path: str, user_role: str) -> 'NoteAIOutput':
+        """
+        Complete AI pipeline: Audio → Transcription → LLM Analysis → Structured Output
+        
+        This is the main orchestration method that:
+        1. Transcribes audio using dual-engine failover
+        2. Processes transcript with LLM for insights extraction
+        3. Returns structured NoteAIOutput with title, summary, tasks, etc.
+        
+        Args:
+            audio_path: Path to the preprocessed audio file
+            user_role: User's role for context-aware processing
+            
+        Returns:
+            NoteAIOutput: Structured analysis with title, summary, priority, transcript, tasks
+        """
+        from app.schemas.note import NoteAIOutput
+        
+        request_id = str(uuid.uuid4())[:8]
+        logger.info(f"[{request_id}] 🚀 Starting full analysis pipeline")
+        
+        try:
+            self.request_tracker.start_request(
+                request_id,
+                "full_analysis",
+                audio_path=audio_path,
+                user_role=user_role
+            )
+            
+            # Step 1: Transcribe with failover
+            logger.info(f"[{request_id}] Step 1/2: Transcription")
+            transcript, engine_used = await self.transcribe_with_failover(audio_path)
+            
+            if not transcript or len(transcript.strip()) < 10:
+                logger.warning(f"[{request_id}] Transcript too short or empty")
+                # Return minimal output for empty transcripts
+                self.request_tracker.end_request(request_id, success=True)
+                return NoteAIOutput(
+                    title="Empty Recording",
+                    summary="No speech detected in this recording.",
+                    priority="LOW",
+                    transcript=transcript or "",
+                    tasks=[]
+                )
+            
+            # Step 2: LLM Analysis
+            logger.info(f"[{request_id}] Step 2/2: LLM Analysis (engine: {engine_used})")
+            ai_output = await self.llm_brain(
+                transcript=transcript,
+                user_role=user_role
+            )
+            
+            # Ensure transcript from engine is preserved
+            if not ai_output.transcript:
+                ai_output.transcript = transcript
+            
+            self.request_tracker.end_request(request_id, success=True)
+            logger.info(f"[{request_id}] ✅ Full analysis complete")
+            
+            return ai_output
+            
+        except Exception as e:
+            self.request_tracker.end_request(request_id, success=False, error_msg=str(e))
+            logger.error(f"[{request_id}] ❌ Full analysis failed: {e}")
+            
+            # Graceful degradation: Return raw transcript if LLM fails
+            try:
+                # Try to at least get the transcript
+                transcript, _ = await self.transcribe_with_failover(audio_path)
+                return NoteAIOutput(
+                    title="Transcription Only",
+                    summary="AI analysis failed. Raw transcript provided.",
+                    priority="MEDIUM",
+                    transcript=transcript,
+                    tasks=[]
+                )
+            except:
+                raise RuntimeError(f"Full analysis pipeline failed: {str(e)}")
