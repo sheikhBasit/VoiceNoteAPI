@@ -9,6 +9,7 @@ from app.db import models
 from app.schemas import task as task_schema
 from app.services.cloudinary_service import CloudinaryService
 from app.worker.task import process_task_image_pipeline
+from app.services.deletion_service import DeletionService
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -178,19 +179,13 @@ def approve_action(task_id: str, db: Session = Depends(get_db)):
 
 @router.delete("/{task_id}")
 def delete_task(task_id: str, hard: bool = False, db: Session = Depends(get_db)):
-    """DELETE /{task_id}: Soft delete by default, Hard delete if specified."""
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    if hard:
-        db.delete(task)
-    else:
-        task.is_deleted = True
-        task.deleted_at = int(time.time() * 1000)
-    
-    db.commit()
-    return {"message": "Task deleted successfully", "type": "hard" if hard else "soft"}
+    """DELETE /{task_id}: Professional deletion handling via DeletionService."""
+    # Note: Service handles role/admin check in a real pro backend.
+    # For now, we pass a dummy 'user_id' as deleted_by.
+    result = DeletionService.soft_delete_task(db, task_id, deleted_by="USER")
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 @router.patch("/{task_id}/assign")
 async def assign_task(
@@ -552,19 +547,11 @@ def restore_soft_deleted_task(
     task_id: str,
     db: Session = Depends(get_db)
 ):
-    """PATCH /{task_id}/restore: Restore a soft-deleted task."""
-    task = db.query(models.Task).filter(models.Task.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    if not task.is_deleted:
-        return {"message": "Task is not deleted", "task_id": task_id}
-    
-    task.is_deleted = False
-    task.deleted_at = None
-    db.commit()
-    
-    return {"message": "Task restored successfully", "task_id": task_id}
+    """PATCH /{task_id}/restore: Restore a soft-deleted task via DeletionService."""
+    result = DeletionService.restore_task(db, task_id, restored_by="USER")
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 @router.post("/{task_id}/duplicate", response_model=task_schema.TaskResponse, status_code=status.HTTP_201_CREATED)

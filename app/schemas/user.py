@@ -3,7 +3,6 @@ from app.db.models import UserRole
 from typing import Optional, List, Dict, Any
 import json
 
-
 class UserBase(BaseModel):
     id: str
     name: str
@@ -32,3 +31,11 @@ class UserUpdate(BaseModel):
     system_prompt: Optional[str] = None
     work_start_hour: Optional[int] = None
     work_end_hour: Optional[int] = None
+
+class UserResponse(UserBase):
+    last_login: Optional[int] = None
+    is_deleted: bool = False
+    
+    class Config:
+        from_attributes = True
+        populate_by_name = True

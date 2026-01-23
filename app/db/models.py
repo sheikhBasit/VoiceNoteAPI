@@ -47,8 +47,11 @@ class User(Base):
     device_id = Column(String)
     device_model = Column(String)
     last_login = Column(BigInteger, default=lambda: int(time.time() * 1000))
-    is_deleted = Column(Boolean, default=False)
+    is_deleted = Column(Boolean, default=False, index=True)
     deleted_at = Column(BigInteger, nullable=True)
+    deleted_by = Column(String, nullable=True)
+    deletion_reason = Column(String, nullable=True)
+    can_restore = Column(Boolean, default=True)
     
     # AI Context & Roles
     primary_role = Column(Enum(UserRole), default=UserRole.GENERIC)
@@ -69,15 +72,20 @@ class User(Base):
     work_end_hour = Column(Integer, default=17)
     work_days = Column(JSON, default=lambda: [2,3,4,5,6]) # 1=Mon...7=Sun
 
-    # Relationships
-    notes = relationship("Note", back_populates="user", cascade="all, delete-orphan")
+    # Relationships with CASCADE deletion
+    notes = relationship(
+        "Note", 
+        back_populates="user", 
+        cascade="all, delete-orphan",
+        passive_deletes=True  # Use database-level CASCADE
+    )
 
 
 class Note(Base):
     __tablename__ = "notes"
     
     id = Column(String, primary_key=True)
-    user_id = Column(String, ForeignKey("users.id"), index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     title = Column(String)
     summary = Column(Text)
     
@@ -96,9 +104,12 @@ class Note(Base):
     priority = Column(Enum(Priority), default=Priority.MEDIUM)
     status = Column(Enum(NoteStatus), default=NoteStatus.PENDING)
     
-    # Flags
-    is_deleted = Column(Boolean, default=False)
+    # Deletion Metadata (Enhanced)
+    is_deleted = Column(Boolean, default=False, index=True)
     deleted_at = Column(BigInteger, nullable=True)
+    deleted_by = Column(String, nullable=True)  # User ID who performed deletion
+    deletion_reason = Column(Text, nullable=True)  # Reason for deletion
+    can_restore = Column(Boolean, default=True)  # Whether item can be restored
     is_pinned = Column(Boolean, default=False)
     is_liked = Column(Boolean, default=False)
     is_archived = Column(Boolean, default=False)
@@ -109,24 +120,32 @@ class Note(Base):
     links = Column(JSON, default=list)
     embedding = Column(Vector(1536)) # Dimension for Llama/OpenAI Embeddings
     
-    # Relationships
+    # Relationships with CASCADE deletion
     user = relationship("User", back_populates="notes")
-    tasks = relationship("Task", back_populates="note", cascade="all, delete-orphan")
+    tasks = relationship(
+        "Task", 
+        back_populates="note", 
+        cascade="all, delete-orphan",
+        passive_deletes=True  # Use database-level CASCADE
+    )
 
 
 class Task(Base):
     __tablename__ = "tasks"
     
     id = Column(String, primary_key=True)
-    note_id = Column(String, ForeignKey("notes.id"), index=True)
+    note_id = Column(String, ForeignKey("notes.id", ondelete="CASCADE"), index=True)
     description = Column(Text)
     is_done = Column(Boolean, default=False)
     deadline = Column(BigInteger, nullable=True)
     priority = Column(Enum(Priority), default=Priority.MEDIUM)
     
-    # Deletion Metadata
-    is_deleted = Column(Boolean, default=False)
+    # Deletion Metadata (Enhanced)
+    is_deleted = Column(Boolean, default=False, index=True)
     deleted_at = Column(BigInteger, nullable=True)
+    deleted_by = Column(String, nullable=True)  # User ID who performed deletion
+    deletion_reason = Column(Text, nullable=True)  # Reason for deletion
+    can_restore = Column(Boolean, default=True)  # Whether item can be restored
     created_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
     updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
     

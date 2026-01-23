@@ -4,17 +4,19 @@ from sqlalchemy import func
 from typing import List
 from app.db.session import get_db
 from app.db import models
-from app.schemas import note_schema
+from app.schemas import note as note_schema
 from app.services.ai_service import AIService # Service we built earlier
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from fastapi import Request
+
 router = APIRouter(prefix="/api/v1/ai", tags=["AI & Insights"])
 ai_service = AIService()
 
 limiter = Limiter(key_func=get_remote_address, storage_uri="redis://redis:6379/0")
 @router.post("/search", response_model=List[note_schema.NoteResponse])
 @limiter.limit("5/hour")
-async def semantic_search(query: str, user_id: str, db: Session = Depends(get_db)):
+async def semantic_search(request: Request, query: str, user_id: str, db: Session = Depends(get_db)):
     query_vector = ai_service.generate_embedding(query)
     
     # Strictly filter by user_id and is_deleted before calculating distance

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, Query
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.db.session import get_db
@@ -16,6 +16,7 @@ from app.services.ai_service import AIService
 from app.services.search_service import SearchService
 from app.services.analytics_service import AnalyticsService
 from app.utils.security import verify_device_signature
+from app.services.deletion_service import DeletionService
 
 ai_service = AIService()
 search_service = SearchService(ai_service)
@@ -27,6 +28,7 @@ router = APIRouter(prefix="/api/v1/notes", tags=["Notes"])
 @router.post("/process", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("3/minute")
 async def process_note(
+    request: Request,
     file: UploadFile = File(...),
     user_id: str = Form(...),
     instruction: Optional[str] = Form(None),
@@ -80,6 +82,7 @@ async def process_note(
 @router.get("", response_model=List[note_schema.NoteResponse])
 @limiter.limit("60/minute")
 def list_notes(
+    request: Request,
     user_id: str, 
     skip: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(10, ge=1, le=500, description="Max 500 items per page"),
@@ -150,23 +153,10 @@ def delete_note(
     hard: bool = False, 
     db: Session = Depends(get_db)
 ):
-    """DELETE /{note_id}: Soft or Hard delete a note and all its associated tasks.
-    
-    PROTECTION: Cannot delete a Note that has "In-Progress" HIGH Priority Tasks.
-    This returns a 400 Bad Request per the redundancy check requirement.
-    
-    Args:
-        note_id: Note to delete
-        user_id: Current user (for ownership validation)
-        hard: If False, soft delete. If True, hard delete.
     """
-    db_note = db.query(models.Note).filter(
-        models.Note.id == note_id,
-        models.Note.user_id == user_id
-    ).first()
-    if not db_note:
-        raise HTTPException(status_code=403, detail="Access denied or note not found")
-    
+    DELETE /{note_id}: Professional deletion handling via DeletionService.
+    Includes redundancy check: Block deletion if note has in-progress HIGH priority tasks.
+    """
     # REDUNDANCY CHECK: Block deletion if note has in-progress HIGH priority tasks
     high_priority_active_tasks = db.query(models.Task).filter(
         models.Task.note_id == note_id,
@@ -178,35 +168,19 @@ def delete_note(
     if high_priority_active_tasks:
         raise HTTPException(
             status_code=400, 
-            detail="Cannot delete note: It contains in-progress HIGH priority tasks. "
-                   "Please complete or delete these tasks first."
+            detail="Cannot delete note: It contains in-progress HIGH priority tasks."
         )
     
-    # Cascade to Tasks
-    tasks = db.query(models.Task).filter(models.Task.note_id == note_id).all()
-    
-    if hard:
-        # Hard Delete Note & Tasks
-        for task in tasks:
-            db.delete(task)
-        db.delete(db_note)
-        msg = "Note and all related tasks permanently deleted."
-    else:
-        # Soft Delete Note & Tasks
-        now = int(time.time() * 1000)
-        db_note.is_deleted = True
-        db_note.deleted_at = now
-        for task in tasks:
-            task.is_deleted = True
-            task.deleted_at = now
-        msg = "Note and tasks archived (Soft Delete)."
-    
-    db.commit()
-    return note_schema.NoteResponse.model_validate(db_note)
+    result = DeletionService.soft_delete_note(db, note_id, deleted_by=user_id)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+        
+    return result
 
 @router.post("/{note_id}/ask")
 @limiter.limit("5/minute")
 async def ask_ai(
+    request: Request,
     note_id: str, 
     question: str, 
     user_id: str, 
@@ -255,31 +229,16 @@ async def ask_ai(
 
 @router.patch("/{note_id}/restore")
 def restore_note(note_id: str, user_id: str, db: Session = Depends(get_db)):
-    """PATCH /{note_id}/restore: Restore a soft-deleted note and all its associated tasks."""
-    db_note = db.query(models.Note).filter(
-        models.Note.id == note_id,
-        models.Note.user_id == user_id
-    ).first()
-    if not db_note:
-        raise HTTPException(status_code=403, detail="Access denied or note not found")
-    
-    # 1. Restore the Note
-    db_note.is_deleted = False
-    db_note.deleted_at = None
-    db_note.updated_at = int(time.time() * 1000)
-    
-    # 2. Restore all Tasks associated with this note
-    db.query(models.Task).filter(models.Task.note_id == note_id).update({
-        "is_deleted": False, 
-        "deleted_at": None
-    })
-    
-    db.commit()
-    return note_schema.NoteResponse.model_validate(db_note)
+    """PATCH /{note_id}/restore: Restore a soft-deleted note and all its associated tasks via DeletionService."""
+    result = DeletionService.restore_note(db, note_id, restored_by=user_id)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 @router.post("/search")
 @limiter.limit("10/minute")
 async def search_notes_hybrid(
+    request: Request,
     query: note_schema.SearchQuery,
     db: Session = Depends(get_db)
 ):

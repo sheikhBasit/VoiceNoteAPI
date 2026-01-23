@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db import models
-from app.schemas import user_schema
+from app.schemas import user as user_schema
 from app.utils.admin_utils import AdminManager, verify_admin, verify_permission
 from app.utils.ai_service_utils import AIServiceError
 from typing import List, Optional
