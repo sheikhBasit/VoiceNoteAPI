@@ -8,10 +8,8 @@ Handles various formats and preserves speaker continuity.
 import os
 import math
 from pydub import AudioSegment
+from app.utils.json_logger import JLogger
 from pydub.silence import detect_nonsilent
-import logging
-
-logger = logging.getLogger(__name__)
 
 class AudioChunker:
     """Handles intelligent audio chunking for large files."""
@@ -35,11 +33,14 @@ class AudioChunker:
             bool: True if file should be chunked
         """
         try:
+            JLogger.debug("Checking if audio should be chunked", file_path=file_path, max_duration_minutes=max_duration_minutes)
             audio = AudioSegment.from_file(file_path)
             duration_minutes = len(audio) / 1000 / 60
-            return duration_minutes > max_duration_minutes
+            should_chunk = duration_minutes > max_duration_minutes
+            JLogger.info("Audio chunk decision", file_path=file_path, duration_minutes=duration_minutes, should_chunk=should_chunk)
+            return should_chunk
         except Exception as e:
-            logger.error(f"Error checking audio duration: {e}")
+            JLogger.error("Error checking audio duration", file_path=file_path, error=str(e))
             return False
     
     @staticmethod
@@ -50,24 +51,37 @@ class AudioChunker:
         Returns:
             tuple: (is_valid, error_message)
         """
+        JLogger.debug("Validating audio file", file_path=file_path)
+        
+        if file_path is None or file_path == "":
+            JLogger.warning("Invalid file path provided", file_path=file_path)
+            return False, "File path cannot be None or empty"
+        
         if not os.path.exists(file_path):
+            JLogger.warning("File does not exist", file_path=file_path)
             return False, "File does not exist"
+
         
         # Check file size (max 100MB)
         file_size = os.path.getsize(file_path)
         if file_size > 100 * 1024 * 1024:
+            JLogger.warning("File too large", file_path=file_path, size_mb=file_size / 1024 / 1024)
             return False, f"File too large: {file_size / 1024 / 1024:.2f}MB (max 100MB)"
         
         if file_size == 0:
+            JLogger.warning("Empty file detected", file_path=file_path)
             return False, "File is empty"
         
         # Try to load audio
         try:
             audio = AudioSegment.from_file(file_path)
             if len(audio) == 0:
+                JLogger.warning("Audio has zero duration", file_path=file_path)
                 return False, "Audio has zero duration"
+            JLogger.info("Audio file validated successfully", file_path=file_path, duration_ms=len(audio), size_bytes=file_size)
             return True, ""
         except Exception as e:
+            JLogger.error("Invalid audio file", file_path=file_path, error=str(e))
             return False, f"Invalid audio file: {str(e)}"
     
     @staticmethod
@@ -88,10 +102,11 @@ class AudioChunker:
             raise ValueError(error)
         
         # Load audio
+        JLogger.info("Starting audio chunking", file_path=file_path, output_dir=output_dir)
         audio = AudioSegment.from_file(file_path)
         total_duration = len(audio)
         
-        logger.info(f"Chunking audio: {total_duration/1000:.2f}s total duration")
+        JLogger.info("Audio loaded for chunking", file_path=file_path, total_duration_s=total_duration/1000)
         
         # Calculate optimal chunk count
         num_chunks = math.ceil(total_duration / AudioChunker.MAX_CHUNK_DURATION_MS)

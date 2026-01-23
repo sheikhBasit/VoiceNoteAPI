@@ -10,11 +10,9 @@ import numpy as np
 import soundfile as sf
 import noisereduce as nr
 from typing import Dict, Any, Tuple
-import logging
 from groq import Groq
+from app.utils.json_logger import JLogger
 import os
-
-logger = logging.getLogger(__name__)
 
 class AudioQualityAnalyzer:
     """Analyzes audio quality and provides LLM-based recommendations."""
@@ -23,9 +21,10 @@ class AudioQualityAnalyzer:
         self.groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY")
         if self.groq_api_key:
             self.groq_client = Groq(api_key=self.groq_api_key)
+            JLogger.info("AudioQualityAnalyzer initialized with Groq API")
         else:
             self.groq_client = None
-            logger.warning("No Groq API key provided. LLM feedback will be disabled.")
+            JLogger.warning("No Groq API key provided. LLM feedback will be disabled.")
     
     def analyze_audio_quality(self, audio_path: str) -> Dict[str, Any]:
         """
@@ -35,8 +34,10 @@ class AudioQualityAnalyzer:
             dict: Audio quality metrics
         """
         try:
+            JLogger.info("Starting audio quality analysis", audio_path=audio_path)
             # Load audio
             y, sr = librosa.load(audio_path, sr=None)
+            JLogger.debug("Audio loaded", audio_path=audio_path, sample_rate=sr, samples=len(y))
             
             metrics = {}
             
@@ -106,10 +107,17 @@ class AudioQualityAnalyzer:
             metrics['quality_score'] = self._calculate_quality_score(metrics)
             metrics['quality_category'] = self._categorize_quality(metrics['quality_score'])
             
+            JLogger.info("Audio quality analysis complete", 
+                        audio_path=audio_path, 
+                        quality_score=metrics['quality_score'],
+                        quality_category=metrics['quality_category'],
+                        snr_db=metrics.get('snr_db'),
+                        clipping_pct=metrics.get('clipping_percentage'))
+            
             return metrics
             
         except Exception as e:
-            logger.error(f"Error analyzing audio quality: {e}")
+            JLogger.error("Error analyzing audio quality", audio_path=audio_path, error=str(e))
             return {"error": str(e)}
     
     def _calculate_quality_score(self, metrics: Dict[str, Any]) -> float:
