@@ -10,7 +10,22 @@ from app.db.models import Note, Task, NoteStatus, Priority
 import os
 from datetime import datetime, timedelta
 import time
+import redis
 from app.utils.json_logger import JLogger
+
+# Redis sync client for workers
+redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
+
+def broadcast_ws_update(user_id: str, event_type: str, data: any):
+    """Publish a real-time update to the WebSocket manager via Redis."""
+    payload = {
+        "user_id": user_id,
+        "type": event_type,
+        "data": data,
+        "timestamp": int(time.time() * 1000)
+    }
+    redis_client.publish("ws_updates", json.dumps(payload))
+
 @celery_app.task(name="ping_task")
 def ping_task(message: str):
     """Simple task for testing Celery connectivity."""
@@ -26,6 +41,11 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         JLogger.info("Worker: Starting note processing pipeline", note_id=note_id, user_role=user_role)
         db.query(Note).filter(Note.id == note_id).update({"status": NoteStatus.PROCESSING})
         db.commit()
+        
+        # Notify UI immediately
+        note_owner_id = db.query(Note.user_id).filter(Note.id == note_id).scalar()
+        if note_owner_id:
+            broadcast_ws_update(note_owner_id, "NOTE_STATUS", {"note_id": note_id, "status": "PROCESSING"})
 
         # 2. Preprocess (Offloading from Android for battery/speed)
         processed_path = preprocess_audio_pipeline(local_file_path)
@@ -418,6 +438,10 @@ def process_ai_query_task(note_id: str, question: str, user_id: str):
         history.append(new_resp)
         note.ai_responses = history
         db.commit()
+        
+        # Notify UI of AI Response
+        if note.user_id:
+            broadcast_ws_update(note.user_id, "AI_RESPONSE", new_resp)
         
         return {"status": "success", "response": new_resp}
     except Exception as e:

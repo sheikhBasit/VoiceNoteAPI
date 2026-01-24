@@ -139,7 +139,7 @@ class SearchService:
             logger.error(f"RAG Synthesis failed: {e}")
             return {
                 "query": query,
-                "answer": "I found some relevant information but failed to synthesize a complete answer. Please see the raw results below.",
+                "answer": "Synthesis incomplete: We retrieved relevant information but encountered an issue while generating a comprehensive summary. Please review the specific results below.",
                 "source": "error",
                 "results": local_results + web_results
             }

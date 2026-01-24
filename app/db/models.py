@@ -36,7 +36,10 @@ class UserRole(enum.Enum):
     PSYCHOLOGIST = "PSYCHOLOGIST"
     GENERIC = "GENERIC"
 
-# --- Models ---
+class SubscriptionTier(enum.Enum):
+    FREE = "FREE"
+    STANDARD = "STANDARD"
+    PREMIUM = "PREMIUM"
 
 class User(Base):
     __tablename__ = "users"
@@ -47,6 +50,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     device_id = Column(String)
     device_model = Column(String)
+    tier = Column(Enum(SubscriptionTier), default=SubscriptionTier.FREE)
     password_hash = Column(String, nullable=True) # For Admin Web Login
     last_login = Column(BigInteger, default=lambda: int(time.time() * 1000))
     is_deleted = Column(Boolean, default=False, index=True)

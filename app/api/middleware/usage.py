@@ -31,35 +31,41 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
              # In headers or query param?
              user_id = request.headers.get("X-User-ID", "anonymous")
 
-        # 2. COST ESTIMATION & KILL-SWITCH
-        # Define basic costs for endpoints (Simple heuristic)
+        # 2. COST ESTIMATION & LIMIT ENFORCEMENT
+        from app.db.models import User, SubscriptionTier
+        
         cost_map = {
-            "/api/v1/notes": 1,        # Retrieval
-            "/api/v1/transcribe": 10,  # Heavy
-            "/api/v1/ai/analyze": 5,   # LLM
-            "/api/v1/meetings/join": 20 # Bot Dispatch
+            "/api/v1/notes": 1,
+            "/api/v1/transcribe": 10,
+            "/api/v1/ai/analyze": 5,
+            "/api/v1/meetings/join": 20
         }
         
-        # Check if endpoint has a cost
         estimated_cost = 0
         for path, cost in cost_map.items():
             if path in request.url.path:
                 estimated_cost = cost
                 break
         
-        # Enforce Payment if user is known and cost > 0
         if user_id != "anonymous" and estimated_cost > 0:
             db = SessionLocal()
             try:
-                billing = BillingService(db)
-                has_funds = billing.check_balance(user_id, estimated_cost)
-                if not has_funds:
-                    return JSONResponse(
-                        status_code=402, 
-                        content={"detail": "Payment Required: Insufficient credits"}
-                    )
+                user = db.query(User).filter(User.id == user_id).first()
+                if user.tier == SubscriptionTier.PREMIUM:
+                    # Premium users get unlimited basic notes access
+                    if "/api/v1/notes" in request.url.path:
+                        estimated_cost = 0 
+                
+                if estimated_cost > 0:
+                    billing = BillingService(db)
+                    has_funds = billing.check_balance(user_id, estimated_cost)
+                    if not has_funds:
+                        return JSONResponse(
+                            status_code=402, 
+                            content={"detail": "Payment Required: Your credit balance is depleted. Please upgrade to Premium for unlimited access."}
+                        )
             except Exception as e:
-                logger.error(f"Billing check failed: {e}")
+                logger.error(f"Usage enforcement failed: {e}")
             finally:
                 db.close()
         

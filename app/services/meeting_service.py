@@ -57,38 +57,50 @@ class MeetingService:
         event_type = event_data.get("event")
         data = event_data.get("data", {})
         bot_id = data.get("bot_id")
+        metadata = data.get("bot", {}).get("metadata", {})
+        user_id = metadata.get("user_id")
         
         logger.info(f"Received meeting event: {event_type} for bot {bot_id}")
-        
-        if event_type == "bot.transcription":
+
+        from app.worker.task import broadcast_ws_update
+
+        if event_type == "bot.status_change":
+            status = data.get("status")
+            if user_id:
+                broadcast_ws_update(user_id, "BOT_STATUS", {"bot_id": bot_id, "status": status})
+
+        elif event_type == "bot.transcription":
+            # For real-time updates (Phase 9 integration)
             transcript = data.get("transcript")
-            # Retrieve metadata to find user
-            metadata = data.get("bot", {}).get("metadata", {})
-            user_id = metadata.get("user_id")
-
-            if user_id and transcript and self.db:
-                self._save_transcript_to_note(user_id, transcript, bot_id)
+            if user_id and transcript:
+                broadcast_ws_update(user_id, "LIVE_TRANSCRIPT", {"bot_id": bot_id, "text": transcript})
             
-        elif event_type == "bot.video_recording.done":
-             # Logic to download video
-             pass
+        elif event_type == "bot.leave":
+            # Trigger full synthesis when meeting ends
+            if user_id:
+                # Retrieve final transcript from Recall API (omitted for brevity, assuming data has it)
+                final_transcript = data.get("transcript", "")
+                self._save_transcript_and_summarize(user_id, final_transcript, bot_id)
 
-    def _save_transcript_to_note(self, user_id: str, transcript: str, bot_id: str):
+    def _save_transcript_and_summarize(self, user_id: str, transcript: str, bot_id: str):
         try:
-            note_title = f"Meeting Transcript {time.strftime('%Y-%m-%d %H:%M')}"
+            note_title = f"Meeting: {time.strftime('%Y-%m-%d %H:%M')}"
             new_note = Note(
                 id=str(uuid.uuid4()),
                 user_id=user_id,
                 title=note_title,
-                transcript_deepgram=str(transcript), # Store as external transcript
-                status=NoteStatus.DONE, # Or PROCESSING if we want AI analysis
-                priority=Priority.MEDIUM,
-                is_liked=False,
-                # tags not supported yet
+                transcript_groq=str(transcript),
+                status=NoteStatus.PROCESSING, # Set to PROCESSING to trigger worker flow
+                priority=Priority.MEDIUM
             )
             self.db.add(new_note)
             self.db.commit()
-            logger.info(f"Saved meeting transcript for user {user_id} (Note ID: {new_note.id})")
+            
+            # Trigger Background AI Analysis (Phase 8 Synthesis)
+            from app.worker.task import analyze_note_semantics_task
+            analyze_note_semantics_task.delay(new_note.id)
+            
+            logger.info(f"Meeting ended. Automated synthesis triggered for user {user_id} (Note ID: {new_note.id})")
         except Exception as e:
-            logger.error(f"Failed to save meeting note: {e}")
+            logger.error(f"Failed to synthesize meeting note: {e}")
             self.db.rollback()

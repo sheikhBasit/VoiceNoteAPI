@@ -65,10 +65,18 @@ def create_task(
         created_at=int(time.time() * 1000),
         updated_at=int(time.time() * 1000)
     )
-    db.add(new_task)
-    db.commit()
-    db.refresh(new_task)
-    JLogger.info("Task created manually", task_id=new_task.id, user_id=current_user.id, note_id=task_data.note_id)
+    try:
+        db.add(new_task)
+        db.commit()
+        db.refresh(new_task)
+        JLogger.info("Task created manually", task_id=new_task.id, user_id=current_user.id, note_id=task_data.note_id)
+    except Exception as e:
+        db.rollback()
+        JLogger.error("Failed to persist manual task", user_id=current_user.id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Task creation failed"
+        )
     return new_task
 
 @router.get("", response_model=List[task_schema.TaskResponse])
@@ -321,23 +329,31 @@ def update_task(
             task.is_deleted = False
             task.deleted_at = None
 
-    for key, value in update_data.items():
-        if key == "is_deleted": continue # Handled above
+    try:
+        for key, value in update_data.items():
+            if key == "is_deleted": continue # Handled above
+            
+            if key == "assigned_entities" and value is not None:
+                task.assigned_entities = [e.dict(exclude_unset=True) for e in value]
+            elif key == "external_links" and value is not None:
+                task.external_links = [e.dict(exclude_unset=True) for e in value]
+            elif key == "image_urls" and value is not None:
+                task.image_urls = list(value)
+            elif key == "document_urls" and value is not None:
+                task.document_urls = list(value)
+            else:
+                setattr(task, key, value)
         
-        if key == "assigned_entities" and value is not None:
-            task.assigned_entities = [e.dict(exclude_unset=True) for e in value]
-        elif key == "external_links" and value is not None:
-            task.external_links = [e.dict(exclude_unset=True) for e in value]
-        elif key == "image_urls" and value is not None:
-            task.image_urls = list(value)
-        elif key == "document_urls" and value is not None:
-            task.document_urls = list(value)
-        else:
-            setattr(task, key, value)
-    
-    task.updated_at = int(time.time() * 1000)
-    db.commit()
-    db.refresh(task)
+        task.updated_at = int(time.time() * 1000)
+        db.commit()
+        db.refresh(task)
+    except Exception as e:
+        db.rollback()
+        JLogger.error("Task patch failed in database", task_id=task_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Task update could not be persisted"
+        )
     return task
 
 

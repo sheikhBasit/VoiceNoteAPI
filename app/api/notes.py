@@ -56,8 +56,8 @@ async def process_note(
                         extension=file_ext, 
                         user_id=current_user.id)
         raise HTTPException(
-            status_code=400, 
-            detail=f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=f"The uploaded file format is not supported. Please provide an audio file in one of the following formats: {', '.join(ALLOWED_EXTENSIONS)}."
         )
     
     # ✅ VALIDATION: File size check (50MB limit) via stream
@@ -84,8 +84,8 @@ async def process_note(
                                 user_id=current_user.id, 
                                 size_bytes=total_size)
                 raise HTTPException(
-                    status_code=413,
-                    detail=f"File too large. Maximum size: 50MB."
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"The uploaded file exceeds the maximum allowed size of 50MB. Please optimize the file and try again."
                 )
             buffer.write(chunk)
 
@@ -119,14 +119,22 @@ def create_note(
         timestamp=int(time.time() * 1000),
         updated_at=int(time.time() * 1000)
     )
-    db.add(db_note)
-    db.commit()
-    db.refresh(db_note)
+    try:
+        db.add(db_note)
+        db.commit()
+        db.refresh(db_note)
 
-    # NEW: Trigger background tasks immediately
-    generate_note_embeddings_task.delay(note_id)
-    if db_note.transcript_groq:
-        analyze_note_semantics_task.delay(note_id)
+        # Trigger background tasks
+        generate_note_embeddings_task.delay(note_id)
+        if db_note.transcript_groq:
+            analyze_note_semantics_task.delay(note_id)
+    except Exception as e:
+        db.rollback()
+        JLogger.error("Failed to create note in database", user_id=current_user.id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Failed to save note"
+        )
 
     return db_note
 
@@ -178,7 +186,13 @@ async def update_note(
     """
     db_note = verify_note_ownership(db, current_user.id, note_id)
     
+    # Block updates on deleted notes (unless it's a restore operation handled below)
     data = update_data.model_dump(exclude_unset=True)
+    if db_note.is_deleted and "is_deleted" not in data:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operation restricted: This note is currently in the trash. Please restore it before making any further updates."
+        )
 
     # Handle soft deletion/restore
     if "is_deleted" in data:
@@ -191,7 +205,10 @@ async def update_note(
                 models.Task.is_deleted == False
             ).first()
             if high_priority_active_tasks:
-                raise HTTPException(status_code=400, detail="Cannot delete note: It contains in-progress HIGH priority tasks.")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, 
+                    detail="Action restricted: This note cannot be deleted while it contains incomplete high-priority tasks. Please complete or re-prioritize these tasks first."
+                )
             
             DeletionService.soft_delete_note(db, note_id, deleted_by=current_user.id)
             db.refresh(db_note)
@@ -212,20 +229,28 @@ async def update_note(
         
         if high_priority_tasks:
             raise HTTPException(
-                status_code=400, 
-                detail="Cannot archive note: It contains unfinished HIGH priority tasks."
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Action restricted: This note cannot be archived while it contains incomplete high-priority tasks. Please complete or re-prioritize these tasks first."
             )
 
-    for key, value in data.items():
-        if key == "is_deleted": continue
-        setattr(db_note, key, value)
-    
-    # NEW: Trigger background embedding update if content changed
-    if any(k in data for k in ["title", "summary"]):
-        generate_note_embeddings_task.delay(note_id)
+    try:
+        for key, value in data.items():
+            if key == "is_deleted": continue
+            setattr(db_note, key, value)
+        
+        # Trigger background embedding update if content changed
+        if any(k in data for k in ["title", "summary"]):
+            generate_note_embeddings_task.delay(note_id)
 
-    db_note.updated_at = int(time.time() * 1000)
-    db.commit()
+        db_note.updated_at = int(time.time() * 1000)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        JLogger.error("Failed to update note", note_id=note_id, user_id=current_user.id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Note update failed"
+        )
     return db_note
 
 

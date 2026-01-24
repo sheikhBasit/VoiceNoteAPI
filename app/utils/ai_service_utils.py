@@ -75,7 +75,7 @@ def retry_with_backoff(
                         logger.error(f"All {max_attempts} attempts exhausted")
             
             raise RetryExhaustedError(
-                f"Failed after {max_attempts} attempts: {str(last_exception)}"
+                f"All {max_attempts} attempts exhausted. Last failure: {str(last_exception)}"
             )
         
         return wrapper
