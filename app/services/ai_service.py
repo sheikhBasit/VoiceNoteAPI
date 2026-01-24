@@ -112,36 +112,57 @@ class AIService:
                 "deepgram_model": ai_config.DEEPGRAM_MODEL
             }
 
+    def generate_embedding_sync(self, text: str) -> List[float]:
+        """Synchronous version for Celery worker."""
+        if not text or not text.strip():
+            return [0.0] * 384
+        model = self._get_local_embedding_model()
+        if model:
+            try:
+                embedding = model.encode(text)
+                return embedding.tolist()
+            except Exception as e:
+                logger.warning(f"Local embedding failed: {e}")
+        return [0.0] * 384
+
     async def generate_embedding(self, text: str) -> List[float]:
         """
         Generates 384-dimensional vector embeddings for semantic search.
         Using local SentenceTransformer (Free).
         """
-        if not text or not text.strip():
-            return [0.0] * 384
+        return self.generate_embedding_sync(text)
 
-        model = self._get_local_embedding_model()
-        if model:
-            try:
-                # Synchronous call in an async wrapper
-                embedding = model.encode(text)
-                return embedding.tolist()
-            except Exception as e:
-                logger.warning(f"Local embedding failed: {e}")
+    def transcribe_with_failover_sync(self, audio_path: str) -> Tuple[str, str]:
+        """Synchronous version of transcription with failover."""
+        if not os.path.exists(audio_path):
+            raise AIServiceError(f"Audio file not found: {audio_path}")
 
-        # Tier 2: Hash-based deterministic pseudo-embedding (Ultimate fallback)
-        logger.warning("Using hash-based fallback for embedding")
-        hash_obj = hashlib.sha256(text.encode())
-        hash_hex = hash_obj.hexdigest()
-        result = []
-        for i in range(0, len(hash_hex), 2):
-            val = int(hash_hex[i:i+2], 16) / 255.0
-            result.append(val)
-        
-        # Tile to reach 384
-        while len(result) < 384:
-            result.extend(result)
-        return result[:384]
+        request_id = str(uuid.uuid4())
+        settings = self._get_dynamic_settings()
+        preferred_engine = settings["stt_engine"]
+
+        # Try Preferred engine (Force Groq for sync if Deepgram is strictly async in this sdk version)
+        # Actually, let's just use Groq for failover/sync as it's guaranteed sync here
+        try:
+            self.request_tracker.start_request(request_id, "groq")
+            with open(audio_path, "rb") as file:
+                transcription = self.groq_client.audio.transcriptions.create(
+                    file=(os.path.basename(audio_path), file.read()),
+                    model=settings["groq_whisper_model"],
+                    response_format="text",
+                )
+            self.request_tracker.complete_request(request_id, "groq")
+            return transcription, "groq"
+        except Exception as e:
+            self.request_tracker.fail_request(request_id, "groq", str(e))
+            logger.error(f"Sync transcription failed: {e}")
+            raise AIServiceError(f"Transcription failed: {str(e)}")
+
+    def run_full_analysis_sync(self, audio_path: str, user_role: str = "ASSISTANT") -> NoteAIOutput:
+        """Synchronous orchestration of full audio to analysis pipeline."""
+        transcript, engine = self.transcribe_with_failover_sync(audio_path)
+        ai_output = self.llm_brain_sync(transcript, user_role)
+        return ai_output
 
     async def transcribe_with_failover(self, audio_path: str) -> Tuple[str, str]:
         """
@@ -221,11 +242,8 @@ class AIService:
 
         raise AIServiceError("All transcription engines failed or are not configured.")
 
-    @retry_with_backoff(max_attempts=3)
-    async def llm_brain(self, transcript: str, user_role: str = "ASSISTANT", user_instruction: str = "") -> NoteAIOutput:
-        """
-        Structured extraction using Llama 3.1 on Groq with robust validation.
-        """
+    def llm_brain_sync(self, transcript: str, user_role: str = "ASSISTANT", user_instruction: str = "") -> NoteAIOutput:
+        """Synchronous structured extraction for Celery worker."""
         # Validation
         transcript = validate_transcript(transcript)
         
@@ -243,7 +261,6 @@ class AIService:
             system_prompt = f"{system_prompt}\n\nYou are acting as a {user_role}."
         
         user_content = f"Instruction: {user_instruction or 'Analyze the transcript.'}\n\nTranscript:\n{transcript}"
-
         settings = self._get_dynamic_settings()
         
         try:
@@ -271,9 +288,9 @@ class AIService:
             tasks = []
             for t in data.get("tasks", []):
                 tasks.append({
-                    "title": t.get("title", "Task")[:200],
+                    "description": t.get("description") or t.get("title", "Task")[:200],
                     "priority": t.get("priority", "MEDIUM").upper(),
-                    "due_date": t.get("due_date")
+                    "deadline": t.get("deadline") or t.get("due_date")
                 })
 
             return NoteAIOutput(
@@ -285,7 +302,12 @@ class AIService:
             )
         except Exception as e:
             logger.error(f"LLM brain failed for {user_role}: {e}")
-            raise # Let retry decorator handle it or fail final attempt
+            raise 
+
+    @retry_with_backoff(max_attempts=3)
+    async def llm_brain(self, transcript: str, user_role: str = "ASSISTANT", user_instruction: str = "") -> NoteAIOutput:
+        """Structured extraction using Llama 3.1 on Groq with robust validation."""
+        return self.llm_brain_sync(transcript, user_role, user_instruction)
 
     async def run_full_analysis(self, audio_path: str) -> NoteAIOutput:
         """
@@ -328,12 +350,9 @@ class AIService:
             logger.error(f"Conflict detection failed: {e}")
             return []
 
-    async def semantic_analysis(self, transcript: str, user_role: str = "GENERIC") -> dict:
-        """
-        Deep semantic analysis: emotional tone, patterns, logical consistency.
-        """
+    def semantic_analysis_sync(self, transcript: str, user_role: str = "GENERIC") -> dict:
+        """Synchronous version for Celery worker."""
         settings = self._get_dynamic_settings()
-        
         system_prompt = f"""
         Role: SEMANTIC_ANALYST (Expert in psychology, linguistics, and logical reasoning)
         Background: You are analyzing a voice note from a {user_role}.
@@ -356,10 +375,20 @@ class AIService:
                 ],
                 model=settings["llm_model"],
                 response_format={"type": "json_object"},
-                temperature=0.5 # Slightly higher for more creative analysis
+                temperature=0.5
             )
             data = validate_json_response(response.choices[0].message.content)
-            return data
+            # Match schema expected by background task
+            return type('Analysis', (), {
+                'sentiment': data.get('sentiment'),
+                'tone': data.get('emotional_tone'),
+                'hidden_patterns': data.get('logical_patterns'),
+                'suggested_questions': data.get('suggested_questions')
+            })
         except Exception as e:
             logger.error(f"Semantic analysis failed: {e}")
-            raise AIServiceError(f"Failed to perform semantic analysis: {str(e)}")
+            raise 
+
+    async def semantic_analysis(self, transcript: str, user_role: str = "GENERIC") -> dict:
+        """Deep semantic analysis: emotional tone, patterns, logical consistency."""
+        return self.semantic_analysis_sync(transcript, user_role)

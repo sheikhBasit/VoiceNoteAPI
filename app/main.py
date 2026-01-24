@@ -13,7 +13,6 @@ app.include_router(notes.router)
 app.include_router(tasks.router)
 app.include_router(ai.router)
 app.include_router(admin.router)  # NEW: Admin endpoints
-app.include_router(admin.router)  # NEW: Admin endpoints
 app.include_router(testing.test_router) # NEW: Test endpoints
 from app.api import webhooks, meetings # NEW: Commercial routers
 app.include_router(webhooks.router)

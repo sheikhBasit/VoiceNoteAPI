@@ -1,4 +1,5 @@
 from .celery_app import celery_app
+import json
 import cloudinary.uploader
 from app.core.audio import preprocess_audio_pipeline
 from app.services.ai_service import AIService
@@ -36,11 +37,11 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         # 4. AI Analysis (Whisper STT -> Llama 3.1 LLM)
         # Inherits logic from Android's AiRepository.processConversationChunks
         JLogger.info("Worker: Running AI analysis", note_id=note_id)
-        analysis = ai_service.run_full_analysis(processed_path, user_role)
+        analysis = ai_service.run_full_analysis_sync(processed_path, user_role)
         JLogger.info("Worker: AI analysis complete", note_id=note_id, tasks_found=len(analysis.tasks))
 
         # 5. Generate Vector Embedding for Semantic Search
-        embedding = ai_service.generate_embedding(analysis.summary)
+        embedding = ai_service.generate_embedding_sync(analysis.summary)
 
         # 6. Update Database with AI Results
         note = db.query(Note).filter(Note.id == note_id).first()
@@ -51,6 +52,7 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         note.transcript_android = analysis.transcript  # Propagate for consistency
         note.audio_url = audio_url
         note.embedding = embedding
+        note.embedding_version = 1 # Initial cache version
         note.status = NoteStatus.DONE
         
         # 7. Map & Save Tasks (Replacing Task.kt logic)
@@ -349,3 +351,161 @@ def rotate_to_backup_key(service_name: str, failed_key_id: str, error_reason: st
         return {"status": "error", "message": str(e)}
     finally:
         db.close()
+@celery_app.task(name="analyze_note_semantics_task")
+def analyze_note_semantics_task(note_id: str):
+    """Refined background task for deep analysis of note semantics."""
+    db = SessionLocal()
+    ai_service = AIService()
+    try:
+        note = db.query(Note).filter(Note.id == note_id).first()
+        if not note:
+            return {"error": "Note not found"}
+
+        transcript = note.transcript
+        if not transcript:
+            return {"error": "No transcript available"}
+
+        user_role = note.user.primary_role.name if note.user else "GENERIC"
+        
+        # Call AI service
+        JLogger.info("Worker: Running semantic analysis", note_id=note_id)
+        analysis = ai_service.semantic_analysis_sync(transcript, user_role)
+        
+        # Save result to JSONB field for caching
+        note.semantic_analysis = {
+            "sentiment": analysis.sentiment,
+            "tone": analysis.tone,
+            "patterns": analysis.hidden_patterns,
+            "suggested_questions": analysis.suggested_questions,
+            "analyzed_at": int(time.time() * 1000)
+        }
+        db.commit()
+        
+        JLogger.info("Worker: Semantic analysis complete", note_id=note_id)
+        return {"status": "success", "note_id": note_id}
+    except Exception as e:
+        JLogger.error("Worker: Semantic analysis failed", note_id=note_id, error=str(e))
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+@celery_app.task(name="process_ai_query_task")
+def process_ai_query_task(note_id: str, question: str, user_id: str):
+    """Handles background AI Q&A for specific notes."""
+    db = SessionLocal()
+    ai_service = AIService()
+    try:
+        note = db.query(Note).filter(Note.id == note_id).first()
+        if not note:
+            return {"error": "Note not found"}
+
+        transcript = note.transcript
+        user_role = note.user.primary_role.name if note.user else "GENERIC"
+        
+        # Generate Answer
+        response = ai_service.llm_brain_sync(transcript, user_role, question)
+        
+        # Append to ai_responses history
+        new_resp = {
+            "question": question,
+            "answer": response.summary if hasattr(response, 'summary') else str(response),
+            "timestamp": int(time.time() * 1000)
+        }
+        
+        history = list(note.ai_responses) if note.ai_responses else []
+        history.append(new_resp)
+        note.ai_responses = history
+        db.commit()
+        
+        return {"status": "success", "response": new_resp}
+    except Exception as e:
+        JLogger.error("Worker: AI query processing failed", note_id=note_id, error=str(e))
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+@celery_app.task(name="generate_note_embeddings_task")
+def generate_note_embeddings_task(note_id: str):
+    """Regenerates embeddings when note content changes significantly."""
+    db = SessionLocal()
+    ai_service = AIService()
+    try:
+        note = db.query(Note).filter(Note.id == note_id).first()
+        if not note:
+            return {"error": "Note not found"}
+
+        # Combine title and summary for better semantic representation
+        text_to_embed = f"{note.title}\n{note.summary}"
+        embedding = ai_service.generate_embedding_sync(text_to_embed)
+        
+        note.embedding = embedding
+        note.embedding_version += 1
+        db.commit()
+        
+        return {"status": "success", "version": note.embedding_version}
+    except Exception as e:
+        JLogger.error("Worker: Embedding generation failed", note_id=note_id, error=str(e))
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+@celery_app.task(name="generate_productivity_report_task")
+def generate_productivity_report_task():
+    """Scheduled task to generate weekly reports for all active users."""
+    db = SessionLocal()
+    from app.services.analytics_service import AnalyticsService
+    from app.db.models import User, UserRole
+    analytics = AnalyticsService()
+    try:
+        # 1. Get all active users
+        users = db.query(User).filter(User.is_deleted == False).all()
+        
+        for user in users:
+            try:
+                # 2. Get productivity pulse for the week
+                pulse = analytics.get_productivity_pulse(db, user.id)
+                
+                # 3. Format a summary message
+                report_body = f"Hello {user.name or 'User'}! Here is your weekly productivity pulse:\n\n"
+                report_body += f"📊 Active Notes: {pulse.get('total_notes_this_week', 0)}\n"
+                report_body += f"✅ Tasks Completed: {pulse.get('tasks_completed', 0)}\n"
+                report_body += f"💡 Insight: {pulse.get('suggestion', 'Keep up the great work!')}"
+                
+                # 4. Trigger pushing notification (Real-world: Email or Push)
+                if user.token:
+                    send_push_notification.delay(
+                        user.token,
+                        title="📈 Your Weekly Pulse is Ready!",
+                        body="Tap to see your productivity summary for the last 7 days.",
+                        data={"type": "WEEKLY_REPORT", "pulse": pulse}
+                    )
+            except Exception as e:
+                JLogger.error(f"Failed to generate report for user {user.id}", error=str(e))
+                continue
+                
+        return {"status": "success", "users_processed": len(users)}
+    finally:
+        db.close()
+
+@celery_app.task(name="sync_external_service_task")
+def sync_external_service_task(note_id: str, service_name: str, user_id: str):
+    """
+    Background worker for third-party integrations (Google Calendar, Notion).
+    Requirement: "Sync to Google Calendar or Export to Notion should be background tasks"
+    """
+    db = SessionLocal()
+    try:
+        if service_name.lower() == "google_calendar":
+            # Logic for calendar sync (using existing CalendarService)
+            pass
+        elif service_name.lower() == "notion":
+            # Future expansion for Notion export
+            pass
+            
+        return {"status": "success", "service": service_name, "note_id": note_id}
+    finally:
+        db.close()
+

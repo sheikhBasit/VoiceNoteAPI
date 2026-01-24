@@ -1,0 +1,84 @@
+ 
+ -------------- celery@basitdev-Latitude-5420 v5.6.2 (recovery)
+--- ***** ----- 
+-- ******* ---- Linux-6.14.0-37-generic-x86_64-with-glibc2.39 2026-01-25 00:18:34
+- *** --- * --- 
+- ** ---------- [config]
+- ** ---------- .> app:         voicenote_worker:0x789d0ac27140
+- ** ---------- .> transport:   redis://localhost:6380/2
+- ** ---------- .> results:     redis://localhost:6380/3
+- *** --- * --- .> concurrency: 8 (prefork)
+-- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)
+--- ***** ----- 
+ -------------- [queues]
+                .> celery           exchange=celery(direct) key=celery
+                
+
+[tasks]
+  . analyze_note_semantics_task
+  . check_upcoming_tasks
+  . generate_note_embeddings_task
+  . generate_productivity_report_task
+  . hard_delete_expired_records
+  . ping_task
+  . process_ai_query_task
+  . process_task_image_pipeline
+  . process_voice_note_pipeline
+  . reset_api_key_limits
+  . rotate_to_backup_key
+  . send_push_notification
+  . sync_external_service_task
+
+[2026-01-25 00:18:37,932: INFO/MainProcess] Connected to redis://localhost:6380/2
+[2026-01-25 00:18:37,945: INFO/MainProcess] mingle: searching for neighbors
+[2026-01-25 00:18:38,960: INFO/MainProcess] mingle: all alone
+[2026-01-25 00:18:38,979: INFO/MainProcess] celery@basitdev-Latitude-5420 ready.
+[2026-01-25 00:18:38,986: INFO/MainProcess] Task analyze_note_semantics_task[ace959e6-36cc-4e6d-8c20-4a0ca1e0baf6] received
+[2026-01-25 00:18:38,988: INFO/MainProcess] Task process_ai_query_task[d6683c6d-3d11-4cfe-8327-97e4d0dbb1f2] received
+[2026-01-25 00:18:38,992: INFO/MainProcess] Task generate_note_embeddings_task[30a39827-e6e9-4a28-9648-057544a2d9cf] received
+{"timestamp": "2026-01-24T19:18:39.295562+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Loading local embedding model: all-MiniLM-L6-v2", "filename": "ai_service.py", "funcName": "_get_local_embedding_model", "lineno": 65, "pathname": "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/app/services/ai_service.py"}
+[2026-01-25 00:18:39,295: INFO/ForkPoolWorker-2] Loading local embedding model: all-MiniLM-L6-v2
+[2026-01-25 00:18:39,333: INFO/ForkPoolWorker-8] Task analyze_note_semantics_task[ace959e6-36cc-4e6d-8c20-4a0ca1e0baf6] succeeded in 0.3459928900010709s: {'error': 'No transcript available'}
+[2026-01-25 00:18:39,335: INFO/ForkPoolWorker-2] Use pytorch device_name: cpu
+[2026-01-25 00:18:39,335: INFO/ForkPoolWorker-2] Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+{"timestamp": "2026-01-24T19:18:39.373846+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Worker: AI query processing failed", "filename": "task.py", "funcName": "process_ai_query_task", "lineno": 423, "pathname": "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/app/worker/task.py", "note_id": "9865c6d5-fa0c-4c16-a49b-6def4f362e32", "error": "Transcript cannot be empty"}
+[2026-01-25 00:18:39,373: ERROR/ForkPoolWorker-1] Worker: AI query processing failed
+[2026-01-25 00:18:39,383: ERROR/ForkPoolWorker-1] Task process_ai_query_task[d6683c6d-3d11-4cfe-8327-97e4d0dbb1f2] raised unexpected: AIServiceError('Transcript cannot be empty')
+Traceback (most recent call last):
+  File "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/venv/lib/python3.12/site-packages/celery/app/trace.py", line 479, in trace_task
+    R = retval = fun(*args, **kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/venv/lib/python3.12/site-packages/celery/app/trace.py", line 779, in __protected_call__
+    return self.run(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/app/worker/task.py", line 407, in process_ai_query_task
+    response = ai_service.llm_brain_sync(transcript, user_role, question)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/app/services/ai_service.py", line 248, in llm_brain_sync
+    transcript = validate_transcript(transcript)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/app/utils/ai_service_utils.py", line 122, in validate_transcript
+    raise AIServiceError("Transcript cannot be empty")
+app.utils.ai_service_utils.AIServiceError: Transcript cannot be empty
+[2026-01-25 00:18:45,169: WARNING/ForkPoolWorker-2] Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+[2026-01-25 00:18:45,298: WARNING/ForkPoolWorker-2] Batches: 100%|##########| 1/1 [00:00<00:00,  7.76it/s]
+[2026-01-25 00:18:45,299: WARNING/ForkPoolWorker-2] Batches: 100%|##########| 1/1 [00:00<00:00,  7.70it/s]
+[2026-01-25 00:18:45,331: INFO/ForkPoolWorker-2] Task generate_note_embeddings_task[30a39827-e6e9-4a28-9648-057544a2d9cf] succeeded in 6.335042808999788s: {'status': 'success', 'version': 2}
+[2026-01-25 00:19:18,844: INFO/MainProcess] Task analyze_note_semantics_task[613590e3-d628-4c7e-a5f4-26a75ebea7d3] received
+[2026-01-25 00:19:18,863: INFO/MainProcess] Task process_ai_query_task[9e002eac-2dba-41fa-a1c8-379ffc66ab92] received
+[2026-01-25 00:19:18,901: INFO/MainProcess] Task generate_note_embeddings_task[67fc0d1b-9274-4e45-9bfc-d80ae075e301] received
+{"timestamp": "2026-01-24T19:19:19.017953+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Loading local embedding model: all-MiniLM-L6-v2", "filename": "ai_service.py", "funcName": "_get_local_embedding_model", "lineno": 65, "pathname": "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/app/services/ai_service.py"}
+[2026-01-25 00:19:19,017: INFO/ForkPoolWorker-2] Loading local embedding model: all-MiniLM-L6-v2
+[2026-01-25 00:19:19,020: INFO/ForkPoolWorker-2] Use pytorch device_name: cpu
+[2026-01-25 00:19:19,021: INFO/ForkPoolWorker-2] Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+{"timestamp": "2026-01-24T19:19:19.028371+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Worker: Running semantic analysis", "filename": "task.py", "funcName": "analyze_note_semantics_task", "lineno": 371, "pathname": "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/app/worker/task.py", "note_id": "42003566-f628-4a5b-a8e1-9b45e97d5607"}
+[2026-01-25 00:19:19,028: INFO/ForkPoolWorker-8] Worker: Running semantic analysis
+[2026-01-25 00:19:19,561: INFO/ForkPoolWorker-1] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+[2026-01-25 00:19:19,606: INFO/ForkPoolWorker-1] Task process_ai_query_task[9e002eac-2dba-41fa-a1c8-379ffc66ab92] succeeded in 0.7416049089988519s: {'status': 'success', 'response': {'question': 'What was the growth mentioned in the note?', 'answer': 'The company has experienced a 20% growth in quarterly earnings. Implementation of autonomous agents and improved background processing is critical for future growth. This will be key for VoiceNote AI development.', 'timestamp': 1769282359597}}
+[2026-01-25 00:19:19,969: INFO/ForkPoolWorker-8] HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "HTTP/1.1 200 OK"
+{"timestamp": "2026-01-24T19:19:20.002615+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Worker: Semantic analysis complete", "filename": "task.py", "funcName": "analyze_note_semantics_task", "lineno": 384, "pathname": "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/app/worker/task.py", "note_id": "42003566-f628-4a5b-a8e1-9b45e97d5607"}
+[2026-01-25 00:19:20,002: INFO/ForkPoolWorker-8] Worker: Semantic analysis complete
+[2026-01-25 00:19:20,004: INFO/ForkPoolWorker-8] Task analyze_note_semantics_task[613590e3-d628-4c7e-a5f4-26a75ebea7d3] succeeded in 1.1588527389994852s: {'status': 'success', 'note_id': '42003566-f628-4a5b-a8e1-9b45e97d5607'}
+[2026-01-25 00:19:23,133: WARNING/ForkPoolWorker-2] Batches:   0%|          | 0/1 [00:00<?, ?it/s]
+[2026-01-25 00:19:23,187: WARNING/ForkPoolWorker-2] Batches: 100%|##########| 1/1 [00:00<00:00, 18.51it/s]
+[2026-01-25 00:19:23,204: INFO/ForkPoolWorker-2] Task generate_note_embeddings_task[67fc0d1b-9274-4e45-9bfc-d80ae075e301] succeeded in 4.302548053999999s: {'status': 'success', 'version': 2}

@@ -121,6 +121,11 @@ class Note(Base):
     document_urls = Column(JSON, default=list)
     links = Column(JSON, default=list)
     embedding = Column(Vector(384)) # Dimension for all-MiniLM-L6-v2 Embeddings
+    embedding_version = Column(Integer, default=1) # Cache versioning
+    
+    # AI Background Results (NEW)
+    semantic_analysis = Column(JSONB, nullable=True) # Result of background analysis
+    ai_responses = Column(JSONB, default=list)      # History of Q&A task results
     
     # Relationships with CASCADE deletion
     user = relationship("User", back_populates="notes")

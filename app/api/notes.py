@@ -5,7 +5,12 @@ from app.db.session import get_db
 from app.db import models
 from app.schemas import note as note_schema
 from app.schemas.note import NoteSemanticAnalysis
-from app.worker.task import process_voice_note_pipeline  # Celery task
+from app.worker.task import (
+    process_voice_note_pipeline, 
+    analyze_note_semantics_task,
+    generate_note_embeddings_task,
+    process_ai_query_task
+)  # Celery tasks
 import time
 import uuid
 import os
@@ -17,6 +22,7 @@ from app.utils.json_logger import JLogger
 from app.services.ai_service import AIService
 from app.services.search_service import SearchService
 from app.services.analytics_service import AnalyticsService
+from app.core.config import ai_config
 from app.utils.security import verify_device_signature, verify_note_ownership
 from app.services.deletion_service import DeletionService
 from app.services.auth_service import get_current_user
@@ -90,6 +96,30 @@ async def process_note(
     process_voice_note_pipeline.delay(note_id, temp_path, user_role)
     
     return {"note_id": note_id, "message": f"Processing started in {mode} mode"}
+
+@router.post("/create", response_model=note_schema.NoteResponse)
+def create_note(
+    note_data: note_schema.NoteUpdate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    """POST /: Manually create a text-based note."""
+    note_id = str(uuid.uuid4())
+    db_note = models.Note(
+        id=note_id,
+        user_id=current_user.id,
+        title=note_data.title or "Untitled Note",
+        summary=note_data.summary or "",
+        transcript_groq=note_data.transcript or "",
+        priority=note_data.priority or models.Priority.MEDIUM,
+        status=models.NoteStatus.DONE,
+        timestamp=int(time.time() * 1000),
+        updated_at=int(time.time() * 1000)
+    )
+    db.add(db_note)
+    db.commit()
+    db.refresh(db_note)
+    return db_note
 
 @router.get("", response_model=List[note_schema.NoteResponse])
 @limiter.limit("60/minute")
@@ -181,6 +211,10 @@ async def update_note(
         if key == "is_deleted": continue
         setattr(db_note, key, value)
     
+    # NEW: Trigger background embedding update if content changed
+    if any(k in data for k in ["title", "summary"]):
+        generate_note_embeddings_task.delay(note_id)
+
     db_note.updated_at = int(time.time() * 1000)
     db.commit()
     return db_note
@@ -218,55 +252,22 @@ def delete_note(
         
     return result
 
-@router.post("/{note_id}/ask")
-@limiter.limit("5/minute")
+@router.post("/{note_id}/ask", status_code=status.HTTP_202_ACCEPTED)
 async def ask_ai(
-    request: Request,
     note_id: str, 
     question: str = Body(..., embed=True), 
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """POST /{note_id}/ask: Query AI about a note's content with error handling."""
-    # Verify ownership and deletion status before processing
+    """POST /{note_id}/ask: Offloaded AI Q&A. Result appears in note.ai_responses."""
     db_note = verify_note_ownership(db, current_user.id, note_id)
     
     if db_note.is_deleted:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Permission denied: This voice note has been deleted and must be restored before use"
-        )
+        raise HTTPException(status_code=403, detail="Note is deleted")
     
-    # ✅ VALIDATION: Transcript exists
-    transcript = db_note.transcript_deepgram or db_note.transcript_groq or db_note.transcript_android
-    if not transcript:
-        raise HTTPException(
-            status_code=400, 
-            detail="Note has no transcript. Transcription may still be processing."
-        )
-    
-    try:
-        # ✅ ERROR HANDLING: Try-except with timeout
-        answer = await asyncio.wait_for(
-            ai_service.llm_brain(
-                transcript=transcript, 
-                user_role=db_note.user.primary_role.value if db_note.user else "GENERIC",
-                user_instruction=question
-            ),
-            timeout=30.0
-        )
-        return {"answer": answer.summary if hasattr(answer, 'summary') else str(answer)}
-    except asyncio.TimeoutError:
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="Request timeout: The AI service took too long to respond. Please try again"
-        )
-    except Exception as e:
-        JLogger.error("AI question-answer failed", note_id=note_id, error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error: AI failed to process your request"
-        )
+    # Offload to Celery
+    process_ai_query_task.delay(note_id, question, current_user.id)
+    return {"message": "AI is processing your question", "note_id": note_id}
 
 
 @router.post("/search")
@@ -314,7 +315,7 @@ def get_whatsapp_draft(note_id: str, db: Session = Depends(get_db), current_user
     
     return {"whatsapp_link": wa_link, "draft": text}
 
-@router.post("/{note_id}/semantic-analysis", response_model=NoteSemanticAnalysis)
+@router.post("/{note_id}/semantic-analysis", status_code=status.HTTP_202_ACCEPTED)
 async def analyze_note_semantics(
     note_id: str,
     db: Session = Depends(get_db),
@@ -322,43 +323,20 @@ async def analyze_note_semantics(
 ):
     """
     POST /{note_id}/semantic-analysis: Deep dive into note meaning.
-    Provides sentiment, emotional tone, hidden patterns, and suggested questions.
+    Offloaded to background for elite performance.
     """
     db_note = verify_note_ownership(db, current_user.id, note_id)
     
     if db_note.is_deleted:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Permission denied: This voice note has been deleted and must be restored before analysis"
+            detail="Permission denied: Note is deleted"
         )
     
-    transcript = db_note.transcript_deepgram or db_note.transcript_groq or db_note.transcript_android
-    if not transcript:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Validation failed: Note has no transcript to analyze"
-        )
+    # Trigger background task
+    analyze_note_semantics_task.delay(note_id)
     
-    try:
-        analysis = await asyncio.wait_for(
-            ai_service.semantic_analysis(
-                transcript=transcript, 
-                user_role=db_note.user.primary_role.value if db_note.user else "GENERIC"
-            ),
-            timeout=45.0
-        )
-        return analysis
-    except asyncio.TimeoutError:
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="Request timeout: Semantic analysis took too long. Please try again"
-        )
-    except Exception as e:
-        JLogger.error("Semantic analysis failed", note_id=note_id, error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error: Semantic analysis failed"
-        )
+    return {"message": "Semantic analysis started in background", "note_id": note_id}
 
 
     

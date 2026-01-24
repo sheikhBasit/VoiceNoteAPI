@@ -44,4 +44,11 @@ celery_app.conf.beat_schedule = {
         "task": "reset_api_key_limits",
         "schedule": crontab(hour=0, minute=0),  # Daily at midnight UTC
     },
+    
+    # Weekly Productivity Report
+    # Requirement: "Tell me user activity over the week and generate a summary note every Monday morning"
+    "weekly-productivity-report": {
+        "task": "generate_productivity_report_task",
+        "schedule": crontab(day_of_week=1, hour=9, minute=0), # Monday at 9:00 AM UTC
+    },
 }

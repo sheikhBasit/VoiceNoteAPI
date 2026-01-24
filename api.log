@@ -1,5 +1,18 @@
 INFO:     Loading environment from '.env'
-INFO:     Started server process [353539]
+INFO:     Started server process [109442]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56324 - "GET /api/v1/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56330 - "POST /api/v1/notes/9865c6d5-fa0c-4c16-a49b-6def4f362e32/semantic-analysis HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:56334 - "POST /api/v1/ai/9865c6d5-fa0c-4c16-a49b-6def4f362e32/ask HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:56340 - "GET /api/v1/notes/9865c6d5-fa0c-4c16-a49b-6def4f362e32 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56356 - "PATCH /api/v1/notes/9865c6d5-fa0c-4c16-a49b-6def4f362e32 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57618 - "GET /api/v1/notes/9865c6d5-fa0c-4c16-a49b-6def4f362e32 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54834 - "GET /api/v1/notes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54838 - "POST /api/v1/notes/create HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54848 - "POST /api/v1/notes/42003566-f628-4a5b-a8e1-9b45e97d5607/semantic-analysis HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:54864 - "POST /api/v1/ai/42003566-f628-4a5b-a8e1-9b45e97d5607/ask HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:54872 - "GET /api/v1/notes/42003566-f628-4a5b-a8e1-9b45e97d5607 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54880 - "PATCH /api/v1/notes/42003566-f628-4a5b-a8e1-9b45e97d5607 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52282 - "GET /api/v1/notes/42003566-f628-4a5b-a8e1-9b45e97d5607 HTTP/1.1" 200 OK

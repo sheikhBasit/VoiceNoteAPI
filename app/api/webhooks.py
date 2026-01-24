@@ -61,18 +61,24 @@ def _handle_checkout_completed(session, billing_service: BillingService):
         logger.info(f"Funding wallet for user {user_id}: +{amount_paid}")
         billing_service.process_deposit(user_id, amount_paid, "Stripe Checkout")
 
+from app.db.models import Wallet
+
 def _handle_invoice_payment(invoice, billing_service: BillingService):
     """
     Fund wallet on subscription renewal.
     """
-    # Requires mapping stripe_customer_id to user_id in DB if metadata is missing
-    # For MVP, assuming subscription metadata has user_id or we look it up
-    # This part is simplified
     amount_paid = invoice.get("amount_paid", 0)
     customer_id = invoice.get("customer")
     
-    # In a real app, look up user by stripe_customer_id
-    # user = db.query(Wallet).filter(Wallet.stripe_customer_id == customer_id).first()
-    # For now, we log it
-    logger.info(f"Subscription renewal for customer {customer_id}: +{amount_paid}")
-    # billing_service.process_deposit(user.user_id, amount_paid, "Stripe Subscription")
+    if not customer_id or amount_paid <= 0:
+        logger.warning(f"Invalid invoice payload: {invoice.get('id')}")
+        return
+
+    # Look up wallet by stripe_customer_id
+    wallet = billing_service.db.query(Wallet).filter(Wallet.stripe_customer_id == customer_id).first()
+    
+    if wallet:
+        logger.info(f"Subscription renewal for customer {customer_id} (User: {wallet.user_id}): +{amount_paid}")
+        billing_service.process_deposit(wallet.user_id, amount_paid, "Stripe Subscription")
+    else:
+        logger.warning(f"Received payment for unknown customer {customer_id}")

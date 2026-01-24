@@ -8,8 +8,10 @@ from app.schemas import note as note_schema
 from app.services.ai_service import AIService # Service we built earlier
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from fastapi import Request
+from fastapi import Request, Body, status
 from app.utils.json_logger import JLogger
+from app.worker.task import process_ai_query_task
+from app.services.auth_service import get_current_user
 import os
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI & Insights"])
@@ -18,8 +20,14 @@ ai_service = AIService()
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"))
 @router.post("/search", response_model=List[note_schema.NoteResponse])
 @limiter.limit("5/hour")
-async def semantic_search(request: Request, query: str, user_id: str, db: Session = Depends(get_db)):
-    query_vector = ai_service.generate_embedding(query)
+async def semantic_search(
+    request: Request, 
+    query: str, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    user_id = current_user.id
+    query_vector = ai_service.generate_embedding_sync(query)
     
     # Strictly filter by user_id and is_deleted before calculating distance
     results = db.query(models.Note).filter(
@@ -37,12 +45,34 @@ async def semantic_search(request: Request, query: str, user_id: str, db: Sessio
     
     return results
 
+@router.post("/{note_id}/ask", status_code=status.HTTP_202_ACCEPTED)
+async def ask_ai(
+    note_id: str,
+    question: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    POST /{note_id}/ask: Unified Background AI Q&A.
+    Returns 202 Accepted. Result will appear in note.ai_responses.
+    """
+    from app.utils.security import verify_note_ownership
+    verify_note_ownership(db, current_user.id, note_id)
+    process_ai_query_task.delay(note_id, question, current_user.id)
+    return {"message": "AI is thinking...", "note_id": note_id}
+
+from app.services.auth_service import get_current_user
+
 @router.get("/stats")
-def get_user_stats(user_id: str, db: Session = Depends(get_db)):
+def get_user_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     """
     GET /stats: Dashboard Insights.
     Returns high-level stats like '5 High Priority tasks today'.
     """
+    user_id = current_user.id
     high_priority_count = db.query(models.Task).join(models.Note).filter(
         models.Note.user_id == user_id,
         models.Task.priority == models.Priority.HIGH,

@@ -7,6 +7,8 @@ from app.services.billing_service import BillingService
 from app.db.models import UsageLog
 import logging
 
+from fastapi.responses import JSONResponse
+
 logger = logging.getLogger("VoiceNote.Usage")
 
 class UsageTrackingMiddleware(BaseHTTPMiddleware):
@@ -20,32 +22,63 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
         if request.url.path in ["/", "/health", "/metrics", "/docs", "/openapi.json"]:
             return await call_next(request)
 
-        # 1. Capture User ID (Assuming Auth Middleware has run)
-        # In a real app, this might come from request.state.user
-        # For MVP, we'll try to extract from Authorization header or fallback
-        user_id = "anonymous"
-        if "Authorization" in request.headers:
-             # Basic extraction - would connect to your specific Auth logic
-             pass 
+        # 1. Capture User ID
+        # For production, this MUST come from the Auth Middleware (request.state.user_id)
+        # For this MVP, we will extract it or default to "anonymous"
+        user_id = getattr(request.state, "user_id", None)
+        if not user_id:
+             # Fallback for testing commercial flows without full Auth middleware
+             # In headers or query param?
+             user_id = request.headers.get("X-User-ID", "anonymous")
+
+        # 2. COST ESTIMATION & KILL-SWITCH
+        # Define basic costs for endpoints (Simple heuristic)
+        cost_map = {
+            "/api/v1/notes": 1,        # Retrieval
+            "/api/v1/transcribe": 10,  # Heavy
+            "/api/v1/ai/analyze": 5,   # LLM
+            "/api/v1/meetings/join": 20 # Bot Dispatch
+        }
         
-        # Proceed with request
+        # Check if endpoint has a cost
+        estimated_cost = 0
+        for path, cost in cost_map.items():
+            if path in request.url.path:
+                estimated_cost = cost
+                break
+        
+        # Enforce Payment if user is known and cost > 0
+        if user_id != "anonymous" and estimated_cost > 0:
+            db = SessionLocal()
+            try:
+                billing = BillingService(db)
+                has_funds = billing.check_balance(user_id, estimated_cost)
+                if not has_funds:
+                    return JSONResponse(
+                        status_code=402, 
+                        content={"detail": "Payment Required: Insufficient credits"}
+                    )
+            except Exception as e:
+                logger.error(f"Billing check failed: {e}")
+            finally:
+                db.close()
+        
+        # 3. Proceed with request
         response = await call_next(request)
         
-        # 2. Calculate Metrics
+        # 4. Calculate Metrics & Charge (Post-Processing)
         process_time = time.time() - start_time
         
-        # 3. Log Usage (Fire and Forget - ideally async task)
-        # For MVP, we write to UsageLog table synchronously or via simple helper
         try:
-            self.log_usage(request, response, process_time)
+            self.log_usage(request, response, process_time, user_id, estimated_cost)
         except Exception as e:
             logger.error(f"Failed to log usage: {e}")
             
         return response
 
-    def log_usage(self, request: Request, response: Response, duration: float):
+    def log_usage(self, request: Request, response: Response, duration: float, user_id: str, estimated_cost: int):
         """
-        Writes to UsageLog table.
+        Writes to UsageLog table and Charges Logic if successful.
         """
         # Filter only relevant API calls
         if not request.url.path.startswith("/api/v1"):
@@ -53,9 +86,16 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
 
         db = SessionLocal()
         try:
-            # Attempt to find user from request state if set by Auth middleware
-            user_id = getattr(request.state, "user_id", None)
-            
+            # 1. Charge the user if response was successful (2xx)
+            if response.status_code < 400 and estimated_cost > 0 and user_id != "anonymous":
+                billing = BillingService(db)
+                billing.charge_usage(
+                    user_id, 
+                    estimated_cost, 
+                    f"API Call: {request.url.path}"
+                )
+
+            # 2. Log metadata
             log = UsageLog(
                 user_id=user_id,
                 endpoint=request.url.path,
