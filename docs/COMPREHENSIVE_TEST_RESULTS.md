@@ -101,7 +101,7 @@
 {
   "timestamp": "2026-01-23T12:09:01.123456Z",
   "level": "INFO",
-  "logger": "NEXAVOXA",
+  "logger": "VoiceNote",
   "message": "Audio file validated successfully",
   "filename": "audio_chunker.py",
   "funcName": "validate_audio_file",
@@ -117,7 +117,7 @@
 {
   "timestamp": "2026-01-23T12:09:02.234567Z",
   "level": "INFO",
-  "logger": "NEXAVOXA",
+  "logger": "VoiceNote",
   "message": "Audio quality analysis complete",
   "filename": "audio_quality_analyzer.py",
   "funcName": "analyze_audio_quality",
@@ -135,7 +135,7 @@
 {
   "timestamp": "2026-01-23T12:09:03.345678Z",
   "level": "WARNING",
-  "logger": "NEXAVOXA",
+  "logger": "VoiceNote",
   "message": "Invalid file path provided",
   "filename": "audio_chunker.py",
   "funcName": "validate_audio_file",

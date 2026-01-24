@@ -40,6 +40,19 @@ class TaskBase(BaseModel):
 class TaskCreate(TaskBase):
     note_id: str
 
+class TaskUpdate(BaseModel):
+    description: Optional[str] = None
+    priority: Optional[Priority] = None
+    deadline: Optional[int] = None
+    is_done: Optional[bool] = None
+    assigned_entities: Optional[List[ContactEntity]] = None
+    image_urls: Optional[List[HttpUrl]] = None
+    document_urls: Optional[List[HttpUrl]] = None
+    external_links: Optional[List[LinkEntity]] = None
+    communication_type: Optional[CommunicationType] = None
+    is_action_approved: bool = False
+    is_deleted: Optional[bool] = None
+
 class TaskResponse(TaskBase):
     id: str
     note_id: str

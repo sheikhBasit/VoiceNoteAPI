@@ -8,12 +8,14 @@ import os
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@db:5432/voicenote")
 
 if DATABASE_URL.startswith("sqlite"):
-    ASYNC_DATABASE_URL = DATABASE_URL.replace("sqlite://", "sqlite+aiosqlite://")
-    SYNC_DATABASE_URL = DATABASE_URL
+    ASYNC_DATABASE_URL = DATABASE_URL.replace("sqlite://", "sqlite+aiosqlite://") if "aiosqlite" not in DATABASE_URL else DATABASE_URL
+    SYNC_DATABASE_URL = DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
     connect_args = {"check_same_thread": False}
 else:
-    ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
-    SYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://")
+    # Handle CASE: DATABASE_URL might already have +asyncpg
+    clean_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://").replace("postgresql+psycopg2://", "postgresql://")
+    ASYNC_DATABASE_URL = clean_url.replace("postgresql://", "postgresql+asyncpg://")
+    SYNC_DATABASE_URL = clean_url.replace("postgresql://", "postgresql+psycopg2://")
     connect_args = {}
 
 # Async Setup

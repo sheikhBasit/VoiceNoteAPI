@@ -2,6 +2,7 @@ import time
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.db import models
+from app.utils.json_logger import JLogger
 from collections import Counter
 import re
 
@@ -11,6 +12,7 @@ class AnalyticsService:
         """
         Calculates the "Productivity Pulse" dashboard metrics.
         """
+        JLogger.info("Calculating productivity pulse", user_id=user_id)
         # 1. Task Velocity
         total_tasks = db.query(models.Task).join(models.Note).filter(
             models.Note.user_id == user_id,
@@ -37,16 +39,25 @@ class AnalyticsService:
             content = f"{note.title} {note.summary}".lower()
             # Basic cleanup
             clean_words = re.findall(r'\w{4,}', content) # Words with at least 4 chars
-            # Filter out common stop words (manual list for MVP)
-            stop_words = {'this', 'that', 'with', 'from', 'about', 'note', 'meeting', 'project'}
+            # Filter out common stop words
+            stop_words = {
+                'this', 'that', 'with', 'from', 'about', 'note', 'meeting', 'project',
+                'should', 'would', 'could', 'there', 'their', 'which', 'where', 'when',
+                'tasks', 'notes', 'summaries', 'transcript', 'user', 'primary', 'secondary'
+            }
             words.extend([w for w in clean_words if w not in stop_words])
             
-        topic_counts = Counter(words).most_common(5)
+        topic_counts = Counter(words).most_common(10) # Show top 10 instead of 5
         topic_heatmap = [{"topic": t, "count": c} for t, c in topic_counts]
         
-        # 3. Meeting ROI
-        # Assumption: Every voice note saves 5 minutes of manual typing/review
-        meeting_roi_hours = (len(notes) * 5) / 60
+        # 3. Dynamic Meeting ROI
+        # Calculation: (Total Words / 40 wpm avg typing speed) / 60 = Hours saved
+        total_words = 0
+        for note in notes:
+            transcript = note.transcript_groq or note.transcript_deepgram or note.transcript_android or ""
+            total_words += len(transcript.split())
+            
+        meeting_roi_hours = total_words / (40 * 60) # 40 wpm is a conservative typing speed
         
         # 4. Recent Activity
         recent_notes_count = db.query(models.Note).filter(

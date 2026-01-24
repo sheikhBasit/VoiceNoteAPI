@@ -173,20 +173,24 @@ async def verify_admin(user_id: str, db: Session) -> models.User:
     """Dependency to verify user is admin"""
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"User with ID '{user_id}' not found"
+        )
     if not AdminManager.is_admin(user):
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Administrative privileges required"
+        )
     return user
 
 
 async def verify_permission(user_id: str, permission: str, db: Session) -> models.User:
     """Dependency to verify user has specific permission"""
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = await verify_admin(user_id, db)
     if not AdminManager.has_permission(user, permission):
         raise HTTPException(
-            status_code=403, 
-            detail=f"Permission '{permission}' required"
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail=f"Permission denied: Required permission '{permission}' is missing"
         )
     return user

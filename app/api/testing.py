@@ -5,15 +5,20 @@ from app.core.audio import preprocess_audio_pipeline
 import shutil
 import os
 import uuid
+import redis
+from app.worker.task import ping_task
+from celery.result import AsyncResult
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 test_router = APIRouter(prefix="/api/test", tags=["Testing Lab"])
 ai_service = AIService()
-limiter = Limiter(key_func=get_remote_address, storage_uri="redis://redis:6379/0")
+limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"))
+
+from fastapi import APIRouter, UploadFile, File, Response, Request
 
 @test_router.post("/stt-comparison")
 @limiter.limit("5/minute")
-async def stt_comparison(file: UploadFile = File(...)):
+async def stt_comparison(request: Request, file: UploadFile = File(...)):
     """
     POST /stt-comparison: Dual STT Test.
     Returns Groq Whisper and Deepgram Nova-3 side-by-side.
@@ -59,3 +64,58 @@ async def audio_lab_preprocess(file: UploadFile = File(...)):
         media_type="audio/wav", 
         filename=f"enhanced_{file.filename}.wav"
     )
+
+@test_router.get("/celery")
+async def test_celery_task():
+    """
+    GET /celery: Test Redis Queue (Celery).
+    Triggers a background task and waits for the result.
+    """
+    task_id = str(uuid.uuid4())
+    result = ping_task.delay(message=f"Hello from API {task_id}")
+    return {
+        "task_id": result.id,
+        "status": "queued",
+        "message": "Task submitted to Celery"
+    }
+
+@test_router.get("/celery/{task_id}")
+async def get_celery_status(task_id: str):
+    """
+    GET /celery/{task_id}: Check status of a specific task.
+    """
+    task_result = AsyncResult(task_id)
+    return {
+        "task_id": task_id,
+        "status": task_result.status,
+        "result": task_result.result
+    }
+
+@test_router.get("/redis")
+async def test_redis_connection():
+    """
+    GET /redis: Test Redis Cache Connectivity.
+    Sets and Gets a value from Redis.
+    """
+    try:
+        redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+        r = redis.from_url(redis_url)
+        
+        # Test Set/Get
+        key = f"test_key_{uuid.uuid4()}"
+        r.set(key, "working", ex=60)
+        value = r.get(key)
+        
+        info = r.info()
+        
+        return {
+            "status": "connected",
+            "val_check": value.decode("utf-8") if value else None,
+            "version": info.get("redis_version"),
+            "used_memory_human": info.get("used_memory_human")
+        }
+    except Exception as e:
+        return {
+            "status": "error", 
+            "details": str(e)
+        }

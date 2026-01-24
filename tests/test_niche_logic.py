@@ -54,7 +54,7 @@ def test_whatsapp_link_generation():
     summary = "Test Summary"
     tasks = [MockTask(description="Task 1", is_done=False)]
     
-    text = f"NexaVoxa Note: {title}\n\nSummary: {summary}\n\nTasks:\n"
+    text = f"VoiceNote Note: {title}\n\nSummary: {summary}\n\nTasks:\n"
     for t in tasks:
         status_icon = "✅" if t.is_done else "⏳"
         text += f"- {status_icon} {t.description}\n"
@@ -63,7 +63,7 @@ def test_whatsapp_link_generation():
     wa_link = f"https://wa.me/?text={encoded_text}"
     
     assert "https://wa.me/?text=" in wa_link
-    assert "NexaVoxa%20Note" in wa_link
+    assert "VoiceNote%20Note" in wa_link
 
 @pytest.mark.asyncio
 async def test_analytics_logic():

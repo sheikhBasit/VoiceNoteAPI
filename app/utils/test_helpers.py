@@ -22,14 +22,12 @@ def validate_email(email: str):
 
 
 def validate_device_model(model: str):
-    """Validate device model - validates it's a string."""
-    if not isinstance(model, str):
-        raise AIServiceError("Device model must be a string")
-    if len(model) > 255:
-        raise AIServiceError("Device model too long")
-    if len(model) < 1:
-        raise AIServiceError("Device model cannot be empty")
-    return model
+    """Validate device model - wraps users_validation."""
+    from app.utils.users_validation import validate_device_model as _validate_device_model
+    try:
+        return _validate_device_model(model)
+    except ValidationError as e:
+        raise AIServiceError(str(e))
 
 
 def validate_transcript(text: str):

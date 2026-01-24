@@ -9,11 +9,13 @@ from app.services.ai_service import AIService # Service we built earlier
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from fastapi import Request
+from app.utils.json_logger import JLogger
+import os
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI & Insights"])
 ai_service = AIService()
 
-limiter = Limiter(key_func=get_remote_address, storage_uri="redis://redis:6379/0")
+limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"))
 @router.post("/search", response_model=List[note_schema.NoteResponse])
 @limiter.limit("5/hour")
 async def semantic_search(request: Request, query: str, user_id: str, db: Session = Depends(get_db)):
@@ -27,6 +29,11 @@ async def semantic_search(request: Request, query: str, user_id: str, db: Sessio
     ).order_by(
         models.Note.embedding.l2_distance(query_vector)
     ).limit(5).all()
+    
+    JLogger.info("Semantic search performed", 
+                 user_id=user_id, 
+                 query=query, 
+                 results_count=len(results))
     
     return results
 

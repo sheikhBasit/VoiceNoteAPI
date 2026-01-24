@@ -40,6 +40,15 @@ class NoteUpdate(BaseModel):
     transcript: Optional[str] = None
     document_urls: Optional[List[str]] = None
     links: Optional[List[ExternalLink]] = None
+    is_deleted: Optional[bool] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TaskSummary(BaseModel):
+    id: str
+    description: str
+    is_done: bool
+    priority: Priority
     model_config = ConfigDict(from_attributes=True)
 
 class NoteResponse(NoteBase):
@@ -52,7 +61,7 @@ class NoteResponse(NoteBase):
     raw_audio_url: Optional[str]
     document_urls: List[str] = []
     links: List[ExternalLink] = []
-    tasks: List[dict] = []  # Avoid circular import
+    tasks: List[TaskSummary] = []  # Typed list for Pydantic validation
     is_pinned: bool
     is_liked: bool
     is_archived: bool
@@ -69,9 +78,17 @@ class NoteAIOutput(BaseModel):
     transcript: str  # Formatted with speaker labels
     tasks: List[dict] = []  # Avoid circular import
 
+class NoteSemanticAnalysis(BaseModel):
+    """Schema for deep semantic insights"""
+    sentiment: str
+    key_insights: List[str]
+    logical_patterns: List[str]
+    suggested_questions: List[str]
+    emotional_tone: str
+    actionable_hidden_tasks: List[str]
+
 class SearchQuery(BaseModel):
     query: str
-    user_id: str
 
 class TopicHeatmapItem(BaseModel):
     topic: str

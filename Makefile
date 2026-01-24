@@ -1,11 +1,11 @@
 # VoiceNote Docker Compose Commands
 # Variables
-COMPOSE=docker-compose
+COMPOSE=docker compose
 API_SERVICE=api
 WORKER_SERVICE=celery_worker
 BEAT_SERVICE=celery_beat
 
-.PHONY: help build up down restart logs test clean seed seed-sql seed-python db-shell db-reset health status
+.PHONY: help build up down restart logs test clean seed seed-sql seed-python db-shell db-reset health status run
 
 help:
 	@echo "========================================="
@@ -179,4 +179,9 @@ fresh-start: clean build up seed
 # Development mode (useful for hot reload)
 dev:
 	@echo "👨‍💻 Starting in development mode..."
-	$(COMPOSE) up
+# Start both infrastructure (Docker) and API (Local venv)
+run:
+	@echo "🚀 Starting infrastructure..."
+	@docker compose up -d db redis
+	@echo "📡 Starting FastAPI server..."
+	@.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

@@ -9,6 +9,11 @@ from app.db.models import Note, Task, NoteStatus, Priority
 import os
 from datetime import datetime, timedelta
 import time
+from app.utils.json_logger import JLogger
+@celery_app.task(name="ping_task")
+def ping_task(message: str):
+    """Simple task for testing Celery connectivity."""
+    return {"status": "pong", "message": message, "timestamp": time.time()}
 
 @celery_app.task(name="process_voice_note_pipeline", bind=True, max_retries=3)
 def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_role: str):
@@ -17,7 +22,8 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
     
     try:
         # 1. Update status to PROCESSING
-        db.query(Note).filter(Note.id == note_id).update({"status": NoteStatus.PENDING})
+        JLogger.info("Worker: Starting note processing pipeline", note_id=note_id, user_role=user_role)
+        db.query(Note).filter(Note.id == note_id).update({"status": NoteStatus.PROCESSING})
         db.commit()
 
         # 2. Preprocess (Offloading from Android for battery/speed)
@@ -29,7 +35,9 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
 
         # 4. AI Analysis (Whisper STT -> Llama 3.1 LLM)
         # Inherits logic from Android's AiRepository.processConversationChunks
+        JLogger.info("Worker: Running AI analysis", note_id=note_id)
         analysis = ai_service.run_full_analysis(processed_path, user_role)
+        JLogger.info("Worker: AI analysis complete", note_id=note_id, tasks_found=len(analysis.tasks))
 
         # 5. Generate Vector Embedding for Semantic Search
         embedding = ai_service.generate_embedding(analysis.summary)
@@ -38,7 +46,9 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         note = db.query(Note).filter(Note.id == note_id).first()
         note.title = analysis.title
         note.summary = analysis.summary
-        note.transcript_groq = analysis.transcript  # Store with engine identifier
+        note.transcript_groq = analysis.transcript
+        note.transcript_deepgram = analysis.transcript # Propagate for consistency
+        note.transcript_android = analysis.transcript  # Propagate for consistency
         note.audio_url = audio_url
         note.embedding = embedding
         note.status = NoteStatus.DONE
@@ -75,10 +85,11 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
                     data={"type": "CONFLICT", "conflict": conflict}
                 )
 
+        JLogger.info("Worker: Note processing pipeline finished successfully", note_id=note_id)
         return {"status": "success", "note_id": note_id, "conflicts_found": len(conflicts) if 'conflicts' in locals() else 0}
 
-
     except Exception as exc:
+        JLogger.exception("Worker: Note processing pipeline failed", note_id=note_id)
         db.rollback()
         # Handle Failover Key Rotation or API errors
         self.retry(exc=exc, countdown=60) 

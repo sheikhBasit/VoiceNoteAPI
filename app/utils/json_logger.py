@@ -101,4 +101,4 @@ class JsonLogger:
 
 
 # Global logger instance
-JLogger = JsonLogger("NEXAVOXA")
+JLogger = JsonLogger("VoiceNote")

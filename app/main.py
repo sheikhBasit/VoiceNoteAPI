@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import users, notes, tasks, ai, admin  # NEW: Import admin router
+from app.api import users, notes, tasks, ai, admin, testing  # NEW: Import testing router
 
 app = FastAPI(
     title="VoiceNote AI API",
@@ -13,6 +13,21 @@ app.include_router(notes.router)
 app.include_router(tasks.router)
 app.include_router(ai.router)
 app.include_router(admin.router)  # NEW: Admin endpoints
+app.include_router(admin.router)  # NEW: Admin endpoints
+app.include_router(testing.test_router) # NEW: Test endpoints
+from app.api import webhooks, meetings # NEW: Commercial routers
+app.include_router(webhooks.router)
+app.include_router(meetings.router)
+
+from prometheus_fastapi_instrumentator import Instrumentator
+from app.api.middleware.usage import UsageTrackingMiddleware # NEW
+
+Instrumentator().instrument(app).expose(app)
+app.add_middleware(UsageTrackingMiddleware) # NEW: Usage Metering
+
+@app.on_event("startup")
+async def startup_event():
+    pass
 
 @app.get("/")
 def read_root():

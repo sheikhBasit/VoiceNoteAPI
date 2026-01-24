@@ -7,12 +7,19 @@ This script creates sample data for development and testing:
 - 30 tasks with different priorities and assignments
 """
 
+import sys
+import os
 import time
 import uuid
 from datetime import datetime, timedelta
+
+# Add the project root to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.db import models
+from app.services.auth_service import get_password_hash
 
 def clear_all_data(db: Session):
     """Clear all data from tables"""
@@ -110,6 +117,24 @@ def create_users(db: Session):
     
     db.commit()
     return users
+
+def create_admin(db: Session):
+    """Create the primary admin user"""
+    print("\n👑 Creating primary admin user...")
+    admin = models.User(
+        id="admin-fixed-id",
+        email="admin@admin.com",
+        name="Admin User",
+        is_admin=True,
+        password_hash=get_password_hash("P@$$w0rd"),
+        token="admin-token",
+        device_id="admin-web",
+        device_model="Web Dashboard",
+        last_login=int(time.time() * 1000)
+    )
+    db.add(admin)
+    db.commit()
+    print("  ✅ Admin created successfully")
 
 def create_notes(db: Session, users):
     """Create test notes with various states"""
@@ -260,6 +285,7 @@ def main():
         clear_all_data(db)
         
         # Create data
+        create_admin(db)
         users = create_users(db)
         notes = create_notes(db, users)
         tasks = create_tasks(db, notes)

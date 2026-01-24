@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from app.db.models import UserRole
 from typing import Optional, List, Dict, Any
 import json
@@ -9,16 +9,16 @@ class UserBase(BaseModel):
     email: str
     primary_role: UserRole = UserRole.GENERIC
     secondary_role: Optional[UserRole] = None
-    custom_role_description: str = ""
-    system_prompt: str = ""
+    custom_role_description: Optional[str] = ""
+    system_prompt: Optional[str] = ""
     jargons: List[str] = []
-    show_floating_button: bool = True
+    show_floating_button: Optional[bool] = True
     work_start_hour: int = 9
     work_end_hour: int = 17
     work_days: List[int] = [2, 3, 4, 5, 6]
     # Admin fields (NEW)
-    is_admin: bool = False
-    admin_permissions: Optional[Dict[str, Any]] = None
+    # is_admin: bool = False
+    # admin_permissions: Optional[Dict[str, Any]] = None
 
 class UserCreate(UserBase):
     token: str
@@ -35,7 +35,14 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     last_login: Optional[int] = None
     is_deleted: bool = False
-    
-    class Config:
-        from_attributes = True
-        populate_by_name = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+class AdminLogin(BaseModel):
+    username: str
+    password: str
+
+class SyncResponse(BaseModel):
+    user: UserResponse
+    access_token: str
+    token_type: str = "bearer"
+    model_config = ConfigDict(from_attributes=True)

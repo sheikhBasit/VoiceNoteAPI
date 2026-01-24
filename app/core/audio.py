@@ -4,6 +4,11 @@ import numpy as np
 import noisereduce as nr
 from pydub import AudioSegment, effects
 import os
+import logging
+from app.utils.audio_quality_analyzer import AudioQualityAnalyzer
+from app.utils.json_logger import JLogger
+
+logger = logging.getLogger(__name__)
 
 def preprocess_audio_pipeline(input_path: str):
     """
@@ -51,6 +56,18 @@ def preprocess_audio_pipeline(input_path: str):
 
     output_path = input_path.replace(".mp3", "_high_gain.wav")
     final_audio.export(output_path, format="wav")
+
+    # 8. Final Quality Audit
+    analyzer = AudioQualityAnalyzer()
+    quality_report = analyzer.analyze_audio_quality(output_path)
+    
+    JLogger.info(
+        "Preprocessing complete with quality audit",
+        input=input_path,
+        output=output_path,
+        quality_score=quality_report.get("quality_score"),
+        quality_category=quality_report.get("quality_category")
+    )
 
     # Cleanup
     if os.path.exists(temp_wav):

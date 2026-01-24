@@ -15,6 +15,7 @@ class Priority(enum.Enum):
 
 class NoteStatus(enum.Enum):
     PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
     DONE = "DONE"
     DELAYED = "DELAYED"
 
@@ -46,6 +47,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     device_id = Column(String)
     device_model = Column(String)
+    password_hash = Column(String, nullable=True) # For Admin Web Login
     last_login = Column(BigInteger, default=lambda: int(time.time() * 1000))
     is_deleted = Column(Boolean, default=False, index=True)
     deleted_at = Column(BigInteger, nullable=True)
@@ -118,7 +120,7 @@ class Note(Base):
     # External Data
     document_urls = Column(JSON, default=list)
     links = Column(JSON, default=list)
-    embedding = Column(Vector(1536)) # Dimension for Llama/OpenAI Embeddings
+    embedding = Column(Vector(384)) # Dimension for all-MiniLM-L6-v2 Embeddings
     
     # Relationships with CASCADE deletion
     user = relationship("User", back_populates="notes")
@@ -128,6 +130,11 @@ class Note(Base):
         cascade="all, delete-orphan",
         passive_deletes=True  # Use database-level CASCADE
     )
+
+    @property
+    def transcript(self):
+        """Returns the best available transcript."""
+        return self.transcript_deepgram or self.transcript_groq or self.transcript_android or ""
 
 
 class Task(Base):
@@ -196,4 +203,94 @@ class ApiKey(Base):
         __import__('sqlalchemy').UniqueConstraint('service_name', 'priority', name='uq_service_priority'),
     )
 
+class SystemSettings(Base):
+    """
+    Global system settings manageable by admins.
+    Controls AI behavior, UI defaults, and system-wide thresholds.
+    """
+    __tablename__ = "system_settings"
+    
+    id = Column(Integer, primary_key=True, default=1) # Single row for global settings
+    
+    # LLM Settings
+    llm_model = Column(String(100), default="llama-3.3-70b-versatile")
+    llm_fast_model = Column(String(100), default="llama-3.1-8b-instant")
+    temperature = Column(Integer, default=3) # Stored as int (0-10) for easier UI, converted to float (0.0-1.0)
+    max_tokens = Column(Integer, default=4096)
+    top_p = Column(Integer, default=9) # Stored as int (0-10)
+    
+    # STT Settings
+    stt_engine = Column(String(50), default="deepgram") # 'deepgram', 'groq'
+    groq_whisper_model = Column(String(100), default="whisper-large-v3-turbo")
+    deepgram_model = Column(String(50), default="nova-3")
+    
+    # Semantic Analysis Settings
+    semantic_analysis_prompt = Column(Text, nullable=True)
+    
+    updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    # Note: Foreign key to users.id for updated_by
+    updated_by = Column(String, ForeignKey("users.id")) 
+
+# --- COMMERCIAL & BILLING MODELS (NEW) ---
+
+class Wallet(Base):
+    """
+    Stores user credit balance for usage-based billing.
+    One-to-One with User.
+    """
+    __tablename__ = "wallets"
+    
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    balance = Column(Integer, default=0) # Stored in smallest currency unit (e.g., cents or credits) or tokens
+    currency = Column(String(3), default="USD")
+    is_frozen = Column(Boolean, default=False) # If payment fails
+    
+    # Stripe Metadata
+    stripe_customer_id = Column(String, index=True, nullable=True)
+    stripe_subscription_id = Column(String, nullable=True)
+    auto_recharge_enabled = Column(Boolean, default=False)
+    recharge_threshold = Column(Integer, default=500) # e.g. $5.00
+    recharge_amount = Column(Integer, default=2000)   # e.g. $20.00
+    
+    updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    
+    user = relationship("User", backref="wallet")
+
+class Transaction(Base):
+    """
+    Ledger for all credit movements (Deposits, Usage, Refunds).
+    Immutable history.
+    """
+    __tablename__ = "transactions"
+    
+    id = Column(String, primary_key=True, default=lambda: str(__import__('uuid').uuid4()))
+    wallet_id = Column(String, ForeignKey("wallets.user_id"), index=True)
+    amount = Column(Integer, nullable=False) # Negative for usage, Positive for deposit
+    balance_after = Column(Integer, nullable=False) # Snapshot of balance
+    type = Column(String(20), nullable=False) # 'DEPOSIT', 'USAGE', 'REFUND', 'BONUS'
+    description = Column(String) # e.g. "Transcription: 5 mins" or "Stripe Payment #123"
+    reference_id = Column(String, nullable=True) # ID of Note/Task/StripeCharge
+    created_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+
+class UsageLog(Base):
+    """
+    Granular log of API resource consumption.
+    Used for metering and anomaly detection.
+    """
+    __tablename__ = "usage_logs"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, ForeignKey("users.id"), index=True)
+    endpoint = Column(String, index=True) # e.g. '/transcribe', '/rag/search'
+    
+    # Metrics
+    duration_seconds = Column(Integer, default=0) # Processing time or audio duration
+    tokens_input = Column(Integer, default=0)
+    tokens_output = Column(Integer, default=0)
+    provider = Column(String) # 'groq', 'deepgram', 'tavily'
+    model = Column(String)    # 'llama-3.1', 'nova-2'
+    
+    cost_estimated = Column(Integer, default=0) # In credits/cents
+    status = Column(Integer, default=200) # HTTP Status
+    timestamp = Column(BigInteger, default=lambda: int(time.time() * 1000)) 
     

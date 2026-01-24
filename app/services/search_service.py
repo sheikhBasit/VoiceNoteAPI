@@ -16,45 +16,48 @@ class SearchService:
         self.tavily_api_key = os.getenv("TAVILY_API_KEY")
         self.tavily_url = "https://api.tavily.com/search"
 
-    async def search_notes(self, db: Session, user_id: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+    async def search_notes(self, db: Session, user_id: str, query: str, limit: int = 5, threshold: float = 1.0) -> List[Dict[str, Any]]:
         """
-        Perform semantic search across user notes using pgvector.
+        Perform semantic search with distance thresholding and pagination.
         """
         # 1. Generate embedding for query
-        query_embedding = self.ai_service.generate_embedding(query)
+        query_embedding = await self.ai_service.generate_embedding(query)
         
         # 2. Search database
-        # L2 distance (lower is better)
+        # L2 distance (lower is better). threshold <= 1.0 is usually a good starting point.
         results = db.query(models.Note).filter(
             models.Note.user_id == user_id,
-            models.Note.is_deleted == False
+            models.Note.is_deleted == False,
+            models.Note.embedding.l2_distance(query_embedding) <= threshold
         ).order_by(
             models.Note.embedding.l2_distance(query_embedding)
         ).limit(limit).all()
         
         formatted_results = []
         for note in results:
+            # Calculate a generic similarity score (1 - normalized distance)
+            # This is a heuristic for the UI
             formatted_results.append({
                 "id": note.id,
                 "title": note.title,
                 "summary": note.summary,
                 "transcript": note.transcript_deepgram or note.transcript_groq or note.transcript_android,
                 "timestamp": note.timestamp,
-                "similarity": 1.0 # pgvector doesn't return score directly in simple query easily, but order_by handles it
+                "similarity_score": round(max(0, 1 - (note.embedding.l2_distance(query_embedding) / threshold)), 2)
             })
             
         return formatted_results
 
     async def search_web(self, query: str) -> List[Dict[str, Any]]:
         """
-        Fallback search using Tavily API.
+        Fallback search using Tavily API with timeout and error handling.
         """
         if not self.tavily_api_key:
             logger.warning("TAVILY_API_KEY not configured. Skipping web search.")
             return []
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
                     self.tavily_url,
                     json={
@@ -63,74 +66,78 @@ class SearchService:
                         "search_depth": "smart",
                         "include_answer": True,
                         "max_results": 5
-                    },
-                    timeout=10.0
+                    }
                 )
                 response.raise_for_status()
                 data = response.json()
-                return data.get("results", [])
+                results = data.get("results", [])
+                
+                # Cleanup web results content
+                for r in results:
+                    r["content"] = r.get("content", "")[:1000] # Cap content length
+                
+                return results
         except Exception as e:
-            logger.error(f"Web search failed: {e}")
+            logger.error(f"Web search failed for query '{query}': {e}")
             return []
 
     async def unified_rag_search(self, db: Session, user_id: str, query: str) -> Dict[str, Any]:
         """
-        The "Niche Conqueror" V-RAG Logic:
-        1. Search local notes first.
-        2. If notes don't provide a clear answer (or if explicitly requested), search web.
-        3. Synthesize final answer.
+        Improved V-RAG synthesis decision logic.
         """
-        # 1. Local Search
-        local_results = await self.search_notes(db, user_id, query)
+        # 1. Local Search with strict threshold
+        local_results = await self.search_notes(db, user_id, query, limit=5, threshold=0.8)
         
-        # 2. Decision logic: Do we need web search?
-        # For MVP: If local results are empty or query seems like a general question
-        needs_web = len(local_results) == 0
+        # 2. Decision logic: Trigger web search if local results are insufficient
+        # Consider a combination of count and similarity score
+        needs_web = len(local_results) == 0 or all(r["similarity_score"] < 0.4 for r in local_results)
         
         web_results = []
         if needs_web:
-            logger.info(f"Local search for '{query}' returned no results. Falling back to web.")
+            logger.info(f"Local context insufficient for '{query}'. Triggering web research.")
             web_results = await self.search_web(query)
             
         # 3. Synthesize Context for LLM
-        context = "LOCAL NOTES:\n"
+        context_parts = []
         if local_results:
+            context_parts.append("USER'S PRIVATE NOTES:")
             for r in local_results:
-                context += f"- {r['title']}: {r['summary']}\nTranscript: {r['transcript'][:500]}...\n\n"
-        else:
-            context += "No relevant local notes found.\n"
-            
+                context_parts.append(f"Title: {r['title']}\nSummary: {r['summary']}\nTranscript Snippet: {r['transcript'][:300]}")
+        
         if web_results:
-            context += "\nWEB SEARCH RESULTS:\n"
+            context_parts.append("\nWEB RESEARCH DATA:")
             for r in web_results:
-                context += f"- {r['title']}: {r['content'][:500]}...\nURL: {r['url']}\n\n"
-                
-        # 4. Ask LLM to synthesize answer
-        prompt = f"""
-        User Query: {query}
+                context_parts.append(f"Source: {r['title']}\nContent: {r['content'][:500]}\nURL: {r['url']}")
         
-        Using the provided context (local notes and web search results), please answer the user's question.
-        If the information is from their local notes, mention it.
-        If the information is from the web because notes were insufficient, clarify that.
-        
-        CONTEXT:
-        {context}
-        """
-        
-        # Reuse ai_service llm_brain but with custom prompt
-        # We can pass this as user_instruction
-        ai_response = await self.ai_service.llm_brain(
-            transcript="See context in instruction", 
-            user_role="RESEARCHER",
-            user_instruction=prompt
+        context = "\n\n".join(context_parts) if context_parts else "No context found."
+            
+        # 4. Ask LLM to synthesize answer using centralized prompt
+        prompt = ai_config.RAG_SYNTHESIS_PROMPT.format(
+            query=query,
+            context=context
         )
         
-        return {
-            "query": query,
-            "answer": ai_response.summary, # LLM fills this
-            "source": "hybrid",
-            "local_note_count": len(local_results),
-            "web_result_count": len(web_results),
-            "local_results": local_results[:2], # Truncated for response
-            "web_results": web_results[:2]
-        }
+        try:
+            # We use a lower temperature for RAG to stay factual
+            ai_response = await self.ai_service.llm_brain(
+                transcript="Synthesizing from multiple sources...", 
+                user_role="RESEARCH_ANALYST",
+                user_instruction=prompt
+            )
+            
+            return {
+                "query": query,
+                "answer": ai_response.summary,
+                "source": "private_notes" if not web_results else ("hybrid" if local_results else "web_only"),
+                "local_note_count": len(local_results),
+                "web_result_count": len(web_results),
+                "results": local_results[:3] + web_results[:2]
+            }
+        except Exception as e:
+            logger.error(f"RAG Synthesis failed: {e}")
+            return {
+                "query": query,
+                "answer": "I found some relevant information but failed to synthesize a complete answer. Please see the raw results below.",
+                "source": "error",
+                "results": local_results + web_results
+            }
