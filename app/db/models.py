@@ -141,6 +141,10 @@ class Note(Base):
         """Returns the best available transcript."""
         return self.transcript_deepgram or self.transcript_groq or self.transcript_android or ""
 
+from sqlalchemy import Index
+# High-performance HNSW index for vector search (Cosine similarity optimized)
+Index('idx_notes_embedding', Note.embedding, postgresql_using='hnsw', postgresql_with={'m': 16, 'ef_construction': 64})
+
 
 class Task(Base):
     __tablename__ = "tasks"

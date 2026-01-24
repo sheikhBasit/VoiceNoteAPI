@@ -77,7 +77,8 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         if user and extracted_tasks:
             events = CalendarService.get_user_events(user.id)
 
-            conflicts = CalendarService.detect_conflicts(extracted_tasks, events)
+            # NEW: Using optimized synchronous conflict detection (Mapping 'title' to context)
+            conflicts = ai_service.detect_conflicts_sync(analysis.summary, [str(e.get('title', '')) for e in events])
             
             for conflict in conflicts:
                 send_push_notification.delay(
@@ -127,7 +128,7 @@ def process_task_image_pipeline(task_id: str, local_path: str, filename: str):
         db.commit()
     except Exception as e:
         db.rollback()
-        print(f"Error processing multimedia for task {task_id}: {str(e)}")
+        JLogger.error("Worker: Multimedia processing failed", task_id=task_id, error=str(e))
     finally:
         db.close()
         if os.path.exists(local_path):
@@ -172,7 +173,7 @@ def check_upcoming_tasks():
                     data={"task_id": task.id, "type": "DEADLINE_REMINDER"}
                 )
     except Exception as e:
-        print(f"Error checking upcoming tasks: {str(e)}")
+        JLogger.error("Worker: Upcoming tasks check failed", error=str(e))
     finally:
         db.close()
 
@@ -426,8 +427,8 @@ def process_ai_query_task(note_id: str, question: str, user_id: str):
     finally:
         db.close()
 
-@celery_app.task(name="generate_note_embeddings_task")
-def generate_note_embeddings_task(note_id: str):
+@celery_app.task(name="generate_note_embeddings_task", bind=True, max_retries=3)
+def generate_note_embeddings_task(self, note_id: str):
     """Regenerates embeddings when note content changes significantly."""
     db = SessionLocal()
     ai_service = AIService()
@@ -448,7 +449,7 @@ def generate_note_embeddings_task(note_id: str):
     except Exception as e:
         JLogger.error("Worker: Embedding generation failed", note_id=note_id, error=str(e))
         db.rollback()
-        raise
+        self.retry(exc=e, countdown=30)
     finally:
         db.close()
 

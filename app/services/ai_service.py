@@ -33,6 +33,8 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger("VoiceNote")
 
 class AIService:
+    _local_embedding_model = None  # Class-level singleton
+
     def __init__(self):
         # AI Clients with graceful environment handling
         self.groq_api_key = os.getenv("GROQ_API_KEY")
@@ -59,14 +61,14 @@ class AIService:
                 logger.error(f"Failed to load speaker diarization: {e}")
 
     def _get_local_embedding_model(self):
-        if self.local_embedding_model is None:
+        if AIService._local_embedding_model is None:
             try:
                 # Using all-MiniLM-L6-v2 which produces 384 dimensions
                 logger.info("Loading local embedding model: all-MiniLM-L6-v2")
-                self.local_embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+                AIService._local_embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
             except Exception as e:
                 logger.error(f"Failed to load local embedding model: {e}")
-        return self.local_embedding_model
+        return AIService._local_embedding_model
 
     def _get_dynamic_settings(self):
         """Fetches settings from DB with a simple cache."""
@@ -320,6 +322,30 @@ class AIService:
         ai_output = await self.llm_brain(transcript)
         
         return ai_output
+
+    def detect_conflicts_sync(self, new_summary: str, existing_notes: list[str]) -> list[dict]:
+        """Synchronous version for Celery worker."""
+        if not existing_notes or not self.groq_client:
+            return []
+
+        context_notes = existing_notes[-10:]
+        formatted_notes = "\n---\n".join([f"Note {i+1}: {note}" for i, note in enumerate(context_notes)])
+        prompt = ai_config.CONFLICT_DETECTOR_PROMPT.format(
+            new_summary=new_summary,
+            existing_notes=formatted_notes
+        )
+
+        try:
+            response = self.groq_client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=ai_config.LLM_FAST_MODEL,
+                response_format={"type": "json_object"}
+            )
+            data = validate_json_response(response.choices[0].message.content)
+            return data.get("conflicts", [])
+        except Exception as e:
+            logger.error(f"Sync conflict detection failed: {e}")
+            return []
 
     @retry_with_backoff(max_attempts=2)
     async def detect_conflicts(self, new_summary: str, existing_notes: list[str]) -> list[dict]:

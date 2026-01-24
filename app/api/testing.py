@@ -10,7 +10,7 @@ from app.worker.task import ping_task
 from celery.result import AsyncResult
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-test_router = APIRouter(prefix="/api/test", tags=["Testing Lab"])
+test_router = APIRouter(prefix="/api/v1/test", tags=["Testing Lab"])
 ai_service = AIService()
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"))
 

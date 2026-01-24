@@ -45,21 +45,9 @@ async def semantic_search(
     
     return results
 
-@router.post("/{note_id}/ask", status_code=status.HTTP_202_ACCEPTED)
-async def ask_ai(
-    note_id: str,
-    question: str = Body(..., embed=True),
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    """
-    POST /{note_id}/ask: Unified Background AI Q&A.
-    Returns 202 Accepted. Result will appear in note.ai_responses.
-    """
-    from app.utils.security import verify_note_ownership
-    verify_note_ownership(db, current_user.id, note_id)
-    process_ai_query_task.delay(note_id, question, current_user.id)
-    return {"message": "AI is thinking...", "note_id": note_id}
+    return results
+
+# NOTE: /{note_id}/ask is now unified in notes.py to avoid duplication.
 
 from app.services.auth_service import get_current_user
 

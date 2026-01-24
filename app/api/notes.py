@@ -18,6 +18,7 @@ import asyncio
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from app.core.config import ai_config
 from app.utils.json_logger import JLogger
 from app.services.ai_service import AIService
 from app.services.search_service import SearchService
@@ -103,12 +104,14 @@ def create_note(
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(get_current_user)
 ):
-    """POST /: Manually create a text-based note."""
+    if not note_data.title or not note_data.title.strip():
+        note_data.title = "Untitled Note"
+
     note_id = str(uuid.uuid4())
     db_note = models.Note(
         id=note_id,
         user_id=current_user.id,
-        title=note_data.title or "Untitled Note",
+        title=note_data.title,
         summary=note_data.summary or "",
         transcript_groq=note_data.transcript or "",
         priority=note_data.priority or models.Priority.MEDIUM,
@@ -119,6 +122,12 @@ def create_note(
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
+
+    # NEW: Trigger background tasks immediately
+    generate_note_embeddings_task.delay(note_id)
+    if db_note.transcript_groq:
+        analyze_note_semantics_task.delay(note_id)
+
     return db_note
 
 @router.get("", response_model=List[note_schema.NoteResponse])

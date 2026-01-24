@@ -1,10 +1,10 @@
  
  -------------- celery@basitdev-Latitude-5420 v5.6.2 (recovery)
 --- ***** ----- 
--- ******* ---- Linux-6.14.0-37-generic-x86_64-with-glibc2.39 2026-01-25 00:37:08
+-- ******* ---- Linux-6.14.0-37-generic-x86_64-with-glibc2.39 2026-01-25 00:47:21
 - *** --- * --- 
 - ** ---------- [config]
-- ** ---------- .> app:         voicenote_worker:0x7b05a6d1cb90
+- ** ---------- .> app:         voicenote_worker:0x7ed7bb3c0a70
 - ** ---------- .> transport:   redis://localhost:6380/2
 - ** ---------- .> results:     redis://localhost:6380/3
 - *** --- * --- .> concurrency: 8 (prefork)
@@ -29,9 +29,9 @@
   . send_push_notification
   . sync_external_service_task
 
-[2026-01-25 00:37:13,136: INFO/MainProcess] Connected to redis://localhost:6380/2
-[2026-01-25 00:37:13,145: INFO/MainProcess] mingle: searching for neighbors
-[2026-01-25 00:37:14,164: INFO/MainProcess] mingle: all alone
-[2026-01-25 00:37:14,194: INFO/MainProcess] celery@basitdev-Latitude-5420 ready.
-
-worker: Warm shutdown (MainProcess)
+[2026-01-25 00:47:25,377: INFO/MainProcess] Connected to redis://localhost:6380/2
+[2026-01-25 00:47:25,388: INFO/MainProcess] mingle: searching for neighbors
+[2026-01-25 00:47:26,402: INFO/MainProcess] mingle: all alone
+[2026-01-25 00:47:26,420: INFO/MainProcess] celery@basitdev-Latitude-5420 ready.
+[2026-01-25 00:47:26,429: INFO/MainProcess] Task ping_task[86e79aad-7262-4dd4-be24-3b38181e3b2d] received
+[2026-01-25 00:47:26,438: INFO/ForkPoolWorker-8] Task ping_task[86e79aad-7262-4dd4-be24-3b38181e3b2d] succeeded in 0.007086454001182574s: {'status': 'pong', 'message': 'Hello from API e79bf553-0971-4dc5-997a-51868cccd8af', 'timestamp': 1769284046.4353783}

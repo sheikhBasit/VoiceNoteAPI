@@ -39,21 +39,18 @@ def test_background_flow():
         return
     notes = res.json()
     
-    if not notes:
-        log("No notes found. Creating a test note...")
-        res = requests.post(f"{BASE_URL}/notes/create", headers=headers, json={
-            "title": "Automated Test Note",
-            "summary": "This note was created for background task testing. We need a summary of the quarterly earnings and the future roadmap for AI features.",
-            "transcript": "Okay everyone, let's look at the quarterly earnings. We've grown by 20%. For the future roadmap, we need to implement autonomous agents and better background processing using Celery. This is critical for VoiceNote AI."
-        })
-        if res.status_code != 200:
-            log(f"Failed to create note: {res.status_code} - {res.text}")
-            return
-        note = res.json()
-        note_id = note['id']
-    else:
-        note = notes[0]
-        note_id = note['id']
+    # Force fresh note creation for testing purity
+    log("Creating a fresh test note...")
+    res = requests.post(f"{BASE_URL}/notes/create", headers=headers, json={
+        "title": f"Automated Test Note {uuid.uuid4().hex[:4]}",
+        "summary": "This note was created for background task testing. We need a summary of the quarterly earnings and the future roadmap for AI features.",
+        "transcript": "Okay everyone, let's look at the quarterly earnings. We've grown by 20%. For the future roadmap, we need to implement autonomous agents and better background processing using Celery. This is critical for VoiceNote AI."
+    })
+    if res.status_code != 200:
+        log(f"Failed to create note: {res.status_code} - {res.text}")
+        return
+    note = res.json()
+    note_id = note['id']
     
     log(f"Using Note ID: {note_id}")
 
@@ -65,7 +62,7 @@ def test_background_flow():
     
     # 4. Test Ask AI (Backgrounded)
     log("Triggering Ask AI...")
-    res = requests.post(f"{BASE_URL}/ai/{note_id}/ask", 
+    res = requests.post(f"{BASE_URL}/notes/{note_id}/ask", 
                         headers=headers, 
                         json={"question": "What was the growth mentioned in the note?"})
     print(f"Response: {res.status_code} - {res.json()}")
@@ -81,8 +78,8 @@ def test_background_flow():
                          json={"title": f"Updated Title {uuid.uuid4().hex[:4]}"})
     print(f"Response: {res.status_code}")
     
-    log("Waiting for background workers to finish (20s for LLM processing)...")
-    time.sleep(20)
+    log("Waiting for background workers to finish (30s for LLM processing)...")
+    time.sleep(30)
 
     # 6. Verify Results
     log("Verifying results in Note model...")

@@ -95,14 +95,19 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
                     f"API Call: {request.url.path}"
                 )
 
+            if user_id == "anonymous":
+                # Optional: Skip logging for anonymous users to avoid FK issues
+                # Or log with user_id = None if the schema allows it
+                return
+
             # 2. Log metadata
-            log = UsageLog(
+            log_entry = UsageLog( # Changed from models.UsageLog to UsageLog as it's directly imported
                 user_id=user_id,
                 endpoint=request.url.path,
                 duration_seconds=int(duration),
                 status=response.status_code
             )
-            db.add(log)
+            db.add(log_entry) # Changed from log to log_entry
             db.commit()
         except Exception as e:
             # Don't break the request if logging fails

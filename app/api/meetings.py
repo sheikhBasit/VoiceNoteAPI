@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 import logging
 
-router = APIRouter(tags=["Meetings"])
+router = APIRouter(prefix="/api/v1", tags=["Meetings"])
 logger = logging.getLogger("VoiceNote.MeetingsAPI")
 
 def get_db():

@@ -5,7 +5,7 @@ from app.services.billing_service import BillingService
 from app.db.session import SessionLocal
 import logging
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1")
 logger = logging.getLogger("VoiceNote.Webhooks")
 
 stripe.api_key = ai_config.STRIPE_SECRET_KEY

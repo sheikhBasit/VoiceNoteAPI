@@ -11,7 +11,10 @@ import sys
 import os
 import time
 import uuid
-from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add the project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,12 +23,18 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.db import models
 from app.services.auth_service import get_password_hash
+from app.utils.admin_utils import DEFAULT_ADMIN_PERMISSIONS
 
 def clear_all_data(db: Session):
-    """Clear all data from tables"""
+    """Clear all data from tables in the correct order"""
     print("🗑️  Clearing existing data...")
+    db.query(models.UsageLog).delete()
+    db.query(models.Transaction).delete()
+    db.query(models.Wallet).delete()
     db.query(models.Task).delete()
     db.query(models.Note).delete()
+    db.query(models.SystemSettings).delete()
+    db.query(models.ApiKey).delete()
     db.query(models.User).delete()
     db.commit()
     print("✅ Data cleared")
@@ -122,19 +131,20 @@ def create_admin(db: Session):
     """Create the primary admin user"""
     print("\n👑 Creating primary admin user...")
     admin = models.User(
-        id="admin-fixed-id",
-        email="admin@admin.com",
-        name="Admin User",
+        id="admin_main",
+        email="admin@voicenote.app",
+        name="Super Admin",
         is_admin=True,
+        admin_permissions=DEFAULT_ADMIN_PERMISSIONS.copy(),
         password_hash=get_password_hash("P@$$w0rd"),
-        token="admin-token",
-        device_id="admin-web",
-        device_model="Web Dashboard",
+        token="token_admin_main",
+        device_id="dev_admin_main",
+        device_model="Server",
         last_login=int(time.time() * 1000)
     )
     db.add(admin)
     db.commit()
-    print("  ✅ Admin created successfully")
+    print("  ✅ Admin created successfully (admin_main)")
 
 def create_notes(db: Session, users):
     """Create test notes with various states"""

@@ -8,6 +8,8 @@ from app.db import models
 from app.services.ai_service import AIService
 from pgvector.sqlalchemy import Vector
 
+from app.core.config import ai_config
+
 logger = logging.getLogger(__name__)
 
 class SearchService:
