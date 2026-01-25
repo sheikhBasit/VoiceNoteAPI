@@ -59,3 +59,7 @@ INFO:     127.0.0.1:39942 - "GET /api/v1/admin/admins HTTP/1.1" 200 OK
 INFO:     127.0.0.1:39942 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
 🛡️ Admin Action Log: {'admin_id': 'admin_main', 'action': 'UPDATE_AI_SETTINGS', 'target_id': 'GLOBAL_SYSTEM_SETTINGS', 'details': {'temperature': 7}, 'timestamp': 1769284059468}
 INFO:     127.0.0.1:39942 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [123536]
