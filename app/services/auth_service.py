@@ -35,6 +35,38 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
+def create_device_verification_token(email: str, device_id: str, device_model: str, biometric_token: str):
+    """Generates a short-lived token (15 mins) to verify a new device."""
+    expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode = {
+        "sub": email,
+        "type": "device_verification",
+        "device_id": device_id,
+        "device_model": device_model,
+        "biometric_token": biometric_token,
+        "exp": expire
+    }
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def verify_device_token(token: str) -> dict:
+    """Decodes and validates a device verification token."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "device_verification":
+            raise Exception("Invalid token type")
+        return payload
+    except Exception as e:
+        return None
+
+def mock_send_verification_email(email: str, link: str):
+    """
+    Mocks sending an email. In production, use SMTP or SendGrid.
+    """
+    print(f"\n[EMAIL SERVICE] To: {email}")
+    print(f"Subject: Verify New Device Login")
+    print(f"Body: Click here to authorize your new device: {link}\n")
+    JLogger.info("Sent verification email", email=email, link=link)
+
 async def get_current_user(
     request: Request,
     token: str = Depends(oauth2_scheme),

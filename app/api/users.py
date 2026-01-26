@@ -21,75 +21,152 @@ from app.services.auth_service import create_access_token, get_current_user
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0")) 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 @router.post("/sync", response_model=user_schema.SyncResponse)
-@limiter.limit("100/minute")
+@limiter.limit("20/minute") # Stricter limit for auth
 def sync_user(request: Request, user_data: user_schema.UserCreate, db: Session = Depends(get_db)):
     """
-    POST /sync: Onboarding/Login. 
-    Registers device ID and sets up the primary user role and system prompt.
+    POST /sync: Email-First Authentication.
+    - If Email New: Account created, device authorized.
+    - If Email Exists + Device New: Returns 403 + Email Sent.
+    - If Email Exists + Device Authorized: Login Success.
     """
     try:
         validated_email = validate_email(user_data.email)
-        validated_user_id = validate_user_id(user_data.id)
-        validated_token = validate_token(user_data.token)
         validated_device_id = validate_device_id(user_data.device_id)
-        validated_device_model = validate_device_model(user_data.device_model)
-        validated_name = validate_name(user_data.name)
-        validated_work_hours = validate_work_hours(user_data.work_start_hour, user_data.work_end_hour)
-        validated_work_days = validate_work_days(user_data.work_days)
-        validated_jargons = validate_jargons(user_data.jargons)
-        validated_system_prompt = validate_system_prompt(user_data.system_prompt)
-        
+        # validated_token = validate_token(user_data.token) # Biometric token checks
     except ValidationError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail=f"Validation failed: {str(e)}"
-        )
+        raise HTTPException(status_code=400, detail=str(e))
     
-    db_user = db.query(models.User).filter(models.User.id == validated_user_id).first()
+    # 1. Find User by Email
+    db_user = db.query(models.User).filter(models.User.email == validated_email).first()
     
+    # 2. Case: New User (Auto-Register)
     if not db_user:
+        import uuid
+        new_user_id = str(uuid.uuid4())
+        
+        # Initialize authorized devices list
+        initial_device = {
+            "device_id": validated_device_id,
+            "device_model": user_data.device_model,
+            "biometric_token": user_data.token,
+            "authorized_at": int(time.time() * 1000)
+        }
+        
         db_user = models.User(
-            id=validated_user_id,
-            name=validated_name,
+            id=new_user_id,
+            name=user_data.name,
             email=validated_email,
-            token=validated_token,
-            device_id=validated_device_id,
-            device_model=validated_device_model,
+            authorized_devices=[initial_device], # PRIMARY CHANGE
+            current_device_id=validated_device_id,
+            
+            # Defaults
             primary_role=user_data.primary_role,
-            secondary_role=user_data.secondary_role,
-            system_prompt=validated_system_prompt,
-            work_start_hour=validated_work_hours[0],
-            work_end_hour=validated_work_hours[1],
-            work_days=validated_work_days,
-            jargons=validated_jargons,
+            work_days=[2,3,4,5,6],
             last_login=int(time.time() * 1000),
             is_deleted=False
         )
         db.add(db_user)
-    else:
-        db_user.token = validated_token
-        db_user.device_id = validated_device_id
-        db_user.device_model = validated_device_model
-        db_user.name = validated_name
-        db_user.email = validated_email
+        db.commit()
+        db.refresh(db_user)
+        
+        # Issue Token
+        access_token = create_access_token(data={"sub": db_user.id})
+        return {"user": db_user, "access_token": access_token, "token_type": "bearer"}
+
+    # 3. Case: Existing User - Check Device Authorization
+    authorized_devices = db_user.authorized_devices or []
+    
+    # Check if this device + token matches any authorized entry
+    is_authorized = False
+    for dev in authorized_devices:
+        if dev.get("device_id") == validated_device_id:
+            # Optional: Check biometric token match strictly? 
+            # For now, if device_id matches, we assume it's valid, 
+            # OR we can update the token if it rotated.
+            is_authorized = True
+            
+            # Update metadata if needed
+            dev["last_seen"] = int(time.time() * 1000)
+            dev["biometric_token"] = user_data.token # Update latest token
+            break
+            
+    if is_authorized:
+        # Login Success
+        db_user.current_device_id = validated_device_id
         db_user.last_login = int(time.time() * 1000)
-        if validated_system_prompt:
-            db_user.system_prompt = validated_system_prompt
-        if user_data.primary_role:
-            db_user.primary_role = user_data.primary_role
+        
+        # Must flag modified for JSON updates in SQLAlchemy
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(db_user, "authorized_devices")
+        
+        db.commit()
+        access_token = create_access_token(data={"sub": db_user.id})
+        return {"user": db_user, "access_token": access_token, "token_type": "bearer"}
+        
+    else:
+        # 4. Case: UNKNOWN DEVICE -> Trigger Magic Link
+        from app.services.auth_service import create_device_verification_token, mock_send_verification_email
+        
+        # Generate Verification Token
+        verification_token = create_device_verification_token(
+            email=validated_email,
+            device_id=validated_device_id,
+            device_model=user_data.device_model,
+            biometric_token=user_data.token
+        )
+        
+        # Construct Link (In real app, this is a deep link or web url)
+        # e.g. https://api.voicenote.ai/api/v1/users/verify-device?token=...
+        magic_link = f"http://localhost:8000/api/v1/users/verify-device?token={verification_token}"
+        
+        mock_send_verification_email(validated_email, magic_link)
+        
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Device not authorized. Check your email to verify this device.",
+            headers={"X-Auth-Reason": "DEVICE_VERIFICATION_REQUIRED"}
+        )
+
+@router.get("/verify-device")
+def verify_new_device(token: str, db: Session = Depends(get_db)):
+    """GET /verify-device: Clicked from Email."""
+    from app.services.auth_service import verify_device_token
+    
+    payload = verify_device_token(token)
+    if not payload:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification link.")
+        
+    email = payload["sub"]
+    device_id = payload["device_id"]
+    
+    db_user = db.query(models.User).filter(models.User.email == email).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found.")
+        
+    # check if already authorized
+    authorized_devices = db_user.authorized_devices or []
+    for dev in authorized_devices:
+        if dev.get("device_id") == device_id:
+             return {"message": "Device already authorized. You can login now."}
+             
+    # Add new device
+    new_device = {
+        "device_id": device_id,
+        "device_model": payload["device_model"],
+        "biometric_token": payload["biometric_token"],
+        "authorized_at": int(time.time() * 1000)
+    }
+    
+    authorized_devices.append(new_device)
+    db_user.authorized_devices = authorized_devices
+    
+    # Must flag modified
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(db_user, "authorized_devices")
     
     db.commit()
-    db.refresh(db_user)
     
-    # ISSUE JWT TOKEN
-    access_token = create_access_token(data={"sub": db_user.id})
-    
-    JLogger.info("User synced profile", user_id=db_user.id, email=db_user.email)
-    return {
-        "user": db_user,
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
+    return {"message": "Device authorized successfully! Return to the app to login."}
 
 @router.get("/me", response_model=user_schema.UserResponse)
 @limiter.limit("60/minute")

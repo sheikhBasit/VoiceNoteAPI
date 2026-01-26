@@ -44,12 +44,16 @@ class SubscriptionTier(enum.Enum):
 class User(Base):
     __tablename__ = "users"
     
-    id = Column(String, primary_key=True) # Usually Firebase UID or Device ID
-    token = Column(String)
+    id = Column(String, primary_key=True) # UUID (not just device ID anymore)
     name = Column(String)
     email = Column(String, unique=True, index=True)
-    device_id = Column(String)
-    device_model = Column(String)
+    
+    # Auth & Device Management
+    # Stores list of dicts: [{"device_id": "...", "device_model": "...", "biometric_token": "...", "authorized_at": 123}]
+    authorized_devices = Column(JSONB, default=list) 
+    
+    # Session Info
+    current_device_id = Column(String, nullable=True)
     tier = Column(Enum(SubscriptionTier), default=SubscriptionTier.FREE)
     password_hash = Column(String, nullable=True) # For Admin Web Login
     last_login = Column(BigInteger, default=lambda: int(time.time() * 1000))
