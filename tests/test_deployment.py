@@ -6,7 +6,7 @@ import pytest
 # This test runs against your LIVE production/staging URL
 LIVE_URL = os.getenv("DEPLOYMENT_URL")
 
-@pytest.mark.skipif(not LIVE_URL, reason="Skipping deployment tests: DEPLOYMENT_URL not set")
+pytestmark = pytest.mark.skipif(not LIVE_URL, reason="Skipping deployment tests: DEPLOYMENT_URL not set")
 
 def test_live_health():
     """Check if the deployed server is up and database is connected."""
