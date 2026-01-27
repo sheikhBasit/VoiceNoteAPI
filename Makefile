@@ -125,15 +125,15 @@ db-backup:
 # Testing
 test:
 	@echo "🧪 Running all tests..."
-	$(COMPOSE) run --rm -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/ -v
+	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/ -v
 
 test-admin:
 	@echo "🧪 Running admin system tests..."
-	$(COMPOSE) run --rm -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/test_admin_system.py -v
+	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/test_admin_system.py -v
 
 test-coverage:
 	@echo "🧪 Running tests with coverage..."
-	$(COMPOSE) run --rm -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/ --cov=app --cov-report=html --cov-report=term
+	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/ --cov=app --cov-report=html --cov-report=term
 
 # Health Check
 health:
