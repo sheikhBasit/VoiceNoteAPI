@@ -36,7 +36,9 @@ sys.modules["soundfile"] = MagicMock()
 
 import os
 # Force local DB connection for pytest
-os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5433/voicenote"
+# Force local DB connection for pytest if not in Docker
+if not os.getenv("DATABASE_URL"):
+    os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5433/voicenote"
 
 from app.db.session import SessionLocal, sync_engine as engine
 from app.db.models import Base
