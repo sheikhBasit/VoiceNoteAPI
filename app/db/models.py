@@ -151,7 +151,7 @@ class Note(Base):
 
 from sqlalchemy import Index
 # High-performance HNSW index for vector search (Cosine similarity optimized)
-Index('idx_notes_embedding', Note.embedding, postgresql_using='hnsw', postgresql_with={'m': 16, 'ef_construction': 64})
+Index('idx_notes_embedding', Note.embedding, postgresql_using='hnsw', postgresql_with={'m': 16, 'ef_construction': 64}, postgresql_ops={'embedding': 'vector_cosine_ops'})
 
 
 class Task(Base):

@@ -78,6 +78,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./scripts:/app/scripts
+      - ./tests:/app/tests
       - ./uploads:/app/uploads
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]

@@ -141,7 +141,7 @@ class AdminManager:
             raise AIServiceError(f"User {user_id} is not an admin")
         
         # Merge with existing permissions
-        current_perms = user.admin_permissions or {}
+        current_perms = dict(user.admin_permissions or {})
         current_perms.update(permissions)
         user.admin_permissions = current_perms
         user.admin_last_action = int(time.time() * 1000)

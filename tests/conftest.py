@@ -14,25 +14,12 @@ sys.modules["pyannote"] = MagicMock()
 sys.modules["pyannote.audio"] = MagicMock()
 # sys.modules["sentence_transformers"] = MagicMock()
 # sys.modules["noisereduce"] = MagicMock()
-sys.modules["torch"] = MagicMock()
-sys.modules["numpy"] = MagicMock()
+# sys.modules["torch"] = MagicMock()
+# sys.modules["numpy"] = MagicMock()
 
-# Configure SentenceTransformer Mock
-mock_st = MagicMock()
-mock_model = MagicMock()
-# Support .encode().tolist() chain
-mock_model.encode.return_value.tolist.return_value = [0.1] * 384
-mock_st.SentenceTransformer.return_value = mock_model
-sys.modules["sentence_transformers"] = mock_st
-
-# Configure NoiseReduce Mock
-mock_nr = MagicMock()
-# Return a fake "numpy array" that soundfile can write (if mocked) or just pass through
-mock_nr.reduce_noise.return_value = MagicMock() 
-sys.modules["noisereduce"] = mock_nr
-
-# Mock Soundfile to avoid IO and numpy dependency issues
-sys.modules["soundfile"] = MagicMock()
+# Configure SentenceTransformer Mock - REMOVED (Use real)
+# Configure NoiseReduce Mock - REMOVED (Use real)
+# Mock Soundfile - REMOVED (Use real)
 
 import os
 # Force local DB connection for pytest
@@ -45,10 +32,10 @@ from app.db.models import Base
 @pytest.fixture(scope="session", autouse=True)
 def setup_db():
     """Create a fresh database schema for the test session."""
+    Base.metadata.drop_all(bind=engine) # Ensure clean start
     Base.metadata.create_all(bind=engine)
     yield
-    # Base.metadata.drop_all(bind=engine)
-    # Base.metadata.drop_all(bind=engine)
+    Base.metadata.drop_all(bind=engine) # Cleanup after
 
 @pytest.fixture
 def db():
@@ -62,3 +49,8 @@ def db():
     session.close()
     transaction.rollback()
     connection.close()
+
+@pytest.fixture
+def db_session(db):
+    """Alias for db fixture to support legacy tests."""
+    return db

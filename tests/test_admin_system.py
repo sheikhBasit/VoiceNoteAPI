@@ -28,9 +28,6 @@ class TestAdminRoleAssignment:
             id="test_user_001",
             name="Test User",
             email="test@example.com",
-            token="token123",
-            device_id="device123",
-            device_model="TestDevice",
             is_admin=False
         )
         db_session.add(user)
@@ -56,9 +53,6 @@ class TestAdminRoleAssignment:
             id="test_user_002",
             name="Moderator",
             email="mod@example.com",
-            token="token456",
-            device_id="device456",
-            device_model="TestDevice"
         )
         db_session.add(user)
         db_session.commit()
@@ -81,9 +75,6 @@ class TestAdminRoleAssignment:
             id="test_user_003",
             name="Viewer",
             email="viewer@example.com",
-            token="token789",
-            device_id="device789",
-            device_model="TestDevice"
         )
         db_session.add(user)
         db_session.commit()
@@ -106,9 +97,6 @@ class TestAdminRoleAssignment:
             id="test_admin_001",
             name="Admin",
             email="admin@example.com",
-            token="admin_token",
-            device_id="admin_device",
-            device_model="TestDevice",
             is_admin=True,
             admin_permissions=DEFAULT_ADMIN_PERMISSIONS
         )
@@ -143,18 +131,12 @@ class TestPermissionChecking:
             id="admin_001",
             name="Admin",
             email="admin@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=True
         )
         regular_user = models.User(
             id="user_001",
             name="User",
             email="user@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=False
         )
         db_session.add_all([admin_user, regular_user])
@@ -169,9 +151,6 @@ class TestPermissionChecking:
             id="admin_001",
             name="Admin",
             email="admin@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=True,
             admin_permissions=DEFAULT_ADMIN_PERMISSIONS
         )
@@ -187,9 +166,6 @@ class TestPermissionChecking:
             id="mod_001",
             name="Moderator",
             email="mod@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=True,
             admin_permissions=MODERATOR_PERMISSIONS
         )
@@ -214,9 +190,6 @@ class TestPermissionChecking:
             id="admin_001",
             name="Admin",
             email="admin@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=True,
             admin_permissions=DEFAULT_ADMIN_PERMISSIONS
         )
@@ -245,9 +218,6 @@ class TestPermissionUpdate:
             id="admin_001",
             name="Admin",
             email="admin@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=True,
             admin_permissions={"can_view_all_users": True}
         )
@@ -269,9 +239,6 @@ class TestPermissionUpdate:
             id="admin_001",
             name="Admin",
             email="admin@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=True,
             admin_permissions=DEFAULT_ADMIN_PERMISSIONS.copy()
         )
@@ -302,9 +269,6 @@ class TestPermissionUpdate:
             id="user_001",
             name="User",
             email="user@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=False
         )
         db_session.add(user)
@@ -361,17 +325,11 @@ class TestAdminDataAccess:
             id="user_001",
             name="User 1",
             email="user1@example.com",
-            token="token1",
-            device_id="device1",
-            device_model="Device1"
         )
         user2 = models.User(
             id="user_002",
             name="User 2",
             email="user2@example.com",
-            token="token2",
-            device_id="device2",
-            device_model="Device2"
         )
         
         # Create notes from different users
@@ -398,9 +356,6 @@ class TestAdminDataAccess:
             id="admin_001",
             name="Admin",
             email="admin@example.com",
-            token="admin_token",
-            device_id="admin_device",
-            device_model="AdminDevice",
             is_admin=True,
             admin_permissions=DEFAULT_ADMIN_PERMISSIONS
         )
@@ -414,9 +369,6 @@ class TestAdminDataAccess:
             id="user_001",
             name="User",
             email="user@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device"
         )
         
         note = models.Note(
@@ -445,9 +397,6 @@ class TestAdminDataAccess:
             id="user_001",
             name="User",
             email="user@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_deleted=False
         )
         
@@ -472,9 +421,6 @@ class TestAdminSecurityBoundaries:
             id="mod_001",
             name="Moderator",
             email="mod@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=True,
             admin_permissions=MODERATOR_PERMISSIONS
         )
@@ -493,9 +439,6 @@ class TestAdminSecurityBoundaries:
             id="viewer_001",
             name="Viewer",
             email="viewer@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=True,
             admin_permissions=VIEWER_PERMISSIONS
         )
@@ -513,9 +456,6 @@ class TestAdminSecurityBoundaries:
             id="user_001",
             name="User",
             email="user@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=False
         )
         
@@ -535,9 +475,6 @@ class TestAdminTimestamps:
             id="user_001",
             name="User",
             email="user@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device"
         )
         db_session.add(user)
         db_session.commit()
@@ -560,9 +497,6 @@ class TestAdminTimestamps:
             id="admin_001",
             name="Admin",
             email="admin@example.com",
-            token="token",
-            device_id="device",
-            device_model="Device",
             is_admin=True,
             admin_permissions=DEFAULT_ADMIN_PERMISSIONS,
             admin_created_at=int(time.time() * 1000) - 10000  # 10 seconds ago

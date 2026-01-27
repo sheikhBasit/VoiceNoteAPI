@@ -112,7 +112,7 @@ class AudioChunker:
         num_chunks = math.ceil(total_duration / AudioChunker.MAX_CHUNK_DURATION_MS)
         target_chunk_duration = total_duration / num_chunks
         
-        logger.info(f"Target: {num_chunks} chunks of ~{target_chunk_duration/1000:.2f}s each")
+        JLogger.info(f"Target: {num_chunks} chunks of ~{target_chunk_duration/1000:.2f}s each")
         
         # Detect non-silent regions for smarter splitting
         nonsilent_ranges = detect_nonsilent(
@@ -165,7 +165,7 @@ class AudioChunker:
             chunk.export(chunk_path, format="wav")
             chunk_paths.append(chunk_path)
             
-            logger.info(f"Created chunk {i+1}/{num_chunks}: {len(chunk)/1000:.2f}s")
+            JLogger.info(f"Created chunk {i+1}/{num_chunks}: {len(chunk)/1000:.2f}s")
         
         return chunk_paths
     
@@ -223,9 +223,9 @@ class AudioChunker:
             # Export as WAV
             audio.export(output_path, format="wav")
             
-            logger.info(f"Converted audio: {file_path} -> {output_path}")
+            JLogger.info(f"Converted audio: {file_path} -> {output_path}")
             return output_path
             
         except Exception as e:
-            logger.error(f"Audio conversion failed: {e}")
+            JLogger.error(f"Audio conversion failed: {e}")
             raise
