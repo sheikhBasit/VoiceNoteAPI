@@ -16,27 +16,58 @@ automatically runs whenever you `git push`.
 - If tests fail: Push is aborted.
 
 **To bypass (emergency only):**
-```css
+```bash
 git push --no-verify
 ```
 
-## 2. Continuous Deployment (CD)
+## 2. Continuous Deployment (CD - Push from Local)
 **Mechanism**: Shell Script
 **Location**: `scripts/deploy.sh`
 
 This script syncs your local code to the production server and restarts the Docker containers.
 
 **Usage:**
-```css
-./scripts/deploy.sh [user@server_ip]
+```bash
+./scripts/deploy.sh
 ```
 
-**Example:**
-```css
-./scripts/deploy.sh root@4.240.96.60
-```
+**Configuration:**
+- **Key File**: `/home/basitdev/Downloads/voice_note_ai.pem`
+- **Server**: `azureuser@4.240.96.60`
+- **Remote Path**: `/home/azureuser/voicenote-api`
 
-**Prerequisites:**
-- SSH access to the server.
-- Docker and Make installed on the server.
-- `rsync` installed on both local and server.
+The script handles the SSH connection using the specified PEM key automatically.
+
+## 3. Webhook-Based CD (Automated via GitHub)
+**Mechanism**: Python Listener (`scripts/cicd_listener.py`)
+**Concept**: GitHub sends a webhook -> Your Server receives it -> Triggers update script.
+
+**Setup Instructions:**
+
+1.  **On The Server (Azure VM):**
+    *   Upload the scripts (or run `deploy.sh` once to sync them):
+        ```bash
+        ./scripts/deploy.sh
+        ```
+    *   SSH into the server:
+        ```bash
+        ssh -i /home/basitdev/Downloads/voice_note_ai.pem azureuser@4.240.96.60
+        ```
+    *   Start the listener (run in background/screen):
+        ```bash
+        cd voicenote-api
+        python3 scripts/cicd_listener.py &
+        ```
+    *   **Important**: Ensure port `9000` is open in your Azure Network Security Group (NSG) for Inbound TCP.
+
+2.  **On GitHub:**
+    *   Go to repo **Settings** -> **Webhooks** -> **Add webhook**.
+    *   **Payload URL**: `http://4.240.96.60:9000/webhook/deploy`
+    *   **Content type**: `application/json`
+    *   **Secret**: `replace_with_your_secure_random_token` (Match the token in `cicd_listener.py`)
+    *   **Events**: Select "Just the push event".
+
+3.  **Workflow:**
+    *   You push code to GitHub.
+    *   GitHub calls your listener.
+    *   Listener runs `server_update.sh`: pulls code via Git and restarts Docker.
