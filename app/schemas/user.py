@@ -21,6 +21,7 @@ class UserBase(BaseModel):
     # admin_permissions: Optional[Dict[str, Any]] = None
 
 class UserCreate(UserBase):
+    id: Optional[str] = None
     token: str
     device_id: str
     device_model: str
