@@ -9,10 +9,11 @@ from app.utils.json_logger import JLogger
 # Secret key for device signature verification
 DEVICE_SECRET_KEY = os.getenv("DEVICE_SECRET_KEY", "default_secret_for_dev_only")
 
-def verify_device_signature(request: Request):
+async def verify_device_signature(request: Request):
     """
     Middleware/Dependency to verify X-Device-Signature.
-    Signature = HMAC_SHA256(secret, method + path + timestamp + body_hash)
+    Signature = HMAC_SHA256(secret, method + path + query + timestamp + body_hash)
+    Match Android HmacInterceptor logic.
     """
     signature = request.headers.get("X-Device-Signature")
     timestamp = request.headers.get("X-Device-Timestamp") # Unix timestamp in seconds
@@ -43,9 +44,27 @@ def verify_device_signature(request: Request):
         )
 
     # Reconstruct message for HMAC
-    # Hardened version: method + path + timestamp (query_string removed to align with client/tests)
-    # query_string = request.url.query
-    message = f"{request.method}{request.url.path}{timestamp}".encode()
+    # Matching Android HmacInterceptor: method + path + query + timestamp + body_hash
+    query_string = request.url.query
+    
+    # Calculate Body Hash
+    body_bytes = await request.body()
+    # Logic: If body exists (non-empty), hash it. If empty/null (GET), use empty string.
+    # Android: body?.let { SHA256(it) } ?: ""
+    if body_bytes:
+        body_hash = hashlib.sha256(body_bytes).hexdigest()
+    else:
+        # Check logic: OkHttp request.body might be null for certain methods.
+        # Ideally, we assume empty string if empty.
+        # But SHA256("") is e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        # If client passes SHA256(""), we must match.
+        # If client passes "", we must match.
+        # HmacInterceptor uses `?: ""` if body is null.
+        # For POST with content, body is not null.
+        # For GET, body is null -> "".
+        body_hash = ""
+
+    message = f"{request.method}{request.url.path}{query_string}{timestamp}{body_hash}".encode()
     
     expected_signature = hmac.new(
         DEVICE_SECRET_KEY.encode(),
@@ -64,6 +83,7 @@ def verify_device_signature(request: Request):
                       timestamp=timestamp,
                       ip=request.client.host if request.client else "unknown",
                       debug_message=message.decode('utf-8', errors='ignore'),
+                      body_hash_debug=body_hash,
                       expected_sig=expected_signature,
                       received_sig=signature)
         raise HTTPException(
