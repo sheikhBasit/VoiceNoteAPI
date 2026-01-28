@@ -68,7 +68,7 @@ services:
       CELERY_RESULT_BACKEND: "redis://redis:6379/1"
       PYTHONUNBUFFERED: "1"
       ENVIRONMENT: "production"
-      DEVICE_SECRET_KEY: "REPLACE_WITH_SECURE_VAULT_KEY"
+      DEVICE_SECRET_KEY: "VN_SECURE_8f7d9a2b_2026"
     ports:
       - "8000:8000"
     depends_on:
@@ -112,7 +112,7 @@ services:
       CELERY_RESULT_BACKEND: "redis://redis:6379/1"
       PYTHONUNBUFFERED: "1"
       ENVIRONMENT: "production"
-      DEVICE_SECRET_KEY: "REPLACE_WITH_SECURE_VAULT_KEY"
+      DEVICE_SECRET_KEY: "VN_SECURE_8f7d9a2b_2026"
     depends_on:
       db:
         condition: service_healthy
