@@ -222,7 +222,7 @@ class TestTaskCreation:
                 "description": ""
             }
         )
-        assert response.status_code == 400
+        assert response.status_code == 422 # Pydantic min_length=1 validation
 
 class TestTaskFiltering:
     """Test task filtering endpoints"""
@@ -249,7 +249,8 @@ class TestTaskFiltering:
         """Test getting tasks assigned to me"""
         response = client.get(
             "/api/v1/tasks/assigned-to-me",
-            headers=headers
+            headers=headers,
+            params={"user_email": TEST_USER["email"]}
         )
         assert response.status_code == 200
         assert isinstance(response.json(), list)
@@ -262,7 +263,7 @@ class TestTaskSearch:
         response = client.get(
             "/api/v1/tasks/search",
             headers=headers,
-            params={"query": "project"}
+            params={"query_text": "project"}
         )
         assert response.status_code == 200
         assert isinstance(response.json(), list)
@@ -272,9 +273,9 @@ class TestTaskSearch:
         response = client.get(
             "/api/v1/tasks/search",
             headers=headers,
-            params={"query": ""}
+            params={"query_text": ""}
         )
-        assert response.status_code == 200
+        assert response.status_code == 400 # Controller strip check
 
 class TestTaskStatistics:
     """Test task statistics endpoint"""
