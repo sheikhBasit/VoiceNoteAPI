@@ -54,14 +54,21 @@ def verify_device_signature(request: Request):
     ).hexdigest()
     
     if not hmac.compare_digest(signature, expected_signature):
+        # DEBUG: Check if using default key
+        if DEVICE_SECRET_KEY == "default_secret_for_dev_only":
+            JLogger.warning("Security Warning: Using DEFAULT device secret key. Client may be using a different key.")
+
         JLogger.error("Invalid device signature detected", 
                       path=request.url.path, 
                       method=request.method,
                       timestamp=timestamp,
-                      ip=request.client.host if request.client else "unknown")
+                      ip=request.client.host if request.client else "unknown",
+                      debug_message=message.decode('utf-8', errors='ignore'),
+                      expected_sig=expected_signature,
+                      received_sig=signature)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid device signature"
+            detail=f"Invalid device signature"
         )
     
     return True
