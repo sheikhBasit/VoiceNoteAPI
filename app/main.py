@@ -145,7 +145,7 @@ async def startup_event():
 def read_root():
     return {
         "status": "VoiceNote AI Online",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "endpoints": {
             "users": "/api/v1/users",
             "notes": "/api/v1/notes",
