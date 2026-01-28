@@ -62,6 +62,9 @@ def db_session():
 
 @pytest.fixture
 def client(db_session):
+    from app.services.auth_service import get_current_user
+    from fastapi import Request, HTTPException  # Ensure imports
+
     def override_get_db():
         try:
             yield db_session
@@ -76,9 +79,6 @@ def client(db_session):
             return db_session.query(models.User).get(user_id)
         raise HTTPException(status_code=401, detail="Test Auth Required")
     
-    from app.services.auth_service import get_current_user
-    from fastapi import Request, HTTPException  # Ensure imports
-
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
     yield TestClient(app)
