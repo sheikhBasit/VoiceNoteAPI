@@ -4,6 +4,7 @@ import hashlib
 import time
 from fastapi import Request, HTTPException, status
 from functools import wraps
+from sqlalchemy.orm import Session
 from app.utils.json_logger import JLogger
 
 # Secret key for device signature verification
@@ -97,7 +98,7 @@ async def verify_device_signature(request: Request):
 
     return True
 
-def verify_note_ownership(db: "Session", user_id: str, note_id: str):
+def verify_note_ownership(db: Session, user_id: str, note_id: str):
     """
     Dependency helper to verify that a note exists and belongs to the user.
     """
@@ -124,7 +125,7 @@ def verify_note_ownership(db: "Session", user_id: str, note_id: str):
     return note
 
 
-def verify_task_ownership(db: "Session", user_id: str, task_id: str):
+def verify_task_ownership(db: Session, user_id: str, task_id: str):
     """
     Dependency helper to verify that a task exists and its parent note belongs to the user.
     """

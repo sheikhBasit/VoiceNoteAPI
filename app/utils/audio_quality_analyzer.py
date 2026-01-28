@@ -220,7 +220,7 @@ class AudioQualityAnalyzer:
             }
             
         except Exception as e:
-            logger.error(f"Error getting LLM feedback: {e}")
+            JLogger.error(f"Error getting LLM feedback: {e}")
             return {
                 "error": str(e),
                 "recommendations": self._fallback_recommendations(metrics)
@@ -321,27 +321,27 @@ class AudioQualityAnalyzer:
                 
                 # Noise reduction
                 if 'noise' in rec_lower and 'reduc' in rec_lower:
-                    logger.info("Applying noise reduction...")
+                    JLogger.info("Applying noise reduction...")
                     y = nr.reduce_noise(y=y, sr=sr)
                 
                 # Normalization
                 if 'normal' in rec_lower or 'volume' in rec_lower:
-                    logger.info("Applying normalization...")
+                    JLogger.info("Applying normalization...")
                     y = librosa.util.normalize(y)
                 
                 # Trim silence
                 if 'trim' in rec_lower or 'silence' in rec_lower:
-                    logger.info("Trimming silence...")
+                    JLogger.info("Trimming silence...")
                     y, _ = librosa.effects.trim(y, top_db=30)
             
             # Save processed audio
             sf.write(output_path, y, sr)
-            logger.info(f"Processed audio saved to {output_path}")
+            JLogger.info(f"Processed audio saved to {output_path}")
             
             return output_path
             
         except Exception as e:
-            logger.error(f"Error applying preprocessing: {e}")
+            JLogger.error(f"Error applying preprocessing: {e}")
             raise
     
     def full_analysis_with_feedback(self, audio_path: str) -> Dict[str, Any]:

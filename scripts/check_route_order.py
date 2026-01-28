@@ -27,7 +27,7 @@ if task_id_route_start:
     for route in specific_routes:
         for i, line in enumerate(lines[task_id_route_start:], start=task_id_route_start):
             if f'@router.get("{route}"' in line:
-                print(f"  ❌ {route} is at line {i+1} (AFTER /{task_id})")
+                print(f"  ❌ {route} is at line {i+1} (AFTER /{{task_id}})")
                 break
     
     print("\nThe issue is confirmed: specific routes are defined AFTER /{task_id}")
