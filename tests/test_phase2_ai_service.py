@@ -265,26 +265,25 @@ class TestAIServiceWithRetry:
     @pytest.mark.asyncio
     async def test_llm_brain_with_timeout(self):
         """Test LLM brain respects timeout structure."""
-        with patch('app.services.ai_service.AIService.__init__', lambda x: None):
-            service = AIService()
-            service.request_tracker = RequestTracker()
-            # Verify structure exists without calling remote APIs
-            assert service.request_tracker is not None
+        # Removed patch of __init__ as it's not needed (clients are mocked globally) and causes conflicts
+        service = AIService()
+        service.request_tracker = RequestTracker()
+        # Verify structure exists without calling remote APIs
+        assert service.request_tracker is not None
     
     @pytest.mark.asyncio
     async def test_transcribe_groq_rate_limited(self):
         """Test Groq transcription with rate limiting."""
-        with patch('app.services.ai_service.AIService.__init__', lambda x: None):
-            service = AIService()
-            service.request_tracker = RequestTracker()
-            service.groq_limiter = RateLimiter(max_requests=1, time_window=0.1)
-            
-            # Mock file operations
-            with patch('builtins.open', create=True):
-                # First request should succeed
-                service.groq_limiter.allow_request()
-                # Second request should be rate limited
-                assert not service.groq_limiter.allow_request()
+        service = AIService()
+        service.request_tracker = RequestTracker()
+        service.groq_limiter = RateLimiter(max_requests=1, time_window=0.1)
+        
+        # Mock file operations
+        with patch('builtins.open', create=True):
+            # First request should succeed
+            service.groq_limiter.allow_request()
+            # Second request should be rate limited
+            assert not service.groq_limiter.allow_request()
     
     def test_llm_brain_input_validation(self):
         """Test LLM brain validates inputs."""
@@ -404,12 +403,12 @@ class TestErrorHandling:
 @pytest.fixture
 def ai_service():
     """Fixture for AI Service instance."""
-    with patch('app.services.ai_service.AIService.__init__', lambda x: None):
-        service = AIService()
-        service.request_tracker = RequestTracker()
-        service.groq_limiter = RateLimiter()
-        service.deepgram_limiter = RateLimiter()
-        return service
+    # Removed patch of __init__
+    service = AIService()
+    service.request_tracker = RequestTracker()
+    service.groq_limiter = RateLimiter()
+    service.deepgram_limiter = RateLimiter()
+    return service
 
 
 if __name__ == "__main__":

@@ -78,9 +78,13 @@ async def test_analytics_logic():
     db.query().join().filter().count.side_effect = [10, 5] # total_tasks, completed_tasks
     
     # Mock notes for heatmap
+    # Mock notes for heatmap
+    # Need 400 words total for (2 * 5)/60 hours = 10 mins = 0.166 hours
+    # 400 words / 2400 words/hour = 0.1666 hours.
+    long_transcript = "word " * 200
     mock_notes = [
-        MockNote(title="Project Alpha", summary="Meeting about Alpha project"),
-        MockNote(title="Cricket Match", summary="Discussion on Cricket strategy")
+        MockNote(title="Project Alpha", summary="Meeting about Alpha project", transcript_groq=long_transcript, transcript_deepgram=None, transcript_android=None),
+        MockNote(title="Cricket Match", summary="Discussion on Cricket strategy", transcript_groq=long_transcript, transcript_deepgram=None, transcript_android=None)
     ]
     db.query().filter().all.return_value = mock_notes
     
@@ -90,7 +94,8 @@ async def test_analytics_logic():
     result = AnalyticsService.get_productivity_pulse(db, "user_1")
     
     assert result["task_velocity"] == 50.0
-    assert result["meeting_roi_hours"] == (2 * 5) / 60
+    # 400 words / 2400 = 0.166 -> rounded to 0.2
+    assert result["meeting_roi_hours"] == 0.2
     assert any(item["topic"] == "alpha" for item in result["topic_heatmap"])
     assert any(item["topic"] == "cricket" for item in result["topic_heatmap"])
 

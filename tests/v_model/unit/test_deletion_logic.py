@@ -75,9 +75,7 @@ def test_user(db):
     user = models.User(
         id=user_id,
         name="Test User",
-        email=f"test_{uuid.uuid4()}@example.com",
-        token="test_token",
-        device_id="test_device"
+        email=f"test_{uuid.uuid4()}@example.com"
     )
     db.add(user)
     db.commit()

@@ -67,10 +67,23 @@ def client(db_session):
             yield db_session
         finally:
             pass
+            
+    def override_get_current_user(request: Request):
+        # Allow tests to impersonate via header
+        user_id = request.headers.get("X-Test-User-ID")
+        if user_id:
+            # Simple mock of user object
+            return db_session.query(models.User).get(user_id)
+        raise HTTPException(status_code=401, detail="Test Auth Required")
     
+    from app.services.auth_service import get_current_user
+    from fastapi import Request, HTTPException  # Ensure imports
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
     yield TestClient(app)
     del app.dependency_overrides[get_db]
+    del app.dependency_overrides[get_current_user]
 
 class TestEndpointCascadeIntegration:
     """Integration tests for API endpoints."""
@@ -92,7 +105,7 @@ class TestEndpointCascadeIntegration:
         db_session.commit()
         
         # 2. Call API (Soft Delete)
-        response = client.delete(f"/api/v1/users/me?user_id={user_id}&hard=false")
+        response = client.delete(f"/api/v1/users/me?hard=false", headers={"X-Test-User-ID": user_id})
         assert response.status_code == 200
         
         # 3. Verify Cascade
@@ -122,7 +135,7 @@ class TestEndpointCascadeIntegration:
         db_session.commit()
         
         # 2. Delete Note
-        response = client.delete(f"/api/v1/notes/{note_id}?user_id={user_id}")
+        response = client.delete(f"/api/v1/notes/{note_id}", headers={"X-Test-User-ID": user_id})
         assert response.status_code == 200
         
         # 3. Verify
@@ -175,7 +188,7 @@ class TestEndpointCascadeIntegration:
         db_session.commit()
         
         # 2. Attempt Deletion
-        response = client.delete(f"/api/v1/notes/{note_id}?user_id={user_id}")
+        response = client.delete(f"/api/v1/notes/{note_id}", headers={"X-Test-User-ID": user_id})
         
         # 3. Should Fail
         assert response.status_code == 400

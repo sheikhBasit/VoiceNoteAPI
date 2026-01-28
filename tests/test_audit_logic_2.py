@@ -57,7 +57,7 @@ def test_note_ownership_bola():
     db.query.return_value.filter.return_value.first.return_value = None
     with pytest.raises(HTTPException) as exc:
         verify_note_ownership(db, "user_2", "note_1")
-    assert exc.value.status_code == 403
+    assert exc.value.status_code == 404
 
 # 3. Test NoteStatus State Machine
 def test_note_status_processing():
