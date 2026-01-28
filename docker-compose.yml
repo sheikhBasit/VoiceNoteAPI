@@ -55,6 +55,7 @@ services:
 
   # FastAPI Application
   api:
+    image: ab745/voicenote-api:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -81,6 +82,8 @@ services:
       - ./scripts:/app/scripts
       - ./tests:/app/tests
       - ./uploads:/app/uploads
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 30s
@@ -99,6 +102,7 @@ services:
 
   # Celery Worker for background tasks
   celery_worker:
+    image: ab745/voicenote-api:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -123,6 +127,8 @@ services:
     volumes:
       - ./app:/app/app
       - ./uploads:/app/uploads
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
     networks:
       - voicenote_network
     restart: unless-stopped
@@ -135,6 +141,7 @@ services:
 
   # Celery Beat for scheduled tasks
   celery_beat:
+    image: ab745/voicenote-api:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -153,6 +160,8 @@ services:
         condition: service_healthy
     volumes:
       - ./app:/app/app
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
     networks:
       - voicenote_network
     restart: unless-stopped

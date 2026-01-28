@@ -31,3 +31,7 @@ uploads/
 
 # Docker
 .docker/
+
+
+ssh_private
+ssh_private.pub

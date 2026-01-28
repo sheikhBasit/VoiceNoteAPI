@@ -21,6 +21,7 @@ limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL"
 router = APIRouter(prefix="/api/v1/tasks", tags=["Tasks"])
 cloudinary_service = CloudinaryService()
 
+@router.post("", response_model=task_schema.TaskResponse, status_code=status.HTTP_201_CREATED)
 def create_task(
     task_data: task_schema.TaskCreate,
     db: Session = Depends(get_db),

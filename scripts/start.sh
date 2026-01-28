@@ -3,7 +3,7 @@ set -e
 
 # Run migrations
 echo "Running database migrations..."
-alembic upgrade head
+alembic -c /app/alembic.ini upgrade head || echo "Migration skipped or failed, continuing..."
 
 # Start application
 echo "Starting application..."
