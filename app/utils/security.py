@@ -43,9 +43,9 @@ def verify_device_signature(request: Request):
         )
 
     # Reconstruct message for HMAC
-    # Hardened version: method + path + query_string + timestamp
-    query_string = request.url.query
-    message = f"{request.method}{request.url.path}{query_string}{timestamp}".encode()
+    # Hardened version: method + path + timestamp (query_string removed to align with client/tests)
+    # query_string = request.url.query
+    message = f"{request.method}{request.url.path}{timestamp}".encode()
     
     expected_signature = hmac.new(
         DEVICE_SECRET_KEY.encode(),
