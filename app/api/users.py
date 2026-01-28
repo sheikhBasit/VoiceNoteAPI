@@ -127,6 +127,19 @@ def sync_user(request: Request, user_data: user_schema.UserCreate, db: Session =
             headers={"X-Auth-Reason": "DEVICE_VERIFICATION_REQUIRED"}
         )
 
+@router.post("/logout")
+def logout_user(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """
+    POST /logout: Terminates the session for the current device.
+    """
+    # Simply clearing the current_device_id signals that the session is over.
+    # The client should discard the token.
+    current_user.current_device_id = None
+    db.commit()
+    
+    JLogger.info("User logged out", user_id=current_user.id)
+    return {"message": "Logged out successfully"}
+
 @router.get("/verify-device")
 def verify_new_device(token: str, db: Session = Depends(get_db)):
     """GET /verify-device: Clicked from Email."""

@@ -280,7 +280,13 @@ def delete_note(
             detail="Cannot delete note: It contains in-progress HIGH priority tasks."
         )
     
-    result = DeletionService.soft_delete_note(db, note_id, deleted_by=current_user.id)
+    if hard:
+        # HARD Delete (Physically remove files)
+        result = DeletionService.hard_delete_note(db, note_id)
+    else:
+        # SOFT Delete (Mark as deleted)
+        result = DeletionService.soft_delete_note(db, note_id, deleted_by=current_user.id)
+        
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
         

@@ -11,6 +11,7 @@ from app.db.models import User, Note, Task
 from app.utils.json_logger import JLogger
 import time
 from typing import Optional, Dict, Any, List
+import os
 
 class DeletionService:
     """
@@ -254,6 +255,48 @@ class DeletionService:
         except Exception as e:
             db.rollback()
             JLogger.error("Error during task soft delete", task_id=task_id, error=str(e))
+            return {"success": False, "error": str(e)}
+
+    @staticmethod
+    def hard_delete_note(
+        db: Session,
+        note_id: str,
+        admin_id: str = None
+    ) -> Dict[str, Any]:
+        """
+        Permanently delete note and its audio file.
+        """
+        JLogger.info("Starting HARD DELETE note", note_id=note_id)
+        
+        try:
+            note = db.query(Note).filter(Note.id == note_id).first()
+            if not note:
+                return {"success": False, "error": "Note not found"}
+
+            # File Cleanup logic
+            file_path = None
+            # Standard logic: raw_audio_url = "uploads/xyz"
+            if note.raw_audio_url and (note.raw_audio_url.startswith("uploads/") or note.raw_audio_url.startswith("/app/uploads/")):
+                file_path = note.raw_audio_url.replace("/app/", "") # Adjust for container path if needed
+            
+            # Safety check: Prevent deleting outside uploads
+            if file_path and ".." not in file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    JLogger.info("Deleted audio file", path=file_path)
+                except Exception as file_error:
+                    JLogger.error("Failed to delete audio file", path=file_path, error=str(file_error))
+            
+            # Hard delete from DB
+            db.delete(note)
+            db.commit()
+            
+            JLogger.info("Note HARD DELETED successfully", note_id=note_id)
+            return {"success": True, "note_id": note_id}
+            
+        except Exception as e:
+            db.rollback()
+            JLogger.error("Error during note hard delete", note_id=note_id, error=str(e))
             return {"success": False, "error": str(e)}
     
     @staticmethod
