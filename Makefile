@@ -127,6 +127,10 @@ test:
 	@echo "🧪 Running all tests..."
 	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/ -v
 
+test-fast:
+	@echo "⚡ Running failed tests first..."
+	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/ --last-failed --maxfail=1 -v
+
 test-admin:
 	@echo "🧪 Running admin system tests..."
 	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/test_admin_system.py -v
