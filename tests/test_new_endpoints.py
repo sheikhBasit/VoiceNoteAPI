@@ -3,11 +3,12 @@ Test suite for newly implemented API endpoints
 Tests: Note Creation, WhatsApp Draft, Semantic Analysis, Task Creation
 """
 import pytest
-import requests
+from fastapi.testclient import TestClient
 import time
 from typing import Dict
+from app.main import app
 
-BASE_URL = "http://localhost:8000/api/v1"
+client = TestClient(app)
 
 # Test credentials
 TEST_USER = {
@@ -18,15 +19,16 @@ TEST_USER = {
 @pytest.fixture(scope="module")
 def auth_token():
     """Get authentication token for tests"""
-    response = requests.post(
-        f"{BASE_URL}/users/login",
+    response = client.post(
+        "/api/v1/users/login",
         json={"username": TEST_USER["email"], "password": TEST_USER["password"]}
     )
     if response.status_code == 200:
         return response.json()["access_token"]
-    # If login fails, try sync
-    sync_response = requests.post(
-        f"{BASE_URL}/users/sync",
+    
+    # If login fails, try sync (register)
+    sync_response = client.post(
+        "/api/v1/users/sync",
         json={
             "name": "Test User",
             "email": TEST_USER["email"],
@@ -37,11 +39,17 @@ def auth_token():
             "primary_role": "GENERIC"
         }
     )
-    return sync_response.json()["access_token"]
+    if sync_response.status_code == 200:
+        return sync_response.json()["access_token"]
+    
+    # If both fail, return None (tests will fail at auth stage)
+    return None
 
 @pytest.fixture
 def headers(auth_token):
     """Get headers with auth token"""
+    if not auth_token:
+        pytest.fail("Could not obtain auth token")
     return {"Authorization": f"Bearer {auth_token}"}
 
 class TestNoteCreation:
@@ -49,8 +57,8 @@ class TestNoteCreation:
     
     def test_create_note_success(self, headers):
         """Test successful note creation"""
-        response = requests.post(
-            f"{BASE_URL}/notes/create",
+        response = client.post(
+            "/api/v1/notes/create",
             headers=headers,
             json={
                 "title": "Test Note",
@@ -63,12 +71,11 @@ class TestNoteCreation:
         assert data["title"] == "Test Note"
         assert data["summary"] == "This is a test note created manually"
         assert data["priority"] == "HIGH"
-        return data["id"]
     
     def test_create_note_minimal(self, headers):
         """Test note creation with minimal data"""
-        response = requests.post(
-            f"{BASE_URL}/notes/create",
+        response = client.post(
+            "/api/v1/notes/create",
             headers=headers,
             json={"title": "Minimal Note"}
         )
@@ -78,14 +85,14 @@ class TestNoteCreation:
     
     def test_create_note_no_title(self, headers):
         """Test note creation without title (should use default)"""
-        response = requests.post(
-            f"{BASE_URL}/notes/create",
+        response = client.post(
+            "/api/v1/notes/create",
             headers=headers,
             json={"summary": "Note without title"}
         )
         assert response.status_code == 200
         data = response.json()
-        assert "Untitled" in data["title"] or data["title"] != ""
+        assert "Untitled" in data["title"] or data.get("title", "") != ""
 
 class TestWhatsAppDraft:
     """Test WhatsApp draft generation endpoint"""
@@ -93,8 +100,8 @@ class TestWhatsAppDraft:
     @pytest.fixture
     def test_note_id(self, headers):
         """Create a test note for WhatsApp draft"""
-        response = requests.post(
-            f"{BASE_URL}/notes/create",
+        response = client.post(
+            "/api/v1/notes/create",
             headers=headers,
             json={
                 "title": "Meeting Notes",
@@ -106,8 +113,8 @@ class TestWhatsAppDraft:
     
     def test_get_whatsapp_draft(self, headers, test_note_id):
         """Test WhatsApp draft generation"""
-        response = requests.get(
-            f"{BASE_URL}/notes/{test_note_id}/whatsapp",
+        response = client.get(
+            f"/api/v1/notes/{test_note_id}/whatsapp",
             headers=headers
         )
         assert response.status_code == 200
@@ -119,8 +126,8 @@ class TestWhatsAppDraft:
     
     def test_whatsapp_draft_invalid_note(self, headers):
         """Test WhatsApp draft with invalid note ID"""
-        response = requests.get(
-            f"{BASE_URL}/notes/invalid-id/whatsapp",
+        response = client.get(
+            "/api/v1/notes/invalid-id/whatsapp",
             headers=headers
         )
         assert response.status_code in [404, 403]
@@ -131,8 +138,8 @@ class TestSemanticAnalysis:
     @pytest.fixture
     def test_note_id(self, headers):
         """Create a test note for semantic analysis"""
-        response = requests.post(
-            f"{BASE_URL}/notes/create",
+        response = client.post(
+            "/api/v1/notes/create",
             headers=headers,
             json={
                 "title": "Product Launch Discussion",
@@ -145,8 +152,8 @@ class TestSemanticAnalysis:
     
     def test_trigger_semantic_analysis(self, headers, test_note_id):
         """Test triggering semantic analysis"""
-        response = requests.post(
-            f"{BASE_URL}/notes/{test_note_id}/semantic-analysis",
+        response = client.post(
+            f"/api/v1/notes/{test_note_id}/semantic-analysis",
             headers=headers
         )
         assert response.status_code == 202  # Accepted
@@ -157,8 +164,8 @@ class TestSemanticAnalysis:
     
     def test_semantic_analysis_invalid_note(self, headers):
         """Test semantic analysis with invalid note ID"""
-        response = requests.post(
-            f"{BASE_URL}/notes/invalid-id/semantic-analysis",
+        response = client.post(
+            "/api/v1/notes/invalid-id/semantic-analysis",
             headers=headers
         )
         assert response.status_code in [404, 403]
@@ -169,8 +176,8 @@ class TestTaskCreation:
     @pytest.fixture
     def test_note_id(self, headers):
         """Create a test note for task creation"""
-        response = requests.post(
-            f"{BASE_URL}/notes/create",
+        response = client.post(
+            "/api/v1/notes/create",
             headers=headers,
             json={"title": "Project Planning"}
         )
@@ -178,8 +185,8 @@ class TestTaskCreation:
     
     def test_create_task_success(self, headers, test_note_id):
         """Test successful task creation"""
-        response = requests.post(
-            f"{BASE_URL}/tasks",
+        response = client.post(
+            "/api/v1/tasks",
             headers=headers,
             json={
                 "note_id": test_note_id,
@@ -195,8 +202,8 @@ class TestTaskCreation:
     
     def test_create_task_minimal(self, headers, test_note_id):
         """Test task creation with minimal data"""
-        response = requests.post(
-            f"{BASE_URL}/tasks",
+        response = client.post(
+            "/api/v1/tasks",
             headers=headers,
             json={
                 "note_id": test_note_id,
@@ -207,8 +214,8 @@ class TestTaskCreation:
     
     def test_create_task_empty_description(self, headers, test_note_id):
         """Test task creation with empty description (should fail)"""
-        response = requests.post(
-            f"{BASE_URL}/tasks",
+        response = client.post(
+            "/api/v1/tasks",
             headers=headers,
             json={
                 "note_id": test_note_id,
@@ -222,8 +229,8 @@ class TestTaskFiltering:
     
     def test_get_tasks_due_today(self, headers):
         """Test getting tasks due today"""
-        response = requests.get(
-            f"{BASE_URL}/tasks/due-today",
+        response = client.get(
+            "/api/v1/tasks/due-today",
             headers=headers
         )
         assert response.status_code == 200
@@ -231,8 +238,8 @@ class TestTaskFiltering:
     
     def test_get_overdue_tasks(self, headers):
         """Test getting overdue tasks"""
-        response = requests.get(
-            f"{BASE_URL}/tasks/overdue",
+        response = client.get(
+            "/api/v1/tasks/overdue",
             headers=headers
         )
         assert response.status_code == 200
@@ -240,8 +247,8 @@ class TestTaskFiltering:
     
     def test_get_assigned_to_me(self, headers):
         """Test getting tasks assigned to me"""
-        response = requests.get(
-            f"{BASE_URL}/tasks/assigned-to-me",
+        response = client.get(
+            "/api/v1/tasks/assigned-to-me",
             headers=headers
         )
         assert response.status_code == 200
@@ -252,8 +259,8 @@ class TestTaskSearch:
     
     def test_search_tasks(self, headers):
         """Test task search"""
-        response = requests.get(
-            f"{BASE_URL}/tasks/search",
+        response = client.get(
+            "/api/v1/tasks/search",
             headers=headers,
             params={"query": "project"}
         )
@@ -262,8 +269,8 @@ class TestTaskSearch:
     
     def test_search_tasks_empty_query(self, headers):
         """Test task search with empty query"""
-        response = requests.get(
-            f"{BASE_URL}/tasks/search",
+        response = client.get(
+            "/api/v1/tasks/search",
             headers=headers,
             params={"query": ""}
         )
@@ -274,8 +281,8 @@ class TestTaskStatistics:
     
     def test_get_task_statistics(self, headers):
         """Test getting task statistics"""
-        response = requests.get(
-            f"{BASE_URL}/tasks/stats",
+        response = client.get(
+            "/api/v1/tasks/stats",
             headers=headers
         )
         assert response.status_code == 200
@@ -293,16 +300,16 @@ class TestTaskDuplication:
     def test_task_id(self, headers):
         """Create a test task for duplication"""
         # First create a note
-        note_response = requests.post(
-            f"{BASE_URL}/notes/create",
+        note_response = client.post(
+            "/api/v1/notes/create",
             headers=headers,
             json={"title": "Test Note for Task"}
         )
         note_id = note_response.json()["id"]
         
         # Then create a task
-        task_response = requests.post(
-            f"{BASE_URL}/tasks",
+        task_response = client.post(
+            "/api/v1/tasks",
             headers=headers,
             json={
                 "note_id": note_id,
@@ -314,8 +321,8 @@ class TestTaskDuplication:
     
     def test_duplicate_task(self, headers, test_task_id):
         """Test task duplication"""
-        response = requests.post(
-            f"{BASE_URL}/tasks/{test_task_id}/duplicate",
+        response = client.post(
+            f"/api/v1/tasks/{test_task_id}/duplicate",
             headers=headers
         )
         assert response.status_code == 201
