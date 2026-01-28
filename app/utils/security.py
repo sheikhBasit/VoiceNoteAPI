@@ -49,20 +49,22 @@ async def verify_device_signature(request: Request):
     
     # Calculate Body Hash
     body_bytes = await request.body()
-    # Logic: If body exists (non-empty), hash it. If empty/null (GET), use empty string.
-    # Android: body?.let { SHA256(it) } ?: ""
-    if body_bytes:
-        body_hash = hashlib.sha256(body_bytes).hexdigest()
-    else:
-        # Check logic: OkHttp request.body might be null for certain methods.
-        # Ideally, we assume empty string if empty.
-        # But SHA256("") is e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-        # If client passes SHA256(""), we must match.
-        # If client passes "", we must match.
-        # HmacInterceptor uses `?: ""` if body is null.
-        # For POST with content, body is not null.
-        # For GET, body is null -> "".
+    
+    # Logic matching Android HmacInterceptor:
+    # val bodyHash = originalRequest.body?.let { ... SHA256(...) } ?: ""
+    # GET/HEAD/DELETE usually have null body in OkHttp -> ""
+    # POST/PUT/PATCH usually have non-null body -> SHA256(bytes)
+    
+    if request.method in ["GET", "HEAD", "DELETE"]:
         body_hash = ""
+    else:
+        # For POST/PUT, even if body is empty, OkHttp usually creates a RequestBody.
+        # SHA256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        if body_bytes:
+             body_hash = hashlib.sha256(body_bytes).hexdigest()
+        else:
+             # Empty POST body
+             body_hash = hashlib.sha256(b"").hexdigest()
 
     message = f"{request.method}{request.url.path}{query_string}{timestamp}{body_hash}".encode()
     
