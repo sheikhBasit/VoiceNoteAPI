@@ -32,6 +32,11 @@ from app.db.models import Base
 @pytest.fixture(scope="session", autouse=True)
 def setup_db():
     """Create a fresh database schema for the test session."""
+    with engine.connect() as conn:
+        from sqlalchemy import text
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        conn.commit()
+    
     Base.metadata.drop_all(bind=engine) # Ensure clean start
     Base.metadata.create_all(bind=engine)
     yield
