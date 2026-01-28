@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-01-28T05:36:46.997520",
+  "summary": {
+    "audio_conversion": {
+      "count": 1,
+      "min": 0.058226823806762695,
+      "max": 0.058226823806762695,
+      "mean": 0.058226823806762695,
+      "total": 0.058226823806762695,
+      "unit": "seconds"
+    }
+  },
+  "raw_metrics": [
+    {
+      "timestamp": 1769578606.9961684,
+      "metric_name": "audio_conversion",
+      "value": 0.058226823806762695,
+      "unit": "seconds",
+      "metadata": {}
+    }
+  ]
+}
