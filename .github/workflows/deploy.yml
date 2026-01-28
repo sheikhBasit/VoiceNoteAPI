@@ -100,7 +100,7 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ab745
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           
       - name: Build and Push API Image
@@ -109,7 +109,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/voicenote-api:latest
+          tags: ab745/voicenote-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
