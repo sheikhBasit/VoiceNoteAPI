@@ -105,13 +105,13 @@ jobs:
           
       - name: Build and Push API Image
         uses: docker/build-push-action@v5
+        env:
+          DOCKER_BUILDKIT: 1
         with:
           context: .
           file: ./Dockerfile
           push: true
           tags: ab745/voicenote-api:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   deploy:
     name: Deploy to Production
