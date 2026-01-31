@@ -23,14 +23,13 @@ COPY requirements.txt .
 
 # Install dependencies using CPU-only wheels for ML libs to save ~3GB
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    # First install CORE ml libs from CPU index
     pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir -r requirements.txt && \
-    # Double check and remove any nvidia packages that might have sneaked in as transitive deps
-    pip uninstall -y nvidia-cublas-cu12 nvidia-cuda-cupti-cu12 nvidia-cuda-nvrtc-cu12 \
-    nvidia-cuda-runtime-cu12 nvidia-cudnn-cu12 nvidia-cufft-cu12 \
-    nvidia-cufile-cu12 nvidia-curand-cu12 nvidia-cusolver-cu12 \
-    nvidia-cusparse-cu12 nvidia-nccl-cu12 nvidia-nvjitlink-cu12 \
-    nvidia-nvtx-cu12 triton || true && \
+    # Then install the rest, but force CPU index as extra to prevent overrides
+    pip install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu && \
+    # Explicitly clear out any nvidia/triton packages that might have been pulled as transitive deps
+    pip list | grep nvidia | awk '{print $1}' | xargs pip uninstall -y || true && \
+    pip uninstall -y triton || true && \
     find /usr/local/lib/python3.11/site-packages -name "__pycache__" -type d -exec rm -rf {} +
 
 # Runtime stage
