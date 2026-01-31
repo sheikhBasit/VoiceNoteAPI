@@ -4,10 +4,11 @@ import os
 from unittest.mock import MagicMock
 from dotenv import load_dotenv
 
-# Load .env at the very beginning
-load_dotenv(dotenv_path="/home/basitdev/Me/StudioProjects/VoiceNoteAPI/.env")
+# Load .env dynamically based on project root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(dotenv_path=os.path.join(PROJECT_ROOT, ".env"))
 
-# Force local DB connection for pytest if not in Docker
+# Force local DB connection for pytest if not in Docker/CI
 if not os.getenv("DATABASE_URL"):
     os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5433/voicenote"
 

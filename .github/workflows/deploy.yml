@@ -83,6 +83,7 @@ jobs:
           ENVIRONMENT: "testing"
           DEVICE_SECRET_KEY: "VN_SECURE_TEST_KEY"
           PYTEST_DB_NAME: "voicenote_test"
+          PYTHONPATH: .
         run: |
           python -m pytest tests/test_new_endpoints.py -v --tb=short
 
