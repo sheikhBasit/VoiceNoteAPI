@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request, Header
 from pydantic import BaseModel, HttpUrl
+from typing import Optional
+import os
 from app.services.meeting_service import MeetingService
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
@@ -20,14 +22,15 @@ class JoinMeetingRequest(BaseModel):
     bot_name: str = "VoiceNote Assistant"
 
 @router.post("/meetings/join")
-async def join_meeting(request: Request, req_body: JoinMeetingRequest, db: Session = Depends(get_db)):
+async def join_meeting(
+    req_body: JoinMeetingRequest, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
     """
     Dispatch a bot to join a Zoom/Teams/Meet call.
     """
-    # Extract user_id from Middleware (request.state.user_id) or Header
-    user_id = getattr(request.state, "user_id", None)
-    if not user_id:
-        user_id = request.headers.get("X-User-ID", "anonymous_meeting_user")
+    user_id = current_user.id
 
     service = MeetingService(db)
     try:
@@ -41,10 +44,20 @@ async def join_meeting(request: Request, req_body: JoinMeetingRequest, db: Sessi
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/webhooks/recall")
-async def recall_webhook(payload: dict, background_tasks: BackgroundTasks):
+async def recall_webhook(
+    payload: dict, 
+    background_tasks: BackgroundTasks,
+    x_recall_signature: Optional[str] = Header(None)
+):
     """
     Receives events from Recall.ai bots.
+    Requirement: "Securing endpoints"
     """
+    # Validation
+    webhook_secret = os.getenv("RECALL_WEBHOOK_SECRET")
+    if webhook_secret and x_recall_signature != webhook_secret:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid webhook signature")
+
     # Create a new session for background task
     db = SessionLocal() 
     service = MeetingService(db)

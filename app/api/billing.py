@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
+from app.utils.security import verify_device_signature
 from sqlalchemy.orm import Session
 import stripe
 import json
+import hmac
+import hashlib
 from app.db.session import SessionLocal
 from app.db import models
 from app.services.billing_service import BillingService
@@ -9,14 +12,34 @@ from app.core.config import ai_config
 from app.utils.json_logger import JLogger
 from typing import Optional
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+async def verify_hmac(request: Request, x_device_signature: str = Header(None), x_device_timestamp: str = Header(None)):
+    """
+    Optional security hardening to verify frontend signatures.
+    """
+    if not ai_config.STRIPE_WEBHOOK_SECRET: # Use a similar secret or dedicated one
+        return
+    # Verification logic would go here
+    pass
+
 router = APIRouter(prefix="/api/v1/billing", tags=["Monetization"])
 
 @router.get("/wallet")
-async def get_wallet(user_id: str):
+async def get_wallet(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+    _sig: bool = Depends(verify_device_signature)
+):
     """
     Retrieve user balance and recent transactions.
     """
-    db = SessionLocal()
+    user_id = current_user.id
     try:
         billing = BillingService(db)
         wallet = billing.get_or_create_wallet(user_id)
@@ -41,11 +64,16 @@ async def get_wallet(user_id: str):
         db.close()
 
 @router.post("/checkout")
-async def create_checkout_session(user_id: str, amount_credits: int):
+async def create_checkout_session(
+    amount_credits: int,
+    current_user: models.User = Depends(get_current_user),
+    _sig: bool = Depends(verify_device_signature)
+):
     """
     Create a Stripe Checkout session for topping up credits.
     1 credit = $0.01 (1 cent) for simplicity.
     """
+    user_id = current_user.id
     try:
         # Create a checkout session
         checkout_session = stripe.checkout.Session.create(

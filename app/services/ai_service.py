@@ -160,10 +160,10 @@ class AIService:
             logger.error(f"Sync transcription failed: {e}")
             raise AIServiceError(f"Transcription failed: {str(e)}")
 
-    def run_full_analysis_sync(self, audio_path: str, user_role: str = "ASSISTANT") -> NoteAIOutput:
+    def run_full_analysis_sync(self, audio_path: str, user_role: str = "ASSISTANT", **kwargs) -> NoteAIOutput:
         """Synchronous orchestration of full audio to analysis pipeline."""
         transcript, engine = self.transcribe_with_failover_sync(audio_path)
-        ai_output = self.llm_brain_sync(transcript, user_role)
+        ai_output = self.llm_brain_sync(transcript, user_role, **kwargs)
         return ai_output
 
     async def transcribe_with_failover(self, audio_path: str) -> Tuple[str, str]:
@@ -244,7 +244,7 @@ class AIService:
 
         raise AIServiceError("All transcription engines failed or are not configured.")
 
-    def llm_brain_sync(self, transcript: str, user_role: str = "ASSISTANT", user_instruction: str = "") -> NoteAIOutput:
+    def llm_brain_sync(self, transcript: str, user_role: str = "ASSISTANT", user_instruction: str = "", **kwargs) -> NoteAIOutput:
         """Synchronous structured extraction for Celery worker."""
         # Validation
         transcript = validate_transcript(transcript)
@@ -262,6 +262,11 @@ class AIService:
         if user_role:
             system_prompt = f"{system_prompt}\n\nYou are acting as a {user_role}."
         
+        # Inject Domain Terminology (Jargons)
+        jargons = kwargs.get("jargons", [])
+        if jargons:
+            system_prompt += f"\n\nCRITICAL CONTEXT: The following industry-specific terms or 'jargons' are relevant to this user. Use them correctly if they appear phonetically or contextually:\n{', '.join(jargons)}"
+
         user_content = f"Instruction: {user_instruction or 'Analyze the transcript.'}\n\nTranscript:\n{transcript}"
         settings = self._get_dynamic_settings()
         
@@ -307,11 +312,11 @@ class AIService:
             raise 
 
     @retry_with_backoff(max_attempts=3)
-    async def llm_brain(self, transcript: str, user_role: str = "ASSISTANT", user_instruction: str = "") -> NoteAIOutput:
+    async def llm_brain(self, transcript: str, user_role: str = "ASSISTANT", user_instruction: str = "", **kwargs) -> NoteAIOutput:
         """Structured extraction using Llama 3.1 on Groq with robust validation."""
-        return self.llm_brain_sync(transcript, user_role, user_instruction)
+        return self.llm_brain_sync(transcript, user_role, user_instruction, **kwargs)
 
-    async def run_full_analysis(self, audio_path: str) -> NoteAIOutput:
+    async def run_full_analysis(self, audio_path: str, user_role: str = "ASSISTANT", **kwargs) -> NoteAIOutput:
         """
         Orchestrates complete audio -> transcript -> AI analysis pipeline.
         """
@@ -319,7 +324,7 @@ class AIService:
         transcript, engine = await self.transcribe_with_failover(audio_path)
         
         # 2. Analyze
-        ai_output = await self.llm_brain(transcript)
+        ai_output = await self.llm_brain(transcript, user_role, **kwargs)
         
         return ai_output
 
@@ -376,12 +381,19 @@ class AIService:
             logger.error(f"Conflict detection failed: {e}")
             return []
 
-    def semantic_analysis_sync(self, transcript: str, user_role: str = "GENERIC") -> dict:
+    def semantic_analysis_sync(self, transcript: str, user_role: str = "GENERIC", **kwargs) -> dict:
         """Synchronous version for Celery worker."""
         settings = self._get_dynamic_settings()
+        
+        jargons = kwargs.get("jargons", [])
+        personal_instruction = kwargs.get("personal_instruction", "")
+        
         system_prompt = f"""
         Role: SEMANTIC_ANALYST (Expert in psychology, linguistics, and logical reasoning)
         Background: You are analyzing a voice note from a {user_role}.
+        
+        Personal User Context: {personal_instruction}
+        Relevant Jargons: {", ".join(jargons)}
         
         Task: Provide a deep semantic analysis of the transcript.
         Output MUST be a JSON object with:
@@ -415,6 +427,6 @@ class AIService:
             logger.error(f"Semantic analysis failed: {e}")
             raise 
 
-    async def semantic_analysis(self, transcript: str, user_role: str = "GENERIC") -> dict:
+    async def semantic_analysis(self, transcript: str, user_role: str = "GENERIC", **kwargs) -> dict:
         """Deep semantic analysis: emotional tone, patterns, logical consistency."""
-        return self.semantic_analysis_sync(transcript, user_role)
+        return self.semantic_analysis_sync(transcript, user_role, **kwargs)

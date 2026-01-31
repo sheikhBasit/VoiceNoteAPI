@@ -55,6 +55,16 @@ class User(Base):
     # Session Info
     current_device_id = Column(String, nullable=True)
     tier = Column(Enum(SubscriptionTier), default=SubscriptionTier.FREE)
+    plan_id = Column(String, ForeignKey("service_plans.id"), nullable=True)
+    
+    # Usage Stats (JSONB cache for quick admin view)
+    usage_stats = Column(JSONB, default=lambda: {
+        "total_audio_minutes": 0.0,
+        "total_notes": 0,
+        "total_tasks": 0,
+        "last_usage_at": None
+    })
+    
     password_hash = Column(String, nullable=True) # For Admin Web Login
     last_login = Column(BigInteger, default=lambda: int(time.time() * 1000))
     is_deleted = Column(Boolean, default=False, index=True)
@@ -68,7 +78,7 @@ class User(Base):
     secondary_role = Column(Enum(UserRole), nullable=True)
     custom_role_description = Column(Text)
     system_prompt = Column(Text)
-    jargons = Column(JSON, default=list) # Custom vocabulary for Whisper/Llama
+    jargons = Column(JSONB, default=list) # Custom vocabulary for Whisper/Llama
     
     # Admin System (NEW)
     is_admin = Column(Boolean, default=False, index=True)
@@ -80,7 +90,8 @@ class User(Base):
     show_floating_button = Column(Boolean, default=True)
     work_start_hour = Column(Integer, default=9)
     work_end_hour = Column(Integer, default=17)
-    work_days = Column(JSON, default=lambda: [2,3,4,5,6]) # 1=Mon...7=Sun
+    work_days = Column(JSONB, default=lambda: [2,3,4,5,6]) # 1=Mon...7=Sun
+    timezone = Column(String, default="UTC", index=True) # e.g. "America/New_York"
 
     # Relationships with CASCADE deletion
     notes = relationship(
@@ -109,10 +120,10 @@ class Note(Base):
     raw_audio_url = Column(String, nullable=True) # Original
     
     # Metadata & Status
-    timestamp = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    timestamp = Column(BigInteger, default=lambda: int(time.time() * 1000), index=True)
     updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
-    priority = Column(Enum(Priority), default=Priority.MEDIUM)
-    status = Column(Enum(NoteStatus), default=NoteStatus.PENDING)
+    priority = Column(Enum(Priority), default=Priority.MEDIUM, index=True)
+    status = Column(Enum(NoteStatus), default=NoteStatus.PENDING, index=True)
     
     # Deletion Metadata (Enhanced)
     is_deleted = Column(Boolean, default=False, index=True)
@@ -158,11 +169,12 @@ class Task(Base):
     __tablename__ = "tasks"
     
     id = Column(String, primary_key=True)
-    note_id = Column(String, ForeignKey("notes.id", ondelete="CASCADE"), index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    note_id = Column(String, ForeignKey("notes.id", ondelete="CASCADE"), index=True, nullable=True)
     description = Column(Text)
-    is_done = Column(Boolean, default=False)
-    deadline = Column(BigInteger, nullable=True)
-    priority = Column(Enum(Priority), default=Priority.MEDIUM)
+    is_done = Column(Boolean, default=False, index=True)
+    deadline = Column(BigInteger, nullable=True, index=True)
+    priority = Column(Enum(Priority), default=Priority.MEDIUM, index=True)
     
     # Deletion Metadata (Enhanced)
     is_deleted = Column(Boolean, default=False, index=True)
@@ -246,9 +258,30 @@ class SystemSettings(Base):
     
     updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
     # Note: Foreign key to users.id for updated_by
-    updated_by = Column(String, ForeignKey("users.id")) 
+    updated_by = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True) 
 
-# --- COMMERCIAL & BILLING MODELS (NEW) ---
+# --- COMMERCIAL & BILLING MODELS ---
+
+class ServicePlan(Base):
+    """
+    Defines billing tiers and limits.
+    """
+    __tablename__ = "service_plans"
+    
+    id = Column(String, primary_key=True)
+    name = Column(String, unique=True, nullable=False) # 'FREE', 'PRO', 'ENTERPRISE'
+    
+    # Pricing
+    price_per_minute = Column(Integer, default=10) # in credits
+    monthly_credits = Column(Integer, default=100)
+    
+    # Features
+    ai_models_allowed = Column(JSON, default=lambda: ["llama-3.1", "nova-2"])
+    can_use_rag = Column(Boolean, default=True)
+    max_storage_mb = Column(Integer, default=500)
+    
+    created_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
 
 class Wallet(Base):
     """
@@ -271,7 +304,10 @@ class Wallet(Base):
     
     updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
     
-    user = relationship("User", backref="wallet")
+    user = relationship("User", back_populates="wallet")
+
+User.wallet = relationship("Wallet", back_populates="user", uselist=False, cascade="all, delete-orphan")
+User.plan = relationship("ServicePlan", backref="users")
 
 class Transaction(Base):
     """
@@ -281,7 +317,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
     
     id = Column(String, primary_key=True, default=lambda: str(__import__('uuid').uuid4()))
-    wallet_id = Column(String, ForeignKey("wallets.user_id"), index=True)
+    wallet_id = Column(String, ForeignKey("wallets.user_id", ondelete="CASCADE"), index=True)
     amount = Column(Integer, nullable=False) # Negative for usage, Positive for deposit
     balance_after = Column(Integer, nullable=False) # Snapshot of balance
     type = Column(String(20), nullable=False) # 'DEPOSIT', 'USAGE', 'REFUND', 'BONUS'
@@ -297,7 +333,7 @@ class UsageLog(Base):
     __tablename__ = "usage_logs"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String, ForeignKey("users.id"), index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     endpoint = Column(String, index=True) # e.g. '/transcribe', '/rag/search'
     
     # Metrics

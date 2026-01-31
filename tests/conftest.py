@@ -1,6 +1,16 @@
 import pytest
 import sys
+import os
 from unittest.mock import MagicMock
+from dotenv import load_dotenv
+
+# Load .env at the very beginning
+load_dotenv(dotenv_path="/home/basitdev/Me/StudioProjects/VoiceNoteAPI/.env")
+
+# Force local DB connection for pytest if not in Docker
+if not os.getenv("DATABASE_URL"):
+    os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5433/voicenote"
+
 from app.db.session import SessionLocal, sync_engine as engine
 from app.db.models import Base
 
@@ -21,14 +31,8 @@ sys.modules["pyannote.audio"] = MagicMock()
 # Configure NoiseReduce Mock - REMOVED (Use real)
 # Mock Soundfile - REMOVED (Use real)
 
-import os
-# Force local DB connection for pytest
-# Force local DB connection for pytest if not in Docker
-if not os.getenv("DATABASE_URL"):
-    os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5433/voicenote"
-
-from app.db.session import SessionLocal, sync_engine as engine
-from app.db.models import Base
+# from app.db.session import SessionLocal, sync_engine as engine
+# from app.db.models import Base
 @pytest.fixture(scope="session", autouse=True)
 def setup_db():
     """Create a fresh database schema for the test session."""

@@ -64,13 +64,13 @@ class DeletionService:
                 and_(Note.user_id == user_id, Note.is_deleted == False)
             ).count()
             
-            tasks_count = db.query(Task).join(Note).filter(
-                and_(Note.user_id == user_id, Task.is_deleted == False)
+            tasks_count = db.query(Task).filter(
+                and_(Task.user_id == user_id, Task.is_deleted == False)
             ).count()
             
             # Soft delete all tasks first
-            tasks = db.query(Task).join(Note).filter(
-                and_(Note.user_id == user_id, Task.is_deleted == False)
+            tasks = db.query(Task).filter(
+                and_(Task.user_id == user_id, Task.is_deleted == False)
             ).all()
             
             for task in tasks:
@@ -470,7 +470,7 @@ class DeletionService:
             
             # Count items
             notes_count = db.query(Note).filter(Note.user_id == user_id).count()
-            tasks_count = db.query(Task).join(Note).filter(Note.user_id == user_id).count()
+            tasks_count = db.query(Task).filter(Task.user_id == user_id).count()
             
             # Hard delete (CASCADE will handle notes and tasks)
             db.delete(user)

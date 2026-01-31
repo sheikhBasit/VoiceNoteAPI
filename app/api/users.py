@@ -16,7 +16,7 @@ import os
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.utils.json_logger import JLogger
-from app.services.auth_service import create_access_token, get_current_user
+from app.utils.security import verify_device_signature
 
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0")) 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
@@ -62,6 +62,7 @@ def sync_user(request: Request, user_data: user_schema.UserCreate, db: Session =
             # Defaults
             primary_role=user_data.primary_role,
             work_days=[2,3,4,5,6],
+            timezone=user_data.timezone or "UTC",
             last_login=int(time.time() * 1000),
             is_deleted=False
         )
@@ -73,7 +74,13 @@ def sync_user(request: Request, user_data: user_schema.UserCreate, db: Session =
         access_token = create_access_token(data={"sub": db_user.id})
         return {"user": db_user, "access_token": access_token, "token_type": "bearer"}
 
-    # 3. Case: Existing User - Check Device Authorization
+    # 3. Case: Existing User - Security Check
+    if db_user.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account deactivated: This user account has been soft-deleted and must be restored by an admin."
+        )
+
     authorized_devices = db_user.authorized_devices or []
     
     # Check if this device + token matches any authorized entry
@@ -99,6 +106,10 @@ def sync_user(request: Request, user_data: user_schema.UserCreate, db: Session =
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(db_user, "authorized_devices")
         
+        # Update timezone if provided during sync
+        if user_data.timezone:
+            db_user.timezone = user_data.timezone
+
         db.commit()
         access_token = create_access_token(data={"sub": db_user.id})
         return {"user": db_user, "access_token": access_token, "token_type": "bearer"}
@@ -238,7 +249,8 @@ def search_users(
 def update_user_settings(
     update_data: user_schema.UserUpdate, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
+    _sig: bool = Depends(verify_device_signature)
 ):
     """PATCH /me: Updates dynamic settings."""
     db_user = current_user
@@ -282,7 +294,13 @@ def update_user_settings(
     return db_user
 
 @router.delete("/me")
-def delete_user_account(hard: bool = False, admin_id: Optional[str] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def delete_user_account(
+    hard: bool = False, 
+    admin_id: Optional[str] = None, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user),
+    _sig: bool = Depends(verify_device_signature)
+):
     """DELETE /me: Handles account deletion via DeletionService."""
     user_id = current_user.id
     if hard:

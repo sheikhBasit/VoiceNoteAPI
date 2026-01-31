@@ -113,7 +113,12 @@ class SearchService:
         
         context = "\n\n".join(context_parts) if context_parts else "No context found."
             
-        # 4. Ask LLM to synthesize answer using centralized prompt
+        # 4. Fetch User for Personalization
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        user_instr = user.system_prompt if user else ""
+        user_jargons = user.jargons if user else []
+
+        # 5. Ask LLM to synthesize answer using centralized prompt
         prompt = ai_config.RAG_SYNTHESIS_PROMPT.format(
             query=query,
             context=context
@@ -124,7 +129,9 @@ class SearchService:
             ai_response = await self.ai_service.llm_brain(
                 transcript="Synthesizing from multiple sources...", 
                 user_role="RESEARCH_ANALYST",
-                user_instruction=prompt
+                user_instruction=prompt,
+                jargons=user_jargons,
+                personal_instruction=user_instr
             )
             
             return {

@@ -18,6 +18,7 @@ from app.schemas import system as system_schema
 from app.utils.admin_utils import AdminManager
 from app.utils.ai_service_utils import AIServiceError
 from app.services.auth_service import create_access_token, verify_password, get_current_active_admin
+from app.schemas import billing as billing_schema
 from typing import List, Optional
 import time
 
@@ -174,11 +175,28 @@ async def list_all_users(
     users = db.query(models.User).offset(skip).limit(limit).all()
     total = db.query(models.User).count()
     
+    # Enhanced user list with usage summaries
+    results = []
+    for u in users:
+        wallet = u.wallet
+        results.append({
+            "id": u.id,
+            "name": u.name,
+            "email": u.email,
+            "is_admin": u.is_admin,
+            "plan_id": u.plan_id,
+            "plan_name": u.plan.name if u.plan else "NONE",
+            "balance": wallet.balance if wallet else 0,
+            "usage_stats": u.usage_stats,
+            "is_deleted": u.is_deleted,
+            "last_login": u.last_login
+        })
+
     return {
         "total": total,
         "skip": skip,
         "limit": limit,
-        "users": users
+        "users": results
     }
 
 
@@ -553,3 +571,90 @@ async def update_ai_settings(
     )
     
     return settings
+
+# ==================== BILLING & USAGE MANAGEMENT ====================
+
+@router.post("/plans", response_model=billing_schema.ServicePlanResponse)
+async def create_service_plan(
+    plan: billing_schema.ServicePlanCreate,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin)
+):
+    """Create a new billing/service plan."""
+    if not AdminManager.has_permission(admin_user, "can_modify_system_settings"):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    
+    db_plan = models.ServicePlan(**plan.model_dump())
+    db.add(db_plan)
+    db.commit()
+    db.refresh(db_plan)
+    
+    AdminManager.log_admin_action(db, admin_user.id, "CREATE_PLAN", db_plan.id)
+    return db_plan
+
+@router.get("/plans", response_model=List[billing_schema.ServicePlanResponse])
+async def list_service_plans(
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin)
+):
+    """List all available service plans."""
+    return db.query(models.ServicePlan).all()
+
+@router.get("/users/{user_identifier}/usage")
+async def get_user_usage_report(
+    user_identifier: str,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin)
+):
+    """
+    Get detailed usage and transaction history for a user.
+    user_identifier can be ID or Email.
+    """
+    if not AdminManager.has_permission(admin_user, "can_view_analytics"):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    
+    user = db.query(models.User).filter(
+        (models.User.id == user_identifier) | (models.User.email == user_identifier)
+    ).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    usage_logs = db.query(models.UsageLog).filter(models.UsageLog.user_id == user.id).order_by(models.UsageLog.timestamp.desc()).limit(100).all()
+    transactions = db.query(models.Transaction).filter(models.Transaction.wallet_id == user.id).order_by(models.Transaction.created_at.desc()).limit(100).all()
+    
+    return {
+        "user_id": user.id,
+        "email": user.email,
+        "usage_stats": user.usage_stats,
+        "wallet": {
+            "balance": user.wallet.balance if user.wallet else 0,
+            "currency": user.wallet.currency if user.wallet else "USD",
+            "plan": user.plan.name if user.plan else "FREE"
+        },
+        "recent_usage": usage_logs,
+        "recent_transactions": transactions
+    }
+
+@router.patch("/users/{user_id}/plan")
+async def update_user_plan(
+    user_id: str,
+    plan_id: str,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin)
+):
+    """Assign a user to a specific billing plan."""
+    if not AdminManager.has_permission(admin_user, "can_modify_system_settings"):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    plan = db.query(models.ServicePlan).filter(models.ServicePlan.id == plan_id).first()
+    
+    if not user or not plan:
+        raise HTTPException(status_code=404, detail="User or Plan not found")
+        
+    user.plan_id = plan_id
+    db.commit()
+    
+    AdminManager.log_admin_action(db, admin_user.id, "UPDATE_USER_PLAN", user_id, {"new_plan": plan_id})
+    return {"status": "success", "message": f"User {user.email} moved to {plan.name} plan"}

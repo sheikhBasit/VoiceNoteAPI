@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, BackgroundTasks, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import uuid
 import time
@@ -14,6 +14,7 @@ from app.worker.task import process_task_image_pipeline
 from app.services.deletion_service import DeletionService
 from app.utils.security import verify_note_ownership, verify_task_ownership
 from app.utils.json_logger import JLogger
+from app.services.task_service import TaskService
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -28,8 +29,9 @@ def create_task(
     current_user: models.User = Depends(get_current_user)
 ):
     """POST /: Create a new task directly (not from AI extraction)."""
-    # ✅ Verify ownership
-    verify_note_ownership(db, current_user.id, task_data.note_id)
+    # ✅ Verify ownership if note_id provided
+    if task_data.note_id:
+        verify_note_ownership(db, current_user.id, task_data.note_id)
     # ✅ Validate description is not empty after strip
     description = task_data.description.strip()
     if not description or len(description) < 1:
@@ -43,16 +45,18 @@ def create_task(
             detail="Validation failed: Task description exceeds maximum length of 2000 characters"
         )
     
-    # Verify the note exists
-    note = db.query(models.Note).filter(models.Note.id == task_data.note_id).first()
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail=f"Resource not found: Associated note with ID '{task_data.note_id}' missing or invalid"
-        )
+    # Verify the note exists if note_id is provided
+    if task_data.note_id:
+        note = db.query(models.Note).filter(models.Note.id == task_data.note_id).first()
+        if not note:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail=f"Resource not found: Associated note with ID '{task_data.note_id}' missing or invalid"
+            )
     
     new_task = models.Task(
         id=str(uuid.uuid4()),
+        user_id=current_user.id,
         note_id=task_data.note_id,
         description=description,
         priority=task_data.priority,
@@ -98,15 +102,12 @@ def list_tasks(
     - Regular Users: See only their own tasks.
     - Filtering: Support for note_id, contact email, and contact phone.
     """
-    query = db.query(models.Task).join(models.Note).filter(
+    query = db.query(models.Task).options(
+        joinedload(models.Task.note)
+    ).filter(
+        models.Task.user_id == current_user.id,
         models.Task.is_deleted == False
     )
-
-    if current_user.is_admin:
-        if user_id:
-            query = query.filter(models.Note.user_id == user_id)
-    else:
-        query = query.filter(models.Note.user_id == current_user.id)
 
     if note_id:
         query = query.filter(models.Task.note_id == note_id)
@@ -130,16 +131,26 @@ def get_tasks_due_today(
     current_user: models.User = Depends(get_current_user)
 ):
     """GET /due-today: Get only tasks with deadline today for user."""
-    current_time = int(time.time() * 1000)
-    today_start = (current_time // (24 * 60 * 60 * 1000)) * (24 * 60 * 60 * 1000)
-    today_end = today_start + (24 * 60 * 60 * 1000)
+    from datetime import datetime, time as dt_time
+    from zoneinfo import ZoneInfo
     
-    tasks = db.query(models.Task).join(models.Note).filter(
-        models.Note.user_id == current_user.id,
+    user_tz = ZoneInfo(current_user.timezone or "UTC")
+    now_user = datetime.fromtimestamp(time.time(), tz=user_tz)
+    
+    # Start and End of "Today" in user's local timezone
+    today_start = datetime.combine(now_user.date(), dt_time.min).replace(tzinfo=user_tz)
+    today_end = datetime.combine(now_user.date(), dt_time.max).replace(tzinfo=user_tz)
+    
+    # Convert back to Unix epoch milliseconds for DB comparison
+    start_ms = int(today_start.timestamp() * 1000)
+    end_ms = int(today_end.timestamp() * 1000)
+    
+    tasks = db.query(models.Task).filter(
+        models.Task.user_id == current_user.id,
         models.Task.is_deleted == False,
         models.Task.is_done == False,
-        models.Task.deadline >= today_start,
-        models.Task.deadline < today_end
+        models.Task.deadline >= start_ms,
+        models.Task.deadline <= end_ms
     ).order_by(models.Task.priority.desc()).limit(limit).offset(offset).all()
     
     return tasks
@@ -155,8 +166,8 @@ def get_overdue_tasks(
     """GET /overdue: Get all overdue tasks (past deadline) for user."""
     current_time = int(time.time() * 1000)
     
-    tasks = db.query(models.Task).join(models.Note).filter(
-        models.Note.user_id == current_user.id,
+    tasks = db.query(models.Task).filter(
+        models.Task.user_id == current_user.id,
         models.Task.is_deleted == False,
         models.Task.is_done == False,
         models.Task.deadline < current_time,
@@ -172,24 +183,26 @@ def get_tasks_assigned_to_me(
     user_phone: Optional[str] = None,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
 ):
-    """GET /assigned-to-me: Get tasks assigned to current user."""
-    if not user_email and not user_phone:
-        raise HTTPException(
-            status_code=400,
-            detail="Provide either user_email or user_phone"
-        )
+    """GET /assigned-to-me: Get tasks assigned to current user (validated)."""
+    # Force search only for current user's own identity for security
+    search_email = user_email or current_user.email
+    search_phone = user_phone # Phone can be optional/different
     
-    query = db.query(models.Task).filter(models.Task.is_deleted == False)
+    query = db.query(models.Task).filter(
+        models.Task.user_id == current_user.id, # Filter by ownership first
+        models.Task.is_deleted == False
+    )
     
-    if user_email:
+    if search_email:
         query = query.filter(
-            models.Task.assigned_entities.contains([{"email": user_email}])
+            models.Task.assigned_entities.contains([{"email": search_email}])
         )
-    if user_phone:
+    if search_phone:
         query = query.filter(
-            models.Task.assigned_entities.contains([{"phone": user_phone}])
+            models.Task.assigned_entities.contains([{"phone": search_phone}])
         )
     
     return query.limit(limit).offset(offset).all()
@@ -210,8 +223,8 @@ def search_tasks(
     # Search in description (case-insensitive)
     search_pattern = f"%{query_text}%"
     
-    tasks = db.query(models.Task).join(models.Note).filter(
-        models.Note.user_id == current_user.id,
+    tasks = db.query(models.Task).filter(
+        models.Task.user_id == current_user.id,
         models.Task.is_deleted == False,
         models.Task.description.ilike(search_pattern)
     ).limit(limit).offset(offset).all()
@@ -225,52 +238,8 @@ def get_task_statistics(
     current_user: models.User = Depends(get_current_user)
 ):
     """GET /stats: Get task statistics for dashboard."""
-    # Query all non-deleted tasks for current_user
-    all_tasks = db.query(models.Task).join(models.Note).filter(
-        models.Note.user_id == current_user.id,
-        models.Task.is_deleted == False
-    ).all()
-    
-    current_time = int(time.time() * 1000)
-    
-    # Calculate statistics
-    total_tasks = len(all_tasks)
-    completed_tasks = len([t for t in all_tasks if t.is_done])
-    pending_tasks = total_tasks - completed_tasks
-    
-    # Tasks by priority
-    high_priority = len([t for t in all_tasks if t.priority == models.Priority.HIGH])
-    medium_priority = len([t for t in all_tasks if t.priority == models.Priority.MEDIUM])
-    low_priority = len([t for t in all_tasks if t.priority == models.Priority.LOW])
-    
-    # Tasks by deadline
-    overdue_tasks = len([
-        t for t in all_tasks
-        if not t.is_done and t.deadline and t.deadline < current_time
-    ])
-    
-    today_start = (current_time // (24 * 60 * 60 * 1000)) * (24 * 60 * 60 * 1000)
-    today_end = today_start + (24 * 60 * 60 * 1000)
-    due_today = len([
-        t for t in all_tasks
-        if not t.is_done and t.deadline and today_start <= t.deadline < today_end
-    ])
-    
-    return {
-        "total_tasks": total_tasks,
-        "completed_tasks": completed_tasks,
-        "pending_tasks": pending_tasks,
-        "by_priority": {
-            "high": high_priority,
-            "medium": medium_priority,
-            "low": low_priority
-        },
-        "by_status": {
-            "overdue": overdue_tasks,
-            "due_today": due_today
-        },
-        "completion_rate": round((completed_tasks / total_tasks * 100) if total_tasks > 0 else 0, 2)
-    }
+    service = TaskService(db)
+    return service.get_task_statistics(current_user.id)
 
 
 
@@ -283,9 +252,8 @@ def get_single_task(task_id: str, db: Session = Depends(get_db), current_user: m
         raise HTTPException(status_code=404, detail=f"Task with ID '{task_id}' not found")
     
     # 2. Ownership Check
-    note = db.query(models.Note).filter(models.Note.id == task.note_id).first()
-    if not note or note.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Permission denied: You do not own the parent note for this task")
+    if task.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Permission denied: You do not own this task")
         
     if task.is_deleted:
         raise HTTPException(
@@ -408,7 +376,7 @@ def delete_task(task_id: str, hard: bool = False, db: Session = Depends(get_db),
 
 
 
-@router.patch("/{task_id}/multimedia/remove")
+@router.patch("/{task_id}/multimedia")
 async def remove_multimedia(
     task_id: str,
     url_to_remove: str,

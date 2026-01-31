@@ -38,7 +38,7 @@ class TaskBase(BaseModel):
     is_action_approved: bool = False
 
 class TaskCreate(TaskBase):
-    note_id: str
+    note_id: Optional[str] = None
 
 class TaskUpdate(BaseModel):
     description: Optional[str] = None
@@ -55,7 +55,7 @@ class TaskUpdate(BaseModel):
 
 class TaskResponse(TaskBase):
     id: str
-    note_id: str
+    note_id: Optional[str] = None
     is_done: bool
     is_deleted: bool
     created_at: int

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Body, UploadFile, File, Form
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from app.db.session import get_db
 from app.db import models
@@ -148,7 +148,9 @@ def list_notes(
     current_user: models.User = Depends(get_current_user)
 ):
     """GET /: Returns all non-deleted notes for the user (paginated)."""
-    return db.query(models.Note).filter(
+    return db.query(models.Note).options(
+        joinedload(models.Note.tasks)
+    ).filter(
         models.Note.user_id == current_user.id,
         models.Note.is_deleted == False
     ).offset(skip).limit(limit).all()

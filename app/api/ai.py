@@ -45,8 +45,6 @@ async def semantic_search(
     
     return results
 
-    return results
-
 # NOTE: /{note_id}/ask is now unified in notes.py to avoid duplication.
 
 from app.services.auth_service import get_current_user
@@ -61,10 +59,11 @@ def get_user_stats(
     Returns high-level stats like '5 High Priority tasks today'.
     """
     user_id = current_user.id
-    high_priority_count = db.query(models.Task).join(models.Note).filter(
-        models.Note.user_id == user_id,
+    high_priority_count = db.query(models.Task).filter(
+        models.Task.user_id == user_id,
         models.Task.priority == models.Priority.HIGH,
-        models.Task.is_done == False
+        models.Task.is_done == False,
+        models.Task.is_deleted == False
     ).count()
 
     total_notes = db.query(models.Note).filter(

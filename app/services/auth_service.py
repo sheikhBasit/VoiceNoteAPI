@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db import models
 from app.utils.json_logger import JLogger
+import hmac
+import hashlib
 
 # Configuration
 SECRET_KEY = os.getenv("DEVICE_SECRET_KEY", "your-secret-key-keep-it-safe")
@@ -141,6 +143,7 @@ async def get_current_user(
             )
 
     return user
+
 
 async def get_current_active_admin(
     current_user: models.User = Depends(get_current_user)

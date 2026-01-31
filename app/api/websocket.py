@@ -1,4 +1,6 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, status
+from sqlalchemy.orm import Session
+from app.db.session import get_db
 from app.services.websocket_manager import manager
 from app.services.auth_service import get_current_user_ws # We need a WS-specific auth
 import logging
@@ -7,13 +9,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ws", tags=["Real-time Sync"])
 
 @router.websocket("/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
+async def websocket_endpoint(
+    websocket: WebSocket, 
+    user_id: str, 
+    token: str = None,
+    db: Session = Depends(get_db)
+):
     """
     Main WebSocket handle.
-    Accepts connection and registers the user for real-time broadcasts.
+    Verifies JWT for secure real-time broadcasts.
     """
-    # NOTE: Real-world apps should verify JWT here. 
-    # For now, we trust the user_id from the path for the dev bridge.
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    try:
+        user = await get_current_user_ws(token, db)
+        if user.id != user_id:
+             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+             return
+    except Exception:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await manager.connect(user_id, websocket)
     try:
         while True:

@@ -29,6 +29,11 @@ class ConnectionManager:
         if not self.pubsub_task:
             self.pubsub_task = asyncio.create_task(self._listen_to_redis())
             
+        # Subscribe to user-specific channel in Redis
+        # (Managed inside _listen_to_redis via a set of subscribed channels or dynamic pattern)
+        # Simplified: We listen to user_updates_* pattern or handle it in the loop.
+        # Let's use user_updates_{user_id} channel.
+        
         logger.info(f"WebSocket: User {user_id} connected. Active connections: {len(self.active_connections[user_id])}")
 
     def disconnect(self, user_id: str, websocket: WebSocket):
@@ -40,23 +45,26 @@ class ConnectionManager:
         logger.info(f"WebSocket: User {user_id} disconnected.")
 
     async def _listen_to_redis(self):
-        """Background task to listen for broadcasts from workers."""
+        """Background task to listen for broadcasts from workers using pattern matching."""
         r = redis.from_url(self.redis_url)
         pubsub = r.pubsub()
-        await pubsub.subscribe("ws_updates")
+        # Listen to all user-specific updates
+        await pubsub.psubscribe("user_updates_*")
         
-        logger.info("WebSocket: Redis Pub/Sub listener started.")
+        logger.info("WebSocket: Redis Pattern Pub/Sub listener started.")
         try:
             async for message in pubsub.listen():
-                if message["type"] == "message":
-                    data = json.loads(message["data"])
-                    user_id = data.get("user_id")
-                    if user_id:
+                if message["type"] == "pmessage":
+                    # Extract user_id from channel name: user_updates_{user_id}
+                    channel = message["channel"].decode("utf-8")
+                    user_id = channel.replace("user_updates_", "")
+                    
+                    if user_id in self.active_connections:
                         await self.send_personal_message(message["data"], user_id)
         except Exception as e:
             logger.error(f"WebSocket: Redis Pub/Sub error: {e}")
         finally:
-            await pubsub.unsubscribe("ws_updates")
+            await pubsub.punsubscribe("user_updates_*")
 
     async def send_personal_message(self, message: str, user_id: str):
         if user_id in self.active_connections:
