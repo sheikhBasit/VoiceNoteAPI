@@ -132,6 +132,11 @@ jobs:
             
             # Pull latest code and images
             git pull origin main
+            
+            # Reclaim disk space before pulling (Aggressive prune)
+            sudo docker system prune -af
+            sudo docker volume prune -f
+            
             sudo docker compose pull
             
             # Restart with latest images

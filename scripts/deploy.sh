@@ -46,15 +46,16 @@ ssh -i "$KEY_PATH" -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP << EOF
         exit 1
     fi
     
+    echo "🧹 Reclaiming disk space..."
+    docker system prune -af
+    docker volume prune -f
+    
     echo "🐳 Rebuilding containers..."
     make build
     
     echo "🛑 Restarting services..."
     make down
     make up
-    
-    echo "🧹 Cleaning up..."
-    docker image prune -f
 EOF
 
 echo "✅ Deployment Complete!"

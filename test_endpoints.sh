@@ -22,6 +22,9 @@ until curl -sf "$HEALTH_URL" | grep -q "healthy"; do
   if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
     echo -e "\n${RED}✗ API failed to become healthy after $MAX_RETRIES seconds${NC}"
     echo "Check docker logs voicenote_api for migration or startup errors."
+    if command -v docker &> /dev/null; then
+       docker logs voicenote_api 2>&1 | tail -n 50
+    fi
     exit 1
   fi
   echo -n "."
@@ -52,6 +55,10 @@ TOKEN=$(echo "$SYNC_RESPONSE" | jq -r '.access_token' 2>/dev/null)
 if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
   echo -e "${RED}✗ Failed to get auth token (Status: $SYNC_STATUS)${NC}"
   echo "Response: $SYNC_RESPONSE"
+  if command -v docker &> /dev/null; then
+     echo "Tail of container logs for debugging:"
+     docker logs voicenote_api 2>&1 | tail -n 50
+  fi
   exit 1
 fi
 echo -e "${GREEN}✓ Got auth token${NC}"
