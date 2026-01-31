@@ -113,10 +113,10 @@ async def redoc_html():
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    JLogger.error("Unhandled exception caught by global handler", 
-                  path=request.url.path, 
-                  method=request.method, 
-                  error=str(exc))
+    # Log the full traceback for engineers
+    JLogger.exception("Unhandled exception caught by global handler", 
+                      path=request.url.path, 
+                      method=request.method)
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error: A critical failure occurred. Our engineers have been notified."},

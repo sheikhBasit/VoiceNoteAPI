@@ -89,11 +89,13 @@ def upgrade() -> None:
             op.add_column('users', sa.Column('is_admin', sa.Boolean(), nullable=True))
             op.create_index(op.f('ix_users_is_admin'), 'users', ['is_admin'], unique=False)
         if 'primary_role' not in existing_cols:
-            # Create enum type if not exists
-            # op.execute("DO $$ BEGIN CREATE TYPE userrole AS ENUM ('STUDENT', 'TEACHER', 'DEVELOPER', 'OFFICE_WORKER', 'BUSINESS_MAN', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'GENERIC'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+            # Create enum type if not exists (Idempotent for PostgreSQL)
+            op.execute("DO $$ BEGIN CREATE TYPE userrole AS ENUM ('STUDENT', 'TEACHER', 'DEVELOPER', 'OFFICE_WORKER', 'BUSINESS_MAN', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'GENERIC'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
             op.add_column('users', sa.Column('primary_role', sa.Enum('STUDENT', 'TEACHER', 'DEVELOPER', 'OFFICE_WORKER', 'BUSINESS_MAN', 'PSYCHIATRIST', 'PSYCHOLOGIST', 'GENERIC', name='userrole'), nullable=True))
         if 'tier' not in existing_cols:
-             op.add_column('users', sa.Column('tier', sa.Enum('FREE', 'STANDARD', 'PREMIUM', name='subscriptiontier'), nullable=True))
+            # Create enum type if not exists (Idempotent for PostgreSQL)
+            op.execute("DO $$ BEGIN CREATE TYPE subscriptiontier AS ENUM ('FREE', 'STANDARD', 'PREMIUM'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+            op.add_column('users', sa.Column('tier', sa.Enum('FREE', 'STANDARD', 'PREMIUM', name='subscriptiontier'), nullable=True))
         if 'work_start_hour' not in existing_cols:
              op.add_column('users', sa.Column('work_start_hour', sa.Integer(), nullable=True))
         if 'usage_stats' not in existing_cols:
