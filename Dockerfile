@@ -18,10 +18,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set work directory
 WORKDIR /app
 
-# Copy and install requirements
+# Copy requirements
 COPY requirements.txt .
+
+# Install dependencies using CPU-only wheels for ML libs to save ~3GB
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements.txt && \
+    find /usr/local/lib/python3.11/site-packages -name "__pycache__" -type d -exec rm -rf {} +
 
 # Runtime stage
 FROM python:3.11-slim

@@ -133,7 +133,7 @@ jobs:
             docker compose pull
             
             # Restart with latest images
-            docker compose up -d
+            docker compose up -d --no-build
             
             # Run migrations
             docker compose exec -T api alembic -c /app/alembic.ini upgrade head

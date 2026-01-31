@@ -9,16 +9,30 @@ __pycache__
 venv
 .pytest_cache
 
-# Media
+# Media & Data
 uploads/
 *.wav
 *.mp3
+*.m4a
+*.log
 
-# Local Config
+# Dev & Tests
+tests/
+docs/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Local Config & Tools
 .env
+.env.*
 .vscode
 .idea
 Dockerfile
 docker-compose.yml
 Makefile
 README.md
+LICENSE
+.github/
+scripts/test_*.sh
