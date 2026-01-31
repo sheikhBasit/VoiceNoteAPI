@@ -4,7 +4,9 @@ from typing import Optional
 import os
 from app.services.meeting_service import MeetingService
 from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
+from app.db.session import get_db, SessionLocal
+from app.db import models
+from app.services.auth_service import get_current_user
 import logging
 
 router = APIRouter(prefix="/api/v1", tags=["Meetings"])

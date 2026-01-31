@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from app.utils.security import verify_device_signature
+from app.services.auth_service import get_current_user
 from sqlalchemy.orm import Session
 import stripe
 import json
 import hmac
 import hashlib
-from app.db.session import SessionLocal
+from app.db.session import get_db, SessionLocal
 from app.db import models
 from app.services.billing_service import BillingService
 from app.core.config import ai_config

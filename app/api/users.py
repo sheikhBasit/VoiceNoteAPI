@@ -17,6 +17,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.utils.json_logger import JLogger
 from app.utils.security import verify_device_signature
+from app.services.auth_service import create_access_token, get_current_user
 
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0")) 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])

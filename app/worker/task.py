@@ -1,5 +1,6 @@
 from .celery_app import celery_app
 import json
+import uuid
 import cloudinary.uploader
 from app.core.audio import preprocess_audio_pipeline
 from app.services.ai_service import AIService
