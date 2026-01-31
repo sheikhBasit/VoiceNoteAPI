@@ -130,14 +130,14 @@ jobs:
             
             # Pull latest code and images
             git pull origin main
-            docker compose pull
+            sudo docker compose pull
             
             # Restart with latest images
-            docker compose up -d --no-build
+            sudo docker compose up -d --no-build
             
             # Run migrations
-            docker compose exec -T api alembic -c /app/alembic.ini upgrade head
+            sudo docker compose exec -T api alembic -c /app/alembic.ini upgrade head
             
             # Verify deployment
-            docker compose ps
+            sudo docker compose ps
             ./test_endpoints.sh

@@ -379,13 +379,17 @@ def delete_task(task_id: str, hard: bool = False, db: Session = Depends(get_db),
 @router.patch("/{task_id}/multimedia")
 async def remove_multimedia(
     task_id: str,
-    url_to_remove: str,
+    payload: dict, # {"url_to_remove": "..."}
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     """
     PATCH: Efficiently remove a specific URL from the JSONB arrays.
     """
+    url_to_remove = payload.get("url_to_remove")
+    if not url_to_remove:
+        raise HTTPException(status_code=400, detail="Missing url_to_remove in request body")
+
     task = verify_task_ownership(db, current_user.id, task_id)
 
     # Filter out the URL from both image and document arrays
