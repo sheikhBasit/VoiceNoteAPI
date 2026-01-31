@@ -1,5 +1,8 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse, HTMLResponse
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from app.db.session import get_db
 from app.api import users, notes, tasks, ai, admin, testing
 from app.utils.json_logger import JLogger
 
@@ -156,5 +159,13 @@ def read_root():
     }
 
 @app.get("/health")
-def health_check():
-    return {"status": "healthy", "service": "VoiceNote"}
+def health_check(db: Session = Depends(get_db)):
+    try:
+        # Check DB connectivity
+        db.execute(text("SELECT 1"))
+        return {"status": "healthy", "database": "connected", "service": "VoiceNote"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "database": "disconnected", "error": str(e)}
+        )

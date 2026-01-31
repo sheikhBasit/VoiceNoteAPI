@@ -74,6 +74,7 @@ def upgrade() -> None:
         sa.Column('work_start_hour', sa.Integer(), nullable=True),
         sa.Column('work_end_hour', sa.Integer(), nullable=True),
         sa.Column('work_days', sa.JSON(), nullable=True),
+        sa.Column('usage_stats', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.PrimaryKeyConstraint('id')
         )
         op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
@@ -95,6 +96,8 @@ def upgrade() -> None:
              op.add_column('users', sa.Column('tier', sa.Enum('FREE', 'STANDARD', 'PREMIUM', name='subscriptiontier'), nullable=True))
         if 'work_start_hour' not in existing_cols:
              op.add_column('users', sa.Column('work_start_hour', sa.Integer(), nullable=True))
+        if 'usage_stats' not in existing_cols:
+             op.add_column('users', sa.Column('usage_stats', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
 
     if 'notes' not in tables:
         op.create_table('notes',

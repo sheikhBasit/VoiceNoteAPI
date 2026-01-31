@@ -11,10 +11,29 @@ NC='\033[0m' # No Color
 echo "=== Testing New API Endpoints ==="
 echo ""
 
+# Wait for API to be ready - Production Grade Readiness Check
+echo "Waiting for API to be healthy (http://localhost:8000/health)..."
+MAX_RETRIES=60
+RETRY_COUNT=0
+HEALTH_URL="http://localhost:8000/health"
+
+until curl -sf "$HEALTH_URL" | grep -q "healthy"; do
+  RETRY_COUNT=$((RETRY_COUNT+1))
+  if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+    echo -e "\n${RED}✗ API failed to become healthy after $MAX_RETRIES seconds${NC}"
+    echo "Check docker logs voicenote_api for migration or startup errors."
+    exit 1
+  fi
+  echo -n "."
+  sleep 2
+done
+echo -e "\n${GREEN}✓ API is healthy and migrations are complete!${NC}"
+echo ""
+
 # 1. Get auth token (using sync for auto-registration)
 echo "1. Getting auth token..."
 UNIQUE_EMAIL="test_$(date +%s)@voicenote.ai"
-TOKEN=$(curl -s -X POST "$BASE_URL/users/sync" \
+SYNC_OUT=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/users/sync" \
   -H "Content-Type: application/json" \
   -d "{
     \"name\": \"Test User\",
@@ -24,10 +43,15 @@ TOKEN=$(curl -s -X POST "$BASE_URL/users/sync" \
     \"device_model\": \"API Tester\",
     \"primary_role\": \"DEVELOPER\",
     \"timezone\": \"UTC\"
-  }" | jq -r '.access_token')
+  }")
+
+SYNC_STATUS=$(echo "$SYNC_OUT" | tail -n1)
+SYNC_RESPONSE=$(echo "$SYNC_OUT" | sed '$d')
+TOKEN=$(echo "$SYNC_RESPONSE" | jq -r '.access_token' 2>/dev/null)
 
 if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
-  echo -e "${RED}✗ Failed to get auth token${NC}"
+  echo -e "${RED}✗ Failed to get auth token (Status: $SYNC_STATUS)${NC}"
+  echo "Response: $SYNC_RESPONSE"
   exit 1
 fi
 echo -e "${GREEN}✓ Got auth token${NC}"
@@ -144,7 +168,7 @@ echo ""
 
 # 9. Test Task Search
 echo "9. Testing GET /tasks/search..."
-SEARCH=$(curl -s -X GET "$BASE_URL/tasks/search?query=test" \
+SEARCH=$(curl -s -X GET "$BASE_URL/tasks/search?query_text=test" \
   -H "Authorization: Bearer $TOKEN")
 
 if echo "$SEARCH" | jq -e '. | length' > /dev/null 2>&1; then
