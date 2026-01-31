@@ -17,40 +17,43 @@ TEST_USER = {
 }
 
 @pytest.fixture(scope="module")
-def auth_token():
-    """Get authentication token for tests"""
-    response = client.post(
-        "/api/v1/users/login",
-        json={"username": TEST_USER["email"], "password": TEST_USER["password"]}
-    )
-    if response.status_code == 200:
-        return response.json()["access_token"]
+def auth_context():
+    """Get authentication context (token and user info) for tests"""
+    # Create a unique test user for this session to avoid device/existing user conflicts
+    timestamp = int(time.time())
+    test_user_payload = {
+        "name": f"Test User {timestamp}",
+        "email": f"test_{timestamp}@example.com",
+        "token": "test-biometric-token",
+        "device_id": f"test-device-{timestamp}",
+        "device_model": "Pytest CI",
+        "primary_role": "GENERIC",
+        "timezone": "UTC"
+    }
     
-    # If login fails, try sync (register)
     sync_response = client.post(
         "/api/v1/users/sync",
-        json={
-            "name": "Test User",
-            "email": TEST_USER["email"],
-            "password": TEST_USER["password"],
-            "token": "test-token",
-            "device_id": "test-device",
-            "device_model": "Test Model",
-            "primary_role": "GENERIC"
-        }
+        json=test_user_payload
     )
-    if sync_response.status_code == 200:
-        return sync_response.json()["access_token"]
     
-    # If both fail, return None (tests will fail at auth stage)
+    if sync_response.status_code == 200:
+        data = sync_response.json()
+        return {
+            "access_token": data["access_token"],
+            "email": test_user_payload["email"],
+            "user_id": data["user"]["id"]
+        }
+    
+    # Debug print if auth fails
+    print(f"Auth failed: {sync_response.status_code} - {sync_response.text}")
     return None
 
 @pytest.fixture
-def headers(auth_token):
+def headers(auth_context):
     """Get headers with auth token"""
-    if not auth_token:
-        pytest.fail("Could not obtain auth token")
-    return {"Authorization": f"Bearer {auth_token}"}
+    if not auth_context:
+        pytest.fail("Could not obtain auth context")
+    return {"Authorization": f"Bearer {auth_context['access_token']}"}
 
 class TestNoteCreation:
     """Test manual note creation endpoint"""
@@ -245,12 +248,12 @@ class TestTaskFiltering:
         assert response.status_code == 200
         assert isinstance(response.json(), list)
     
-    def test_get_assigned_to_me(self, headers):
+    def test_get_assigned_to_me(self, headers, auth_context):
         """Test getting tasks assigned to me"""
         response = client.get(
             "/api/v1/tasks/assigned-to-me",
             headers=headers,
-            params={"user_email": TEST_USER["email"]}
+            params={"user_email": auth_context["email"]}
         )
         assert response.status_code == 200
         assert isinstance(response.json(), list)

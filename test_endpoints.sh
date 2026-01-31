@@ -13,16 +13,18 @@ echo ""
 
 # 1. Get auth token (using sync for auto-registration)
 echo "1. Getting auth token..."
+UNIQUE_EMAIL="test_$(date +%s)@voicenote.ai"
 TOKEN=$(curl -s -X POST "$BASE_URL/users/sync" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "Test User",
-    "email": "test@voicenote.ai",
-    "token": "biometric_test_token",
-    "device_id": "test_device_001",
-    "device_model": "API Tester",
-    "primary_role": "DEVELOPER"
-  }' | jq -r '.access_token')
+  -d "{
+    \"name\": \"Test User\",
+    \"email\": \"$UNIQUE_EMAIL\",
+    \"token\": \"biometric_test_token\",
+    \"device_id\": \"test_device_$(date +%s)\",
+    \"device_model\": \"API Tester\",
+    \"primary_role\": \"DEVELOPER\",
+    \"timezone\": \"UTC\"
+  }" | jq -r '.access_token')
 
 if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
   echo -e "${RED}✗ Failed to get auth token${NC}"

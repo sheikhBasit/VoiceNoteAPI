@@ -151,8 +151,13 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
             conflicts = ai_service.detect_conflicts_sync(analysis.summary, [str(e.get('title', '')) for e in events])
             
             for conflict in conflicts:
+                # Get first available biometric token for notification
+                device_token = "mock_token"
+                if user.authorized_devices:
+                    device_token = user.authorized_devices[0].get("biometric_token", "mock_token")
+                
                 send_push_notification.delay(
-                    user.token or "mock_token",
+                    device_token,
                     title="📅 Schedule Conflict Alert!",
                     body=f"Target: {conflict['task']} conflicts with '{conflict['conflicting_event']}'",
                     data={"type": "CONFLICT", "conflict": conflict}
@@ -228,7 +233,12 @@ def check_upcoming_tasks():
         for task in upcoming_tasks:
             user = db.query(User).filter(User.id == task.user_id).first()
             
-            if not user or not user.token:
+            if not user or not user.authorized_devices:
+                continue
+            
+            # Use the first available token for now
+            device_token = user.authorized_devices[0].get("biometric_token")
+            if not device_token:
                 continue
             
             # Use user's local time to check work hours
@@ -246,7 +256,7 @@ def check_upcoming_tasks():
             # Only notify if it's work hours/day OR if it's a High Priority emergency
             if (is_work_time and is_work_day) or task.priority == Priority.HIGH:
                 send_push_notification.delay(
-                    user.token,
+                    device_token,
                     title="Task Due Soon! ⏰",
                     body=f"Reminder: '{task.description}' is due in less than 24 hours.",
                     data={"task_id": task.id, "type": "DEADLINE_REMINDER"}
@@ -565,9 +575,13 @@ def generate_productivity_report_task():
                 report_body += f"💡 Insight: {pulse.get('suggestion', 'Keep up the great work!')}"
                 
                 # 4. Trigger pushing notification (Real-world: Email or Push)
-                if user.token:
+                device_token = None
+                if user.authorized_devices:
+                    device_token = user.authorized_devices[0].get("biometric_token")
+                
+                if device_token:
                     send_push_notification.delay(
-                        user.token,
+                        device_token,
                         title="📈 Your Weekly Pulse is Ready!",
                         body="Tap to see your productivity summary for the last 7 days.",
                         data={"type": "WEEKLY_REPORT", "pulse": pulse}

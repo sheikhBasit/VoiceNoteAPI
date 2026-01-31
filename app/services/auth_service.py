@@ -136,11 +136,18 @@ async def get_current_user(
     # Security check: Biometric token consistency for App Users
     if not user.is_admin:
         request_biometric = request.headers.get("X-Biometric-Token")
-        if request_biometric and user.token and request_biometric != user.token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Biometric session invalid or changed"
-            )
+        if request_biometric:
+            # Check if any authorized device has this token
+            authorized_devices = user.authorized_devices or []
+            device_authorized = any(d.get("biometric_token") == request_biometric for d in authorized_devices)
+            
+            # For strict security, we'd also check if it matches the CURRENT device.
+            # But for now, ensuring it belongs to the user is the baseline.
+            if not device_authorized:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Biometric session invalid or changed"
+                )
 
     return user
 

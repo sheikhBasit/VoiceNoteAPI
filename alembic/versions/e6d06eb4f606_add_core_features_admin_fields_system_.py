@@ -49,6 +49,8 @@ def upgrade() -> None:
     if 'timezone' not in user_cols:
         op.add_column('users', sa.Column('timezone', sa.String(), nullable=True))
         op.create_index(op.f('ix_users_timezone'), 'users', ['timezone'], unique=False)
+    if 'usage_stats' not in user_cols:
+        op.add_column('users', sa.Column('usage_stats', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
     
     # 3. Tasks Table Updates (Critical Fixes for Ownership & Timezone)
     task_cols = [c['name'] for c in inspector.get_columns('tasks')]

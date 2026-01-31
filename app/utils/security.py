@@ -139,16 +139,28 @@ def verify_task_ownership(db: Session, user_id: str, task_id: str):
             detail=f"Task with ID '{task_id}' not found"
         )
     
-    # 2. Parent Note Check
-    note = db.query(models.Note).filter(models.Note.id == task.note_id).first()
-    if not note or note.user_id != user_id:
-        JLogger.warning("Task ownership violation attempt", 
-                        user_id=user_id, 
-                        task_id=task_id)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permission denied: You do not have authority over this task"
-        )
+    # 2. Ownership Check
+    # NEW: Check task.user_id first (manual tasks may not have a parent note)
+    if task.user_id:
+        if task.user_id != user_id:
+            JLogger.warning("Task ownership violation attempt", 
+                            user_id=user_id, 
+                            task_id=task_id)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied: You do not have authority over this task"
+            )
+    else:
+        # Fallback for old tasks that might not have user_id populated yet
+        note = db.query(models.Note).filter(models.Note.id == task.note_id).first()
+        if not note or note.user_id != user_id:
+            JLogger.warning("Task ownership violation attempt (legacy check)", 
+                            user_id=user_id, 
+                            task_id=task_id)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied: You do not have authority over this task"
+            )
         
     return task
 
