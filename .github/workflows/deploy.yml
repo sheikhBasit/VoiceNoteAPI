@@ -142,7 +142,8 @@ jobs:
             # Restart with latest images
             sudo docker compose up -d --no-build
             
-            # Run migrations
+            # Run migrations and verify head
+            sudo docker compose exec -T api alembic -c /app/alembic.ini current
             sudo docker compose exec -T api alembic -c /app/alembic.ini upgrade head
             
             # Verify deployment
