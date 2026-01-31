@@ -23,7 +23,7 @@ until curl -sf "$HEALTH_URL" | grep -q "healthy"; do
     echo -e "\n${RED}✗ API failed to become healthy after $MAX_RETRIES seconds${NC}"
     echo "Check docker logs voicenote_api for migration or startup errors."
     if command -v docker &> /dev/null; then
-       docker logs voicenote_api 2>&1 | tail -n 50
+       sudo docker logs voicenote_api 2>&1 | tail -n 50
     fi
     exit 1
   fi
@@ -57,7 +57,7 @@ if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
   echo "Response: $SYNC_RESPONSE"
   if command -v docker &> /dev/null; then
      echo "Tail of container logs for debugging:"
-     docker logs voicenote_api 2>&1 | tail -n 50
+     sudo docker logs voicenote_api 2>&1 | tail -n 50
   fi
   exit 1
 fi

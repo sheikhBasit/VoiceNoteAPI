@@ -147,4 +147,4 @@ jobs:
             
             # Verify deployment
             sudo docker compose ps
-            ./test_endpoints.sh
+            sudo ./test_endpoints.sh
