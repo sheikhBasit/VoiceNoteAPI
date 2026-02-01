@@ -40,6 +40,7 @@ class SubscriptionTier(enum.Enum):
     FREE = "FREE"
     STANDARD = "STANDARD"
     PREMIUM = "PREMIUM"
+    GUEST = "GUEST"
 
 class User(Base):
     __tablename__ = "users"
@@ -54,7 +55,7 @@ class User(Base):
     
     # Session Info
     current_device_id = Column(String, nullable=True)
-    tier = Column(Enum(SubscriptionTier), default=SubscriptionTier.FREE)
+    tier = Column(Enum(SubscriptionTier), default=SubscriptionTier.GUEST)
     plan_id = Column(String, ForeignKey("service_plans.id"), nullable=True)
     
     # Usage Stats (JSONB cache for quick admin view)

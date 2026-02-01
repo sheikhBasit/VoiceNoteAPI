@@ -1,12 +1,22 @@
+from app.utils.json_logger import JLogger
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.session import get_db
 from app.api import users, notes, tasks, ai, admin, testing
-from app.utils.json_logger import JLogger
+import logging
+import os
 
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.staticfiles import StaticFiles
+
+# Suppress excessive health/metrics logs
+class EndpointFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.getMessage().find("/health") == -1 and record.getMessage().find("/metrics") == -1
+
+logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 app = FastAPI(
     title="VoiceNote AI API",
@@ -134,15 +144,52 @@ app.include_router(webhooks.router)
 app.include_router(meetings.router)
 app.include_router(websocket.router)
 
+# Mount static files for local storage access
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 from prometheus_fastapi_instrumentator import Instrumentator
 from app.api.middleware.usage import UsageTrackingMiddleware # NEW
 
 Instrumentator().instrument(app).expose(app)
 app.add_middleware(UsageTrackingMiddleware) # NEW: Usage Metering
 
+from starlette.types import Message
+
+class RequestBodyCacheMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Cache the body only for mutating methods
+        if scope["method"] in ("POST", "PUT", "PATCH"):
+            body = b""
+            more_body = True
+            while more_body:
+                message = await receive()
+                body += message.get("body", b"")
+                more_body = message.get("more_body", False)
+
+            # Re-emit the body as a single message for downstream consumers
+            async def receive_cached():
+                return {"type": "http.request", "body": body, "more_body": False}
+
+            # Set the cached body on scope for easy access in dependencies
+            scope["cached_body"] = body
+            await self.app(scope, receive_cached, send)
+        else:
+            await self.app(scope, receive, send)
+
 @app.on_event("startup")
 async def startup_event():
     pass
+
+app.add_middleware(RequestBodyCacheMiddleware)
 
 @app.get("/")
 def read_root():

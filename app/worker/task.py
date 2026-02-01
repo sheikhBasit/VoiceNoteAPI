@@ -1,10 +1,8 @@
 from .celery_app import celery_app
 import json
 import uuid
-import cloudinary.uploader
 from app.core.audio import preprocess_audio_pipeline
 from app.services.ai_service import AIService
-from app.services.cloudinary_service import CloudinaryService
 from app.services.calendar_service import CalendarService # New
 from app.db.session import SessionLocal
 from app.db.models import Note, Task, NoteStatus, Priority, User
@@ -51,14 +49,32 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
             broadcast_ws_update(note_owner_id, "NOTE_STATUS", {"note_id": note_id, "status": "PROCESSING"})
 
         # 2. Preprocess (Offloading from Android for battery/speed)
+        broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "PREPROCESSING", "message": "Cleaning up audio and reducing noise..."})
+        
+        # Robustness Check: If local file is gone, fallback to raw_audio_url
+        if not os.path.exists(local_file_path):
+            JLogger.warning("Local file missing in worker, attempting fallback to raw_audio_url", note_id=note_id)
+            note = db.query(Note).filter(Note.id == note_id).first()
+            if note and note.raw_audio_url:
+                import requests
+                response = requests.get(note.raw_audio_url)
+                if response.status_code == 200:
+                    with open(local_file_path, "wb") as f:
+                        f.write(response.content)
+                    JLogger.info("Successfully recovered audio from Cloudinary", note_id=note_id)
+                else:
+                    raise FileNotFoundError(f"Local file missing and fallback failed for {note_id}")
+            else:
+                raise FileNotFoundError(f"Local file missing and no raw_audio_url available for {note_id}")
+
         processed_path = preprocess_audio_pipeline(local_file_path)
 
-        # 3. Upload to Cloudinary (Stores both raw and processed if needed)
-        upload_result = cloudinary.uploader.upload(processed_path, resource_type="video")
-        audio_url = upload_result.get("secure_url")
+        # 3. Update audio_url with processed path (as a local URL)
+        audio_url = f"/{processed_path}"
 
         # 4. AI Analysis (Whisper STT -> Llama 3.1 LLM)
         JLogger.info("Worker: Running AI analysis", note_id=note_id)
+        broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "SUMMARIZING", "message": "AI is transcribing and summarizing your audio..."})
         
         # Fetch user profile for personalization
         note = db.query(Note).filter(Note.id == note_id).first()
@@ -73,8 +89,10 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
             jargons=user_jargons
         )
         JLogger.info("Worker: AI analysis complete", note_id=note_id, tasks_found=len(analysis.tasks))
+        broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "TASK_EXTRACTION", "message": f"Found {len(analysis.tasks)} actionable tasks. Extracting details..."})
 
         # 5. Generate Vector Embedding for Semantic Search
+        broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "VECTORIZING", "message": "Generating semantic vectors for intelligent search..."})
         embedding = ai_service.generate_embedding_sync(analysis.summary)
 
         # 6. Update Database with AI Results
@@ -88,6 +106,7 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         note.embedding = embedding
         note.embedding_version = 1 # Initial cache version
         note.status = NoteStatus.DONE
+        broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "SAVING_NOTE", "message": "Saving note insights and generated tasks..."})
         
         # 7. Monetization Logic (Standout Strategy)
         try:
@@ -143,6 +162,7 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         db.commit()
 
         # 8. PROACTIVE CONFLICT DETECTION (Requirement: Standout Strategy)
+        broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "FINALIZING", "message": "Checking for calendar conflicts and finalizing tasks..."})
         user = db.query(Note).filter(Note.id == note_id).first().user
         if user and extracted_tasks:
             events = CalendarService.get_user_events(user.id)
@@ -164,38 +184,43 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
                 )
 
         JLogger.info("Worker: Note processing pipeline finished successfully", note_id=note_id)
+        
+        # Cleanup local file on SUCCESS
+        if os.path.exists(local_file_path):
+            os.remove(local_file_path)
+            
         return {"status": "success", "note_id": note_id, "conflicts_found": len(conflicts) if 'conflicts' in locals() else 0}
 
     except Exception as exc:
         JLogger.exception("Worker: Note processing pipeline failed", note_id=note_id)
         db.rollback()
-        # Handle Failover Key Rotation or API errors
+        
+        # Determine if we should cleanup on final failure
+        if self.request.retries >= self.max_retries:
+            if os.path.exists(local_file_path):
+                os.remove(local_file_path)
+                
         self.retry(exc=exc, countdown=60) 
     finally:
         db.close()
-        if os.path.exists(local_file_path):
-            os.remove(local_file_path)
 
 
 @celery_app.task(name="process_task_image_pipeline")
 def process_task_image_pipeline(task_id: str, local_path: str, filename: str):
-    """Process and upload task multimedia (images/documents) to Cloudinary."""
+    """Process task multimedia (images/documents) using local storage."""
     db = SessionLocal()
-    cloud_service = CloudinaryService()
     try:
-        # 1. Detect if image or document
+        # Detect if image or document
         is_image = filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))
         
         if is_image:
-            # Compresses and uploads (non-async wrapper)
-            secure_url = cloud_service.upload_compressed_image(local_path, task_id)
-            # Add to image_urls JSONB array
+            # Just use the local path as the URL
+            secure_url = f"/{local_path}"
             task = db.query(Task).filter(Task.id == task_id).first()
             if task:
                 task.image_urls = (task.image_urls or []) + [secure_url]
         else:
-            # Standard upload for docs (non-async wrapper)
-            secure_url = cloud_service.upload_audio(local_path, f"doc_{task_id}")
+            secure_url = f"/{local_path}"
             task = db.query(Task).filter(Task.id == task_id).first()
             if task:
                 task.document_urls = (task.document_urls or []) + [secure_url]

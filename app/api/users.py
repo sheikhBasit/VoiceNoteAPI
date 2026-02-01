@@ -59,9 +59,10 @@ def sync_user(request: Request, user_data: user_schema.UserCreate, db: Session =
             email=validated_email,
             authorized_devices=[initial_device], # PRIMARY CHANGE
             current_device_id=validated_device_id,
+            tier=models.SubscriptionTier.GUEST, # Free Trial Default
             
             # Defaults
-            primary_role=user_data.primary_role,
+            primary_role=models.UserRole.GENERIC, # Job Role (e.g. DEVELOPER)
             work_days=[2,3,4,5,6],
             timezone=user_data.timezone or "UTC",
             last_login=int(time.time() * 1000),

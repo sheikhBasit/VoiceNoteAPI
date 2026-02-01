@@ -172,6 +172,35 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Flower for real-time Celery monitoring
+  flower:
+    image: ab745/voicenote-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voicenote_flower
+    env_file:
+      - .env
+    environment:
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+      celery_worker:
+        condition: service_started
+    networks:
+      - voicenote_network
+    restart: unless-stopped
+    command: celery -A app.worker.celery_app flower --port=5555
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # pgAdmin for database management
   pgadmin:
     image: dpage/pgadmin4:latest

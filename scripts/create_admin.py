@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 
 # Add the project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,9 +37,13 @@ def create_admin(email, password, name="Admin User"):
                 name=name,
                 is_admin=True,
                 password_hash=get_password_hash(password),
-                token="admin-token",
-                device_id="admin-web",
-                device_model="Web Dashboard"
+                authorized_devices=[{
+                    "device_id": "admin-web",
+                    "device_model": "Web Dashboard",
+                    "biometric_token": "admin-token",
+                    "authorized_at": int(time.time())
+                }],
+                current_device_id="admin-web"
             )
             db.add(user)
         

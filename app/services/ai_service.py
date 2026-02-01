@@ -153,14 +153,14 @@ class AIService:
                     model=settings["groq_whisper_model"],
                     response_format="text",
                 )
-            self.request_tracker.complete_request(request_id, "groq")
+            self.request_tracker.end_request(request_id, True)
             return transcription, "groq"
         except Exception as e:
-            self.request_tracker.fail_request(request_id, "groq", str(e))
+            self.request_tracker.end_request(request_id, False, str(e))
             logger.error(f"Sync transcription failed: {e}")
             raise AIServiceError(f"Transcription failed: {str(e)}")
 
-    def run_full_analysis_sync(self, audio_path: str, user_role: str = "ASSISTANT", **kwargs) -> NoteAIOutput:
+    def run_full_analysis_sync(self, audio_path: str, user_role: str = "GENERIC", **kwargs) -> NoteAIOutput:
         """Synchronous orchestration of full audio to analysis pipeline."""
         transcript, engine = self.transcribe_with_failover_sync(audio_path)
         ai_output = self.llm_brain_sync(transcript, user_role, **kwargs)
@@ -244,7 +244,7 @@ class AIService:
 
         raise AIServiceError("All transcription engines failed or are not configured.")
 
-    def llm_brain_sync(self, transcript: str, user_role: str = "ASSISTANT", user_instruction: str = "", **kwargs) -> NoteAIOutput:
+    def llm_brain_sync(self, transcript: str, user_role: str = "GENERIC", user_instruction: str = "", **kwargs) -> NoteAIOutput:
         """Synchronous structured extraction for Celery worker."""
         # Validation
         transcript = validate_transcript(transcript)
@@ -312,11 +312,11 @@ class AIService:
             raise 
 
     @retry_with_backoff(max_attempts=3)
-    async def llm_brain(self, transcript: str, user_role: str = "ASSISTANT", user_instruction: str = "", **kwargs) -> NoteAIOutput:
+    async def llm_brain(self, transcript: str, user_role: str = "GENERIC", user_instruction: str = "", **kwargs) -> NoteAIOutput:
         """Structured extraction using Llama 3.1 on Groq with robust validation."""
         return self.llm_brain_sync(transcript, user_role, user_instruction, **kwargs)
 
-    async def run_full_analysis(self, audio_path: str, user_role: str = "ASSISTANT", **kwargs) -> NoteAIOutput:
+    async def run_full_analysis(self, audio_path: str, user_role: str = "GENERIC", **kwargs) -> NoteAIOutput:
         """
         Orchestrates complete audio -> transcript -> AI analysis pipeline.
         """

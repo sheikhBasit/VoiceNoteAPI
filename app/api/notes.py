@@ -41,6 +41,7 @@ async def process_note(
     request: Request,
     file: UploadFile = File(...),
     mode: Optional[str] = Form("GENERIC"), # New: Cricket/Quranic Mode
+    debug_sync: bool = Form(False), # For local developer testing
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
     _sig: bool = Depends(verify_device_signature) # Security requirement
@@ -89,11 +90,37 @@ async def process_note(
                 )
             buffer.write(chunk)
 
+    # ✅ STEP: Generate Local URL for Raw audio
+    # Assuming the app runs on port 8000, we'll store relative Path or absolute URL
+    # Relative is safer for different environments
+    raw_audio_url = f"/uploads/{note_id}_{file.filename}"
+    JLogger.info("Note stored locally", note_id=note_id, url=raw_audio_url)
+
+    # ✅ STEP: Create initial record so GET /api/v1/notes/{id} doesn't 404
+    initial_note = models.Note(
+        id=note_id,
+        user_id=current_user.id,
+        title=f"Processing: {file.filename}",
+        summary="AI is currently analyzing your audio...",
+        status=models.NoteStatus.PENDING,
+        raw_audio_url=raw_audio_url,
+        timestamp=int(time.time() * 1000),
+        updated_at=int(time.time() * 1000)
+    )
+    db.add(initial_note)
+    db.commit()
+
     # Trigger Celery pipeline with mode support
-    user_role = current_user.primary_role.name if current_user.primary_role else "GENERIC"
+    user_role = current_user.primary_role.name if current_user.primary_role else "GENERIC" # [tod]
     if mode and mode != "GENERIC":
         user_role = f"{user_role}_{mode}"
 
+    if debug_sync:
+        # Run the pipeline synchronously for immediate feedback in the API response
+        result = process_voice_note_pipeline(note_id, temp_path, user_role)
+        return {"note_id": note_id, "message": "Synchronous processing complete", "result": result}
+
+    from app.worker.task import process_voice_note_pipeline
     process_voice_note_pipeline.delay(note_id, temp_path, user_role)
     
     return {"note_id": note_id, "message": f"Processing started in {mode} mode"}
@@ -173,7 +200,7 @@ def get_dashboard_metrics(db: Session = Depends(get_db), current_user: models.Us
 @router.get("/{note_id}", response_model=note_schema.NoteResponse)
 def get_note(note_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """GET /{note_id}: Returns full note detail (ownership validated)."""
-    return verify_note_ownership(db, current_user.id, note_id)
+    return verify_note_ownership(db, current_user, note_id)
 
 @router.patch("/{note_id}", response_model=note_schema.NoteResponse)
 async def update_note(
@@ -186,7 +213,7 @@ async def update_note(
     PATCH /{note_id}: Unified update for note details.
     Handles title, summary, priority, status, and soft deletion/restore.
     """
-    db_note = verify_note_ownership(db, current_user.id, note_id)
+    db_note = verify_note_ownership(db, current_user, note_id)
     
     # Block updates on deleted notes (unless it's a restore operation handled below)
     data = update_data.model_dump(exclude_unset=True)
@@ -267,7 +294,7 @@ def delete_note(
     DELETE /{note_id}: Professional deletion handling via DeletionService.
     Includes redundancy check: Block deletion if note has in-progress HIGH priority tasks.
     """
-    verify_note_ownership(db, current_user.id, note_id)
+    verify_note_ownership(db, current_user, note_id)
     # REDUNDANCY CHECK: Block deletion if note has in-progress HIGH priority tasks
     high_priority_active_tasks = db.query(models.Task).filter(
         models.Task.note_id == note_id,
@@ -302,7 +329,7 @@ async def ask_ai(
     current_user: models.User = Depends(get_current_user)
 ):
     """POST /{note_id}/ask: Offloaded AI Q&A. Result appears in note.ai_responses."""
-    db_note = verify_note_ownership(db, current_user.id, note_id)
+    db_note = verify_note_ownership(db, current_user, note_id)
     
     if db_note.is_deleted:
         raise HTTPException(status_code=403, detail="Note is deleted")
@@ -343,7 +370,7 @@ def get_whatsapp_draft(note_id: str, db: Session = Depends(get_db), current_user
     GET /{note_id}/whatsapp: Generates a WhatsApp deep-link for the note's summary.
     Requirement: "Voice-to-WhatsApp Draft"
     """
-    note = verify_note_ownership(db, current_user.id, note_id)
+    note = verify_note_ownership(db, current_user, note_id)
     
     text = f"VoiceNote Note: {note.title}\n\nSummary: {note.summary}\n\nTasks:\n"
     tasks = db.query(models.Task).filter(models.Task.note_id == note_id).all()
@@ -367,7 +394,7 @@ async def analyze_note_semantics(
     POST /{note_id}/semantic-analysis: Deep dive into note meaning.
     Offloaded to background for elite performance.
     """
-    db_note = verify_note_ownership(db, current_user.id, note_id)
+    db_note = verify_note_ownership(db, current_user, note_id)
     
     if db_note.is_deleted:
         raise HTTPException(

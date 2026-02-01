@@ -8,7 +8,6 @@ import os
 from app.db.session import get_db
 from app.db import models
 from app.schemas import task as task_schema
-from app.services.cloudinary_service import CloudinaryService
 from app.services.auth_service import get_current_user
 from app.worker.task import process_task_image_pipeline
 from app.services.deletion_service import DeletionService
@@ -20,7 +19,6 @@ from slowapi.util import get_remote_address
 
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"))
 router = APIRouter(prefix="/api/v1/tasks", tags=["Tasks"])
-cloudinary_service = CloudinaryService()
 
 @router.post("", response_model=task_schema.TaskResponse, status_code=status.HTTP_201_CREATED)
 def create_task(
@@ -31,7 +29,7 @@ def create_task(
     """POST /: Create a new task directly (not from AI extraction)."""
     # ✅ Verify ownership if note_id provided
     if task_data.note_id:
-        verify_note_ownership(db, current_user.id, task_data.note_id)
+        verify_note_ownership(db, current_user, task_data.note_id)
     # ✅ Validate description is not empty after strip
     description = task_data.description.strip()
     if not description or len(description) < 1:
@@ -274,7 +272,7 @@ def update_task(
     PATCH /{task_id}: Unified update for task details.
     Handles description, priority, deadline, status, assignments, and soft deletion.
     """
-    task = verify_task_ownership(db, current_user.id, task_id)
+    task = verify_task_ownership(db, current_user, task_id)
     
     # Update only provided fields
     update_data = task_update.model_dump(exclude_unset=True)
@@ -338,7 +336,7 @@ async def add_task_multimedia(
     POST: Upload image/doc and offload processing to background.
     Optimized: Immediate response to user while worker handles compression.
     """
-    task = verify_task_ownership(db, current_user.id, task_id)
+    task = verify_task_ownership(db, current_user, task_id)
 
     # 1. Save locally via chunked reading
     temp_id = str(uuid.uuid4())
@@ -367,7 +365,7 @@ async def add_task_multimedia(
 @router.delete("/{task_id}")
 def delete_task(task_id: str, hard: bool = False, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """DELETE /{task_id}: Professional deletion handling via DeletionService."""
-    verify_task_ownership(db, current_user.id, task_id)
+    verify_task_ownership(db, current_user, task_id)
         
     result = DeletionService.soft_delete_task(db, task_id, deleted_by=current_user.id)
     if not result["success"]:
@@ -390,7 +388,7 @@ async def remove_multimedia(
     if not url_to_remove:
         raise HTTPException(status_code=400, detail="Missing url_to_remove in request body")
 
-    task = verify_task_ownership(db, current_user.id, task_id)
+    task = verify_task_ownership(db, current_user, task_id)
 
     # Filter out the URL from both image and document arrays
     if url_to_remove in task.image_urls:
@@ -413,7 +411,7 @@ def get_communication_options(
     current_user: models.User = Depends(get_current_user)
 ):
     """GET /{task_id}/communication-options: Get available communication channels for assigned entities."""
-    task = verify_task_ownership(db, current_user.id, task_id)
+    task = verify_task_ownership(db, current_user, task_id)
     
     if not task.assigned_entities:
         return {
@@ -450,7 +448,7 @@ def add_external_link(
     current_user: models.User = Depends(get_current_user)
 ):
     """POST /{task_id}/external-links: Add external link/reference to task."""
-    task = verify_task_ownership(db, current_user.id, task_id)
+    task = verify_task_ownership(db, current_user, task_id)
     
     # Append to external_links array
     new_link = link.dict(exclude_unset=True)
@@ -472,7 +470,7 @@ def remove_external_link(
     current_user: models.User = Depends(get_current_user)
 ):
     """DELETE /{task_id}/external-links/{link_index}: Remove specific external link."""
-    task = verify_task_ownership(db, current_user.id, task_id)
+    task = verify_task_ownership(db, current_user, task_id)
     
     if link_index < 0 or link_index >= len(task.external_links):
         raise HTTPException(status_code=400, detail="Invalid link index")
@@ -502,7 +500,7 @@ def duplicate_task(
     current_user: models.User = Depends(get_current_user)
 ):
     """POST /{task_id}/duplicate: Create a copy of existing task."""
-    original_task = verify_task_ownership(db, current_user.id, task_id)
+    original_task = verify_task_ownership(db, current_user, task_id)
     
     # Create duplicate task
     duplicate = models.Task(

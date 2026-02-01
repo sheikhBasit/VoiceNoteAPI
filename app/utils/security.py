@@ -2,20 +2,40 @@ import os
 import hmac
 import hashlib
 import time
-from fastapi import Request, HTTPException, status
+from typing import Any, Optional
+from fastapi import Request, HTTPException, status, Depends
 from functools import wraps
 from sqlalchemy.orm import Session
+from app.db.session import get_db
 from app.utils.json_logger import JLogger
 
 # Secret key for device signature verification
 DEVICE_SECRET_KEY = os.getenv("DEVICE_SECRET_KEY", "default_secret_for_dev_only")
 
-async def verify_device_signature(request: Request):
+async def verify_device_signature(request: Request, db: Session = Depends(get_db)):
     """
     Middleware/Dependency to verify X-Device-Signature.
     Signature = HMAC_SHA256(secret, method + path + query + timestamp + body_hash)
-    Match Android HmacInterceptor logic.
+    
+    Exemption: Admins (identified by Bearer token) bypass this check.
     """
+    # 1. Check for Admin Exemption
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            from app.services.auth_service import SECRET_KEY, ALGORITHM
+            import jwt
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id = payload.get("sub")
+            if user_id:
+                from app.db import models
+                user = db.query(models.User).filter(models.User.id == user_id).first()
+                if user and user.is_admin:
+                    return True
+        except Exception:
+            pass # Invalid token for admin check, proceed to signature check
+
     signature = request.headers.get("X-Device-Signature")
     timestamp = request.headers.get("X-Device-Timestamp") # Unix timestamp in seconds
     
@@ -49,23 +69,11 @@ async def verify_device_signature(request: Request):
     query_string = request.url.query
     
     # Calculate Body Hash
-    body_bytes = await request.body()
-    
-    # Logic matching Android HmacInterceptor:
-    # val bodyHash = originalRequest.body?.let { ... SHA256(...) } ?: ""
-    # GET/HEAD/DELETE usually have null body in OkHttp -> ""
-    # POST/PUT/PATCH usually have non-null body -> SHA256(bytes)
-    
-    if request.method in ["GET", "HEAD", "DELETE"]:
-        body_hash = ""
-    else:
-        # For POST/PUT, even if body is empty, OkHttp usually creates a RequestBody.
-        # SHA256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-        if body_bytes:
-             body_hash = hashlib.sha256(body_bytes).hexdigest()
-        else:
-             # Empty POST body
-             body_hash = hashlib.sha256(b"").hexdigest()
+    # Using RequestBodyCacheMiddleware's cached body if available.
+    body_hash = ""
+    if request.method not in ["GET", "HEAD", "DELETE"]:
+        cached_body = request.scope.get("cached_body", b"")
+        body_hash = hashlib.sha256(cached_body).hexdigest()
 
     message = f"{request.method}{request.url.path}{query_string}{timestamp}{body_hash}".encode()
     
@@ -76,33 +84,24 @@ async def verify_device_signature(request: Request):
     ).hexdigest()
     
     if not hmac.compare_digest(signature, expected_signature):
-        # DEBUG: Check if using default key
-        if DEVICE_SECRET_KEY == "default_secret_for_dev_only":
-            JLogger.warning("Security Warning: Using DEFAULT device secret key. Client may be using a different key.")
-
-        JLogger.error("Invalid device signature detected", 
-                      path=request.url.path, 
-                      method=request.method,
-                      timestamp=timestamp,
-                      ip=request.client.host if request.client else "unknown",
-                      debug_message=message.decode('utf-8', errors='ignore'),
-                      body_hash_debug=body_hash,
-                      expected_sig=expected_signature,
-                      received_sig=signature)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid device signature"
-        )
+        # ... (logging)
+        raise HTTPException(status_code=401, detail="Invalid device signature")
     
     return True
 
     return True
 
-def verify_note_ownership(db: Session, user_id: str, note_id: str):
+def is_admin(user: Session) -> bool:
+    """Utility to check if the current user has an admin role."""
+    return getattr(user, "is_admin", False)
+
+def verify_note_ownership(db: Session, user: Any, note_id: str):
     """
-    Dependency helper to verify that a note exists and belongs to the user.
+    Dependency helper to verify that a note exists and belongs to the user or admin.
     """
     from app.db import models
+    user_id = user.id
+    is_user_admin = is_admin(user)
     
     # 1. Existence Check
     note = db.query(models.Note).filter(models.Note.id == note_id).first()
@@ -112,8 +111,8 @@ def verify_note_ownership(db: Session, user_id: str, note_id: str):
             detail=f"Voice note with ID '{note_id}' not found"
         )
     
-    # 2. Ownership Check
-    if note.user_id != user_id:
+    # 2. Ownership Check (Exempt Admins)
+    if not is_user_admin and note.user_id != user_id:
         JLogger.warning("Ownership violation attempt", 
                         user_id=user_id, 
                         note_id=note_id)
@@ -125,11 +124,13 @@ def verify_note_ownership(db: Session, user_id: str, note_id: str):
     return note
 
 
-def verify_task_ownership(db: Session, user_id: str, task_id: str):
+def verify_task_ownership(db: Session, user: Any, task_id: str):
     """
-    Dependency helper to verify that a task exists and its parent note belongs to the user.
+    Dependency helper to verify that a task exists and its parent note belongs to the user or admin.
     """
     from app.db import models
+    user_id = user.id
+    is_user_admin = is_admin(user)
     
     # 1. Existence Check
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
@@ -140,7 +141,10 @@ def verify_task_ownership(db: Session, user_id: str, task_id: str):
         )
     
     # 2. Ownership Check
-    # NEW: Check task.user_id first (manual tasks may not have a parent note)
+    if is_user_admin:
+        return task
+
+    # Check task.user_id first (manual tasks may not have a parent note)
     if task.user_id:
         if task.user_id != user_id:
             JLogger.warning("Task ownership violation attempt", 
