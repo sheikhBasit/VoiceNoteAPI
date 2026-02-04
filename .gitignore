@@ -37,5 +37,7 @@ ssh_private
 ssh_private.pub
 
 api_env.txt
+# Env files
 *.env
 *_env.txt
+
