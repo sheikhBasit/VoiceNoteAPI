@@ -19,7 +19,15 @@ import requests
 import tempfile
 
 # Redis sync client for workers
-redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
+try:
+    _redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    if _redis_url.startswith("redis://") or _redis_url.startswith("rediss://"):
+        redis_client = redis.from_url(_redis_url)
+    else:
+        # Fallback for memory:// or other testing schemes
+        redis_client = None
+except Exception:
+    redis_client = None
 
 def broadcast_ws_update(user_id: str, event_type: str, data: any):
     """Publish a real-time update to the WebSocket manager via Redis."""
@@ -29,7 +37,11 @@ def broadcast_ws_update(user_id: str, event_type: str, data: any):
         "data": data,
         "timestamp": int(time.time() * 1000)
     }
-    redis_client.publish(f"user_updates_{user_id}", json.dumps(payload))
+    if redis_client:
+        try:
+            redis_client.publish(f"user_updates_{user_id}", json.dumps(payload))
+        except Exception as e:
+            JLogger.warning("Failed to publish WS update to Redis", error=str(e))
 
 @shared_task(name="ping_task")
 def ping_task(message: str):

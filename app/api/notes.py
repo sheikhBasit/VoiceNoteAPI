@@ -20,6 +20,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.core.config import ai_config
 from app.utils.json_logger import JLogger
+import traceback
 from app.services.ai_service import AIService
 from app.services.search_service import SearchService
 from app.services.analytics_service import AnalyticsService
@@ -197,6 +198,7 @@ def create_note(
         db.rollback()
         JLogger.error("Failed to create note in database", user_id=current_user.id, error=str(e))
         if os.getenv("ENVIRONMENT") == "testing":
+            traceback.print_exc()
             raise e
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

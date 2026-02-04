@@ -5,13 +5,20 @@ from dotenv import load_dotenv
 if not os.path.exists("/.dockerenv") and os.path.exists(".env"):
     load_dotenv()
 
-# Determine default broker based on environment
-default_broker = "memory://" if os.getenv("ENVIRONMENT") == "testing" or os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true" else "redis://redis:6379/0"
+# Determine broker based on environment - prioritized for testing stability
+is_testing = os.getenv("ENVIRONMENT") == "testing" or os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true"
+
+if is_testing:
+    broker_url = "memory://"
+    result_backend = "cache+memory://"
+else:
+    broker_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    result_backend = os.getenv("REDIS_URL", "redis://redis:6379/1")
 
 celery_app = Celery(
     "voicenote",
-    broker=os.getenv("REDIS_URL", default_broker),
-    backend=os.getenv("REDIS_URL", default_broker)
+    broker=broker_url,
+    backend=result_backend
 )
 
 # Optimization for audio processing

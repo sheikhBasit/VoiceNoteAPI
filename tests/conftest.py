@@ -14,9 +14,9 @@ if not os.getenv("DATABASE_URL"):
 
 # Force Celery to be eager in tests to avoid connection errors
 os.environ["CELERY_TASK_ALWAYS_EAGER"] = "True"
-# Force Redis to localhost for tests if not provided
-if not os.getenv("REDIS_URL"):
-    os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+os.environ["ENVIRONMENT"] = "testing"
+# Force Redis to memory for tests to avoid connection errors
+os.environ["REDIS_URL"] = "memory://"
 
 from app.db.session import SessionLocal, sync_engine as engine
 from app.db.models import Base
