@@ -304,10 +304,10 @@ def update_task(
                 task.assigned_entities = [e.dict(exclude_unset=True) for e in value]
             elif key == "external_links" and value is not None:
                 task.external_links = [e.dict(exclude_unset=True) for e in value]
-            elif key == "image_urls" and value is not None:
-                task.image_urls = list(value)
-            elif key == "document_urls" and value is not None:
-                task.document_urls = list(value)
+            elif key == "image_uris" and value is not None:
+                task.image_uris = list(value)
+            elif key == "document_uris" and value is not None:
+                task.document_uris = list(value)
             else:
                 setattr(task, key, value)
         
@@ -391,10 +391,10 @@ async def remove_multimedia(
     task = verify_task_ownership(db, current_user, task_id)
 
     # Filter out the URL from both image and document arrays
-    if url_to_remove in task.image_urls:
-        task.image_urls = [u for u in task.image_urls if u != url_to_remove]
-    elif url_to_remove in task.document_urls:
-        task.document_urls = [u for u in task.document_urls if u != url_to_remove]
+    if url_to_remove in task.image_uris:
+        task.image_uris = [u for u in task.image_uris if u != url_to_remove]
+    elif url_to_remove in task.document_uris:
+        task.document_uris = [u for u in task.document_uris if u != url_to_remove]
     
     db.commit()
     return {"message": "Resource removed successfully"}
@@ -510,8 +510,8 @@ def duplicate_task(
         priority=original_task.priority,
         deadline=original_task.deadline,
         assigned_entities=original_task.assigned_entities.copy(),
-        image_urls=original_task.image_urls.copy(),
-        document_urls=original_task.document_urls.copy(),
+        image_uris=original_task.image_uris.copy(),
+        document_uris=original_task.document_uris.copy(),
         external_links=original_task.external_links.copy(),
         communication_type=original_task.communication_type,
         is_action_approved=False,  # Reset approval status

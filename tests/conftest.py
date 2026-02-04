@@ -12,6 +12,9 @@ load_dotenv(dotenv_path=os.path.join(PROJECT_ROOT, ".env"))
 if not os.getenv("DATABASE_URL"):
     os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5433/voicenote"
 
+# Force Celery to be eager in tests to avoid connection errors
+os.environ["CELERY_TASK_ALWAYS_EAGER"] = "True"
+
 from app.db.session import SessionLocal, sync_engine as engine
 from app.db.models import Base
 
