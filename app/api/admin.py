@@ -24,35 +24,6 @@ import time
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 
-from fastapi.security import OAuth2PasswordRequestForm
-
-@router.post("/login")
-async def admin_login(
-    login_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
-):
-    """
-    POST /login: Authenticate admin and return JWT.
-    """
-    admin = db.query(models.User).filter(
-        models.User.email == login_data.username,
-        models.User.is_admin == True,
-        models.User.is_deleted == False
-    ).first()
-    
-    if not admin or not verify_password(login_data.password, admin.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
-        )
-    
-    access_token = create_access_token(data={"sub": admin.id})
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": user_schema.UserResponse.model_validate(admin)
-    }
-
 
 # ==================== USER MANAGEMENT ====================
 

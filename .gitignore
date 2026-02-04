@@ -35,3 +35,7 @@ uploads/
 
 ssh_private
 ssh_private.pub
+
+api_env.txt
+*.env
+*_env.txt

@@ -1,4 +1,5 @@
-from .celery_app import celery_app
+from celery import shared_task
+from typing import List, Optional, Tuple, Dict
 import json
 import uuid
 from app.core.audio import preprocess_audio_pipeline
@@ -27,16 +28,21 @@ def broadcast_ws_update(user_id: str, event_type: str, data: any):
     }
     redis_client.publish(f"user_updates_{user_id}", json.dumps(payload))
 
-@celery_app.task(name="ping_task")
+@shared_task(name="ping_task")
 def ping_task(message: str):
     """Simple task for testing Celery connectivity."""
     return {"status": "pong", "message": message, "timestamp": time.time()}
 
-@celery_app.task(name="process_voice_note_pipeline", bind=True, max_retries=3)
-def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_role: str):
+@shared_task(bind=True, name="process_voice_note_pipeline")
+def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: str, document_uris: Optional[List] = None, image_uris: Optional[List] = None, languages: Optional[List] = None, stt_model: str = "nova"):
     db = SessionLocal()
     ai_service = AIService()
     
+    # Initialize these variables for cleanup in finally/except blocks
+    is_storage_key = not local_file_path.startswith("uploads/")
+    actual_local_path = local_file_path
+    note_owner_id = None # Initialize for broadcast_ws_update in case of early failure
+
     try:
         # 1. Update status to PROCESSING
         JLogger.info("Worker: Starting note processing pipeline", note_id=note_id, user_role=user_role)
@@ -51,12 +57,31 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         # 2. Preprocess (Offloading from Android for battery/speed)
         broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "PREPROCESSING", "message": "Cleaning up audio and reducing noise..."})
         
+        # New: MinIO/Storage Key awareness
+        is_storage_key = not local_file_path.startswith("uploads/")
+        actual_local_path = local_file_path
+        
+        if is_storage_key:
+            from app.services.storage_service import StorageService
+            storage_service = StorageService()
+            local_tmp_path = f"/tmp/storage_{note_id}.wav"
+            storage_service.download_file(local_file_path, local_tmp_path)
+            actual_local_path = local_tmp_path
+            JLogger.info("Worker: Downloaded file from MinIO", note_id=note_id, storage_key=local_file_path)
+
         # Robustness Check: If local file is gone, fallback to raw_audio_url
-        if not os.path.exists(local_file_path):
+        if not os.path.exists(actual_local_path):
             JLogger.warning("Local file missing in worker, attempting fallback to raw_audio_url", note_id=note_id)
             note = db.query(Note).filter(Note.id == note_id).first()
             if note and note.raw_audio_url:
-                import requests
+                local_tmp_path = f"/tmp/fallback_{note_id}.wav"
+                if note.raw_audio_url.startswith("uploads/"):
+                     # It was a file, but maybe missing in this worker? (Shared volumes help here)
+                     actual_local_path = note.raw_audio_url
+                else:
+                    from app.services.storage_service import StorageService
+                    StorageService().download_file(note.raw_audio_url, local_tmp_path)
+                    actual_local_path = local_tmp_path
                 response = requests.get(note.raw_audio_url)
                 if response.status_code == 200:
                     with open(local_file_path, "wb") as f:
@@ -76,17 +101,22 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         JLogger.info("Worker: Running AI analysis", note_id=note_id)
         broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "SUMMARIZING", "message": "AI is transcribing and summarizing your audio..."})
         
-        # Fetch user profile for personalization
+        # Fetch user profile for personalization and timezone context
         note = db.query(Note).filter(Note.id == note_id).first()
         user = note.user if note else None
         user_instr = user.system_prompt if user else ""
         user_jargons = user.jargons if user else []
+        user_timezone = user.timezone if user else "UTC"  # NEW: Get user timezone
         
         analysis = ai_service.run_full_analysis_sync(
             processed_path, 
             user_role, 
+            languages=languages,
+            stt_model=stt_model,
             user_instruction=user_instr, 
-            jargons=user_jargons
+            jargons=user_jargons,
+            note_created_at=note.created_at,  # NEW: Pass note creation timestamp
+            user_timezone=user_timezone  # NEW: Pass user timezone for temporal context
         )
         JLogger.info("Worker: AI analysis complete", note_id=note_id, tasks_found=len(analysis.tasks))
         broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "TASK_EXTRACTION", "message": f"Found {len(analysis.tasks)} actionable tasks. Extracting details..."})
@@ -99,9 +129,21 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         note = db.query(Note).filter(Note.id == note_id).first()
         note.title = analysis.title
         note.summary = analysis.summary
-        note.transcript_groq = analysis.transcript
-        note.transcript_deepgram = analysis.transcript # Propagate for consistency
-        note.transcript_android = analysis.transcript  # Propagate for consistency
+        
+        # Save transcripts from meta
+        transcripts = analysis.metadata.get("all_transcripts", {})
+        if "deepgram" in transcripts:
+            note.transcript_deepgram = transcripts["deepgram"]
+        if "groq" in transcripts:
+            note.transcript_groq = transcripts["groq"]
+        
+        # Handle fallback for primary if not in dict
+        if stt_model == "whisper" and not note.transcript_groq:
+            note.transcript_groq = analysis.transcript
+        elif stt_model == "nova" and not note.transcript_deepgram:
+            note.transcript_deepgram = analysis.transcript
+
+        note.transcript_android = analysis.transcript # Global fallback
         note.audio_url = audio_url
         note.embedding = embedding
         note.embedding_version = 1 # Initial cache version
@@ -142,16 +184,57 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         except Exception as e:
             JLogger.error("Failed to process charging logic", error=str(e))
 
-        # 8. Map & Save Tasks (Replacing Task.kt logic)
+        # 8. Map & Save Tasks with Smart Actions
+        from app.services.action_generator import ActionGenerator
+        
         extracted_tasks = []
         for t_data in analysis.tasks:
+            # Extract action metadata from LLM response
+            actions_metadata = t_data.get("actions", {}) if isinstance(t_data, dict) else {}
+            suggested_actions = {}
+            
+            # Generate Google Search action
+            if "google_search" in actions_metadata:
+                suggested_actions["google_search"] = ActionGenerator.generate_google_search(
+                    actions_metadata["google_search"]["query"]
+                )
+            
+            # Generate Email action
+            if "email" in actions_metadata:
+                email_data = actions_metadata["email"]
+                suggested_actions["email"] = ActionGenerator.generate_email_draft(
+                    to=email_data.get("to", ""),
+                    name=email_data.get("name", ""),
+                    subject=email_data.get("subject", ""),
+                    body=email_data.get("body", "")
+                )
+            
+            # Generate WhatsApp action
+            if "whatsapp" in actions_metadata:
+                wa_data = actions_metadata["whatsapp"]
+                suggested_actions["whatsapp"] = ActionGenerator.generate_whatsapp_message(
+                    phone=wa_data.get("phone", ""),
+                    name=wa_data.get("name", ""),
+                    message=wa_data.get("message", "")
+                )
+            
+            # Generate AI Prompt action
+            if "ai_prompt" in actions_metadata:
+                ai_data = actions_metadata["ai_prompt"]
+                suggested_actions["ai_prompt"] = ActionGenerator.generate_ai_prompt(
+                    model=ai_data.get("model", "chatgpt"),
+                    task_description=t_data["description"] if isinstance(t_data, dict) else t_data.description,
+                    context=note.summary or ""
+                )
+            
             new_task = Task(
-                id=str(uuid.uuid4()), # Ensure ID is set
-                user_id=note.user_id, # Link directly for standalone support
+                id=str(uuid.uuid4()),
+                user_id=note.user_id,
                 note_id=note_id,
                 description=t_data["description"] if isinstance(t_data, dict) else t_data.description,
                 priority=getattr(Priority, t_data["priority"] if isinstance(t_data, dict) else t_data.priority, Priority.MEDIUM),
-                deadline=t_data["deadline"] if isinstance(t_data, dict) else t_data.deadline
+                deadline=t_data["deadline"] if isinstance(t_data, dict) else t_data.deadline,
+                suggested_actions=suggested_actions  # NEW: Add smart actions
             )
             db.add(new_task)
             extracted_tasks.append({
@@ -179,7 +262,7 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
                 send_push_notification.delay(
                     device_token,
                     title="📅 Schedule Conflict Alert!",
-                    body=f"Target: {conflict['task']} conflicts with '{conflict['conflicting_event']}'",
+                    body=f"Conflict: {conflict.get('fact', 'Unknown')} vs {conflict.get('conflict', 'Existing event')}",
                     data={"type": "CONFLICT", "conflict": conflict}
                 )
 
@@ -205,7 +288,7 @@ def process_voice_note_pipeline(self, note_id: str, local_file_path: str, user_r
         db.close()
 
 
-@celery_app.task(name="process_task_image_pipeline")
+@shared_task(name="process_task_image_pipeline")
 def process_task_image_pipeline(task_id: str, local_path: str, filename: str):
     """Process task multimedia (images/documents) using local storage."""
     db = SessionLocal()
@@ -235,7 +318,7 @@ def process_task_image_pipeline(task_id: str, local_path: str, filename: str):
             os.remove(local_path)
 
 
-@celery_app.task(name="check_upcoming_tasks")
+@shared_task(name="check_upcoming_tasks")
 def check_upcoming_tasks():
     """Check for tasks due within 24 hours and send notifications."""
     db = SessionLocal()
@@ -291,7 +374,7 @@ def check_upcoming_tasks():
     finally:
         db.close()
 
-@celery_app.task(name="send_push_notification")
+@shared_task(name="send_push_notification")
 def send_push_notification(device_token: str, title: str, body: str, data: dict):
     """
     Integration point with Firebase Cloud Messaging (FCM).
@@ -304,7 +387,7 @@ def send_push_notification(device_token: str, title: str, body: str, data: dict)
         JLogger.error("Push Notification Failed", device_token=device_token, error=str(e))
 
 
-@celery_app.task(name="hard_delete_expired_records")
+@shared_task(name="hard_delete_expired_records")
 def hard_delete_expired_records():
     """
     30-Day Rule: Hard delete any records where is_deleted=True 
@@ -376,7 +459,7 @@ def hard_delete_expired_records():
         db.close()
 
 
-@celery_app.task(name="reset_api_key_limits")
+@shared_task(name="reset_api_key_limits")
 def reset_api_key_limits():
     """
     Reset API key rate limits daily.
@@ -412,7 +495,7 @@ def reset_api_key_limits():
         db.close()
 
 
-@celery_app.task(name="rotate_to_backup_key")
+@shared_task(name="rotate_to_backup_key")
 def rotate_to_backup_key(service_name: str, failed_key_id: str, error_reason: str):
     """
     Rotate to backup API key when primary fails.
@@ -464,7 +547,7 @@ def rotate_to_backup_key(service_name: str, failed_key_id: str, error_reason: st
         return {"status": "error", "message": str(e)}
     finally:
         db.close()
-@celery_app.task(name="analyze_note_semantics_task")
+@shared_task(name="analyze_note_semantics_task")
 def analyze_note_semantics_task(note_id: str):
     """Refined background task for deep analysis of note semantics."""
     db = SessionLocal()
@@ -511,7 +594,7 @@ def analyze_note_semantics_task(note_id: str):
     finally:
         db.close()
 
-@celery_app.task(name="process_ai_query_task")
+@shared_task(name="process_ai_query_task")
 def process_ai_query_task(note_id: str, question: str, user_id: str):
     """Handles background AI Q&A for specific notes."""
     db = SessionLocal()
@@ -551,7 +634,7 @@ def process_ai_query_task(note_id: str, question: str, user_id: str):
     finally:
         db.close()
 
-@celery_app.task(name="generate_note_embeddings_task", bind=True, max_retries=3)
+@shared_task(name="generate_note_embeddings_task", bind=True, max_retries=3)
 def generate_note_embeddings_task(self, note_id: str):
     """Regenerates embeddings when note content changes significantly."""
     db = SessionLocal()
@@ -577,7 +660,7 @@ def generate_note_embeddings_task(self, note_id: str):
     finally:
         db.close()
 
-@celery_app.task(name="generate_productivity_report_task")
+@shared_task(name="generate_productivity_report_task")
 def generate_productivity_report_task():
     """Scheduled task to generate weekly reports for all active users."""
     db = SessionLocal()
@@ -619,7 +702,7 @@ def generate_productivity_report_task():
     finally:
         db.close()
 
-@celery_app.task(name="sync_external_service_task")
+@shared_task(name="sync_external_service_task")
 def sync_external_service_task(note_id: str, service_name: str, user_id: str):
     """
     Background worker for third-party integrations (Google Calendar, Notion).

@@ -30,8 +30,8 @@ class TaskBase(BaseModel):
     
     # Use default_factory to avoid mutable default issues
     assigned_entities: List[ContactEntity] = Field(default_factory=list)
-    image_urls: List[HttpUrl] = Field(default_factory=list)
-    document_urls: List[HttpUrl] = Field(default_factory=list)
+    image_uris: List[str] = Field(default_factory=list)  # Client-side URIs
+    document_uris: List[str] = Field(default_factory=list)  # Client-side URIs
     external_links: List[LinkEntity] = Field(default_factory=list)
     
     communication_type: Optional[CommunicationType] = None
@@ -46,12 +46,19 @@ class TaskUpdate(BaseModel):
     deadline: Optional[int] = None
     is_done: Optional[bool] = None
     assigned_entities: Optional[List[ContactEntity]] = None
-    image_urls: Optional[List[HttpUrl]] = None
-    document_urls: Optional[List[HttpUrl]] = None
+    image_uris: Optional[List[str]] = None  # Client-side URIs
+    document_uris: Optional[List[str]] = None  # Client-side URIs
     external_links: Optional[List[LinkEntity]] = None
     communication_type: Optional[CommunicationType] = None
     is_action_approved: bool = False
     is_deleted: Optional[bool] = None
+
+class SuggestedActions(BaseModel):
+    """Smart action suggestions for tasks."""
+    google_search: Optional[dict] = None  # {"query": "...", "url": "..."}
+    email: Optional[dict] = None  # {"to": "...", "subject": "...", "body": "...", "mailto_link": "..."}
+    whatsapp: Optional[dict] = None  # {"phone": "...", "message": "...", "deeplink": "..."}
+    ai_prompt: Optional[dict] = None  # {"model": "...", "prompt": "...", "chat_url": "..."}
 
 class TaskResponse(TaskBase):
     id: str
@@ -61,4 +68,5 @@ class TaskResponse(TaskBase):
     created_at: int
     updated_at: Optional[int] = None
     deleted_at: Optional[int] = None
+    suggested_actions: Optional[SuggestedActions] = None  # NEW: Smart actions
     model_config = ConfigDict(from_attributes=True)

@@ -11,7 +11,8 @@ from celery.result import AsyncResult
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 test_router = APIRouter(prefix="/api/v1/test", tags=["Testing Lab"])
-ai_service = AIService()
+# ai_service is instantiated inside endpoints to avoid module-level hangs
+# ai_service = AIService()
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"))
 
 from fastapi import APIRouter, UploadFile, File, Response, Request
@@ -30,6 +31,7 @@ async def stt_comparison(request: Request, file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
 
     # Run STT concurrently
+    ai_service = AIService()
     import asyncio
     groq_text, dg_text = await asyncio.gather(
         ai_service.transcribe_with_groq(temp_path),

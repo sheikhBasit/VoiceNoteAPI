@@ -93,6 +93,7 @@ class User(Base):
     work_end_hour = Column(Integer, default=17)
     work_days = Column(JSONB, default=lambda: [2,3,4,5,6]) # 1=Mon...7=Sun
     timezone = Column(String, default="UTC", index=True) # e.g. "America/New_York"
+    preferred_languages = Column(JSONB, default=lambda: ["en"]) # New: Multilingual support
 
     # Relationships with CASCADE deletion
     notes = relationship(
@@ -137,15 +138,18 @@ class Note(Base):
     is_archived = Column(Boolean, default=False)
     is_encrypted = Column(Boolean, default=False)
     
-    # External Data
-    document_urls = Column(JSON, default=list)
-    links = Column(JSON, default=list)
+    # External Data (Client-Side Storage)
+    document_uris = Column(JSONB, default=lambda: [])  # Local device URIs (e.g., content://...)
+    image_uris = Column(JSONB, default=lambda: [])    # Local device image URIs
+    links = Column(JSONB, default=lambda: [])
     embedding = Column(Vector(384)) # Dimension for all-MiniLM-L6-v2 Embeddings
     embedding_version = Column(Integer, default=1) # Cache versioning
+    languages = Column(JSONB, default=lambda: []) # New: Langs detected or hinted
+    stt_model = Column(String, default="nova") # New: nova, whisper, both
     
     # AI Background Results (NEW)
     semantic_analysis = Column(JSONB, nullable=True) # Result of background analysis
-    ai_responses = Column(JSONB, default=list)      # History of Q&A task results
+    ai_responses = Column(JSONB, default=lambda: [])      # History of Q&A task results
     
     # Relationships with CASCADE deletion
     user = relationship("User", back_populates="notes")
@@ -195,14 +199,23 @@ class Task(Base):
     # Stores: [{"name": "John", "phone": "123", "email": "j@test.com"}]
     assigned_entities = Column(JSONB, default=list) 
     
-    # --- MULTI-MEDIA & LINKS ---
-    image_urls = Column(JSONB, default=list)    # Multiple screenshots/photos
-    document_urls = Column(JSONB, default=list) # Multiple PDFs/Docs
-    external_links = Column(JSONB, default=list) # Multiple URLs with titles
+    # --- MULTI-MEDIA & LINKS (Client-Side Storage) ---
+    image_uris = Column(JSONB, default=lambda: [])    # Local device image URIs (content://...)
+    document_uris = Column(JSONB, default=lambda: []) # Local device document URIs (content://...)
+    external_links = Column(JSONB, default=lambda: []) # External web URLs with titles
     
     # Action Logic
     communication_type = Column(Enum(CommunicationType), nullable=True)
     is_action_approved = Column(Boolean, default=False)
+    
+    # NEW: Smart action suggestions (Google search, email drafts, WhatsApp, AI prompts)
+    suggested_actions = Column(JSONB, nullable=True, default=dict)
+    # Structure: {
+    #   "google_search": {"query": "...", "url": "https://google.com/search?q=..."},
+    #   "email": {"to": "...", "subject": "...", "body": "...", "mailto_link": "..."},
+    #   "whatsapp": {"phone": "...", "message": "...", "deeplink": "..."},
+    #   "ai_prompt": {"model": "...", "prompt": "...", "chat_url": "..."}
+    # }
 
     note = relationship("Note", back_populates="tasks")
 

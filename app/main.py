@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.session import get_db
-from app.api import users, notes, tasks, ai, admin, testing
+from app.api import users, notes, tasks, ai, admin, testing, meetings, webhooks, websocket
 import logging
 import os
 
@@ -23,8 +23,52 @@ app = FastAPI(
     description="AI-powered voice note taking and task management",
     version="1.0.0",
     docs_url=None,
-    redoc_url=None
+    redoc_url=None,
+    swagger_ui_parameters={
+        "persistAuthorization": True
+    }
 )
+
+# Add security scheme for Swagger UI
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    
+    # Define BearerAuth security scheme
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "Enter your JWT token from /api/v1/users/sync"
+        }
+    }
+    
+    # Replace all HTTPBearer references with BearerAuth
+    for path in openapi_schema.get("paths", {}).values():
+        for operation in path.values():
+            if isinstance(operation, dict) and "security" in operation:
+                # Replace HTTPBearer with BearerAuth
+                operation["security"] = [
+                    {"BearerAuth": []} if "HTTPBearer" in sec else sec
+                    for sec in operation["security"]
+                ]
+    
+    # Apply security globally to all endpoints (fallback)
+    openapi_schema["security"] = [{"BearerAuth": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
@@ -138,7 +182,14 @@ app.include_router(notes.router)
 app.include_router(tasks.router)
 app.include_router(ai.router)
 app.include_router(admin.router)  # NEW: Admin endpoints
-app.include_router(testing.test_router) # NEW: Test endpoints
+
+# Testing endpoints - only in non-production environments
+if os.getenv("ENVIRONMENT", "development") != "production":
+    app.include_router(testing.test_router)  # NEW: Test endpoints
+    JLogger.info("Testing endpoints enabled (non-production environment)")
+else:
+    JLogger.info("Testing endpoints disabled (production environment)")
+
 from app.api import webhooks, meetings, websocket # NEW
 app.include_router(webhooks.router)
 app.include_router(meetings.router)

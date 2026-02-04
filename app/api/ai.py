@@ -15,7 +15,8 @@ from app.services.auth_service import get_current_user
 import os
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI & Insights"])
-ai_service = AIService()
+# ai_service is instantiated inside endpoints to avoid module-level hangs
+# ai_service = AIService()
 
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"))
 
@@ -28,6 +29,7 @@ async def semantic_search(
     current_user: models.User = Depends(get_current_user)
 ):
     user_id = current_user.id
+    ai_service = AIService()
     query_vector = ai_service.generate_embedding_sync(query)
     
     # EXEMPTION: Admins can search across all notes

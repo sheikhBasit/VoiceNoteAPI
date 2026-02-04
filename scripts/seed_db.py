@@ -10,6 +10,10 @@ import sys
 from datetime import datetime
 import time
 import uuid
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add app directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -17,7 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from app.db.session import Base
-from app.db.models import User, Note, Task, UserRole, Priority, NoteStatus
+from app.db.models import User, Note, Task, UserRole, Priority, NoteStatus, CommunicationType
 
 # Database URL
 DATABASE_URL = os.getenv(
@@ -47,9 +51,12 @@ async def seed_users(session: AsyncSession):
             id="admin_user_001",
             name="System Admin",
             email="admin@voicenote.app",
-            token=f"admin_token_{uuid.uuid4()}",
-            device_id="admin_device_001",
-            device_model="Server",
+            authorized_devices=[{
+                "device_id": "admin_device_001",
+                "device_model": "Server",
+                "authorized_at": current_time
+            }],
+            current_device_id="admin_device_001",
             last_login=current_time,
             is_deleted=False,
             is_admin=True,
@@ -73,9 +80,12 @@ async def seed_users(session: AsyncSession):
             id="moderator_user_001",
             name="Content Moderator",
             email="moderator@voicenote.app",
-            token=f"moderator_token_{uuid.uuid4()}",
-            device_id="moderator_device_001",
-            device_model="Server",
+            authorized_devices=[{
+                "device_id": "moderator_device_001",
+                "device_model": "Server",
+                "authorized_at": current_time
+            }],
+            current_device_id="moderator_device_001",
             last_login=current_time,
             is_deleted=False,
             is_admin=True,
@@ -92,9 +102,12 @@ async def seed_users(session: AsyncSession):
             id="viewer_user_001",
             name="Analytics Viewer",
             email="viewer@voicenote.app",
-            token=f"viewer_token_{uuid.uuid4()}",
-            device_id="viewer_device_001",
-            device_model="Server",
+            authorized_devices=[{
+                "device_id": "viewer_device_001",
+                "device_model": "Server",
+                "authorized_at": current_time
+            }],
+            current_device_id="viewer_device_001",
             last_login=current_time,
             is_deleted=False,
             is_admin=True,
@@ -115,9 +128,12 @@ async def seed_users(session: AsyncSession):
             id=f"test_user_{str(i).zfill(3)}",
             name=f"Test User {i}",
             email=f"test{i}@voicenote.app",
-            token=f"token_{uuid.uuid4()}",
-            device_id=f"device_{str(i).zfill(3)}",
-            device_model=["iPhone", "Android", "iPad", "Windows"][i % 4],
+            authorized_devices=[{
+                "device_id": f"device_{str(i).zfill(3)}",
+                "device_model": ["iPhone", "Android", "iPad", "Windows"][i % 4],
+                "authorized_at": current_time
+            }],
+            current_device_id=f"device_{str(i).zfill(3)}",
             last_login=current_time,
             is_deleted=False,
         )
@@ -126,7 +142,14 @@ async def seed_users(session: AsyncSession):
     
     all_users = admin_users + test_users
     
+    from sqlalchemy import select
     for user in all_users:
+        # Check if user already exists
+        result = await session.execute(select(User).where(User.email == user.email))
+        existing_user = result.scalars().first()
+        if existing_user:
+            print(f"⏩ User {user.email} already exists, skipping.")
+            continue
         session.add(user)
     
     await session.commit()
@@ -151,14 +174,18 @@ async def seed_notes(session: AsyncSession):
                 title=f"Meeting Notes - {note_num}",
                 summary=f"Summary of meeting {note_num} for {user.name}",
                 priority=Priority.HIGH if note_num == 1 else Priority.MEDIUM,
-                transcript=f"This is the transcribed text of note {note_num}",
-                audio_duration=120 + (note_num * 30),
-                created_at=current_time - (1000 * 60 * 60 * (3 - note_num)),  # Vary timestamps
+                transcript_groq=f"This is the transcribed text of note {note_num}",
+                timestamp=current_time - (1000 * 60 * 60 * (3 - note_num)),  # Vary timestamps
                 is_deleted=False,
             )
             notes.append(note)
     
     for note in notes:
+        # Check if note already exists
+        result = await session.execute(select(Note).where(Note.id == note.id))
+        if result.scalars().first():
+            print(f"⏩ Note {note.id} already exists, skipping.")
+            continue
         session.add(note)
     
     await session.commit()
@@ -183,16 +210,21 @@ async def seed_tasks(session: AsyncSession):
                 user_id=note.user_id,
                 description=f"Action item {task_num} from {note.title}",
                 priority=Priority.HIGH if task_num == 1 else Priority.MEDIUM,
-                status=NoteStatus.PENDING if task_num == 1 else NoteStatus.DONE,
+                is_done=task_num != 1,
                 deadline=current_time + (1000 * 60 * 60 * 24 * (7 + task_num)),  # Next week
-                assigned_contact_name=f"Person {task_num}",
-                communication_type="WHATSAPP" if task_num % 2 == 0 else "EMAIL",
+                assigned_entities=[{"name": f"Person {task_num}"}],
+                communication_type=CommunicationType.WHATSAPP if task_num % 2 == 0 else CommunicationType.SMS,
                 created_at=current_time,
                 is_deleted=False,
             )
             tasks.append(task)
     
     for task in tasks:
+        # Check if task already exists
+        result = await session.execute(select(Task).where(Task.id == task.id))
+        if result.scalars().first():
+            print(f"⏩ Task {task.id} already exists, skipping.")
+            continue
         session.add(task)
     
     await session.commit()
