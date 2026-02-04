@@ -18,6 +18,10 @@ os.environ["ENVIRONMENT"] = "testing"
 # Force Redis to memory for tests to avoid connection errors
 os.environ["REDIS_URL"] = "memory://"
 
+if os.getenv("GITHUB_ACTIONS") == "true":
+    print("DEBUG: conftest.py initialized in GITHUB_ACTIONS")
+    print(f"DEBUG: CELERY_TASK_ALWAYS_EAGER={os.environ['CELERY_TASK_ALWAYS_EAGER']}")
+
 from app.db.session import SessionLocal, sync_engine as engine
 from app.db.models import Base
 
