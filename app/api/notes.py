@@ -196,6 +196,8 @@ def create_note(
     except Exception as e:
         db.rollback()
         JLogger.error("Failed to create note in database", user_id=current_user.id, error=str(e))
+        if os.getenv("ENVIRONMENT") == "testing":
+            raise e
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error: Failed to save note"
