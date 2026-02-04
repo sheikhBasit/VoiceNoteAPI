@@ -6,7 +6,7 @@ if not os.path.exists("/.dockerenv") and os.path.exists(".env"):
     load_dotenv()
 
 celery_app = Celery(
-    "voicenote_worker",
+    "voicenote",
     broker=os.getenv("REDIS_URL", "redis://redis:6379/0"),
     backend=os.getenv("REDIS_URL", "redis://redis:6379/1")
 )
@@ -18,7 +18,8 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    task_always_eager=os.getenv("CELERY_TASK_ALWAYS_EAGER", "False").lower() == "true",
+    task_always_eager=os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true",
+    task_eager_propagates=True,  # Important for tests to see errors
     task_track_started=True,
     task_time_limit=600,
     worker_prefetch_multiplier=1,

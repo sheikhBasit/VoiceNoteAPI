@@ -18,6 +18,9 @@ class EndpointFilter(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
+# Initialize Celery app to ensure config (e.g. eager mode) is applied to current_app
+from app.worker.celery_app import celery_app
+
 app = FastAPI(
     title="VoiceNote AI API",
     description="AI-powered voice note taking and task management",

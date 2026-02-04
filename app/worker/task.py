@@ -1,4 +1,5 @@
 from celery import shared_task
+from app.worker.celery_app import celery_app
 from typing import List, Optional, Tuple, Dict
 import json
 import uuid
