@@ -15,6 +15,7 @@ from app.utils.json_logger import JLogger
 from pydub import AudioSegment
 from app.services.billing_service import BillingService
 import requests
+import tempfile
 
 # Redis sync client for workers
 redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
@@ -65,7 +66,7 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
         if is_storage_key:
             from app.services.storage_service import StorageService
             storage_service = StorageService()
-            local_tmp_path = f"/tmp/storage_{note_id}.wav"
+            local_tmp_path = os.path.join(tempfile.gettempdir(), f"storage_{note_id}.wav")
             storage_service.download_file(local_file_path, local_tmp_path)
             actual_local_path = local_tmp_path
             JLogger.info("Worker: Downloaded file from MinIO", note_id=note_id, storage_key=local_file_path)
@@ -75,7 +76,7 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
             JLogger.warning("Local file missing in worker, attempting fallback to raw_audio_url", note_id=note_id)
             note = db.query(Note).filter(Note.id == note_id).first()
             if note and note.raw_audio_url:
-                local_tmp_path = f"/tmp/fallback_{note_id}.wav"
+                local_tmp_path = os.path.join(tempfile.gettempdir(), f"fallback_{note_id}.wav")
                 if note.raw_audio_url.startswith("uploads/"):
                      # It was a file, but maybe missing in this worker? (Shared volumes help here)
                      actual_local_path = note.raw_audio_url
