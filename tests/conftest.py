@@ -10,10 +10,13 @@ load_dotenv(dotenv_path=os.path.join(PROJECT_ROOT, ".env"))
 
 # Force local DB connection for pytest if not in Docker/CI
 if not os.getenv("DATABASE_URL"):
-    os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5433/voicenote"
+    os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5432/voicenote"
 
 # Force Celery to be eager in tests to avoid connection errors
 os.environ["CELERY_TASK_ALWAYS_EAGER"] = "True"
+# Force Redis to localhost for tests if not provided
+if not os.getenv("REDIS_URL"):
+    os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 
 from app.db.session import SessionLocal, sync_engine as engine
 from app.db.models import Base
@@ -26,8 +29,8 @@ sys.modules["deepgram.core.api_error"] = MagicMock()
 sys.modules["groq"] = MagicMock()
 sys.modules["pyannote"] = MagicMock()
 sys.modules["pyannote.audio"] = MagicMock()
-# sys.modules["sentence_transformers"] = MagicMock()
-# sys.modules["noisereduce"] = MagicMock()
+sys.modules["sentence_transformers"] = MagicMock()
+sys.modules["noisereduce"] = MagicMock()
 # sys.modules["torch"] = MagicMock()
 # sys.modules["numpy"] = MagicMock()
 
