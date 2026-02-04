@@ -19,6 +19,11 @@ os.environ["ENVIRONMENT"] = "testing"
 # Force Redis to memory for tests to avoid connection errors
 os.environ["REDIS_URL"] = "memory://"
 
+# Force dummy API keys to ensure AI clients are initialized (they will be mocked)
+os.environ["GROQ_API_KEY"] = "mock-key-for-testing"
+os.environ["DEEPGRAM_API_KEY"] = "mock-key-for-testing"
+os.environ["ENABLE_AI_PIPELINES"] = "true" # Ensure lazy loading paths are hit if needed
+
 if os.getenv("GITHUB_ACTIONS") == "true":
     print("DEBUG: conftest.py initialized in GITHUB_ACTIONS")
     print(f"DEBUG: CELERY_TASK_ALWAYS_EAGER={os.environ['CELERY_TASK_ALWAYS_EAGER']}")
@@ -44,6 +49,7 @@ mock_groq = MagicMock()
 mock_groq_client = MagicMock()
 mock_response = MagicMock()
 mock_response.choices = [MagicMock()]
+# Ensure the mock object has a content attribute that is a string
 mock_response.choices[0].message.content = json.dumps({
     "summary": "This is a test summary",
     "topics": ["test"],
