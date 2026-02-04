@@ -14,6 +14,7 @@ import redis
 from app.utils.json_logger import JLogger
 from pydub import AudioSegment
 from app.services.billing_service import BillingService
+import requests
 
 # Redis sync client for workers
 redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))

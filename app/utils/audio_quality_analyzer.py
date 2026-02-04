@@ -10,6 +10,7 @@ from typing import Dict, Any, Tuple
 from groq import Groq
 from app.utils.json_logger import JLogger
 import os
+import librosa
 
 class AudioQualityAnalyzer:
     """Analyzes audio quality and provides LLM-based recommendations."""
@@ -31,7 +32,6 @@ class AudioQualityAnalyzer:
             dict: Audio quality metrics
         """
         try:
-            import librosa
             JLogger.info("Starting audio quality analysis", audio_path=audio_path)
             # Load audio
             y, sr = librosa.load(audio_path, sr=None)
@@ -325,13 +325,11 @@ class AudioQualityAnalyzer:
                 
                 # Normalization
                 if 'normal' in rec_lower or 'volume' in rec_lower:
-                    import librosa
                     JLogger.info("Applying normalization...")
                     y = librosa.util.normalize(y)
                 
                 # Trim silence
                 if 'trim' in rec_lower or 'silence' in rec_lower:
-                    import librosa
                     JLogger.info("Trimming silence...")
                     y, _ = librosa.effects.trim(y, top_db=30)
             

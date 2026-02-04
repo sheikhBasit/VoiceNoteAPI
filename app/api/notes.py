@@ -23,6 +23,7 @@ from app.utils.json_logger import JLogger
 from app.services.ai_service import AIService
 from app.services.search_service import SearchService
 from app.services.analytics_service import AnalyticsService
+from app.services.deletion_service import DeletionService
 from app.utils.security import verify_device_signature, verify_note_ownership
 from app.services.storage_service import StorageService
 from app.services.auth_service import get_current_user
