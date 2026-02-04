@@ -1,4 +1,3 @@
-from celery import shared_task
 from app.worker.celery_app import celery_app
 from typing import List, Optional, Tuple, Dict
 import json
@@ -43,12 +42,12 @@ def broadcast_ws_update(user_id: str, event_type: str, data: any):
         except Exception as e:
             JLogger.warning("Failed to publish WS update to Redis", error=str(e))
 
-@shared_task(name="ping_task")
+@celery_app.task(name="ping_task")
 def ping_task(message: str):
     """Simple task for testing Celery connectivity."""
     return {"status": "pong", "message": message, "timestamp": time.time()}
 
-@shared_task(bind=True, name="process_voice_note_pipeline")
+@celery_app.task(bind=True, name="process_voice_note_pipeline")
 def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: str, document_uris: Optional[List] = None, image_uris: Optional[List] = None, languages: Optional[List] = None, stt_model: str = "nova"):
     db = SessionLocal()
     ai_service = AIService()
@@ -303,7 +302,7 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
         db.close()
 
 
-@shared_task(name="process_task_image_pipeline")
+@celery_app.task(name="process_task_image_pipeline")
 def process_task_image_pipeline(task_id: str, local_path: str, filename: str):
     """Process task multimedia (images/documents) using local storage."""
     db = SessionLocal()
@@ -333,7 +332,7 @@ def process_task_image_pipeline(task_id: str, local_path: str, filename: str):
             os.remove(local_path)
 
 
-@shared_task(name="check_upcoming_tasks")
+@celery_app.task(name="check_upcoming_tasks")
 def check_upcoming_tasks():
     """Check for tasks due within 24 hours and send notifications."""
     db = SessionLocal()
@@ -389,7 +388,7 @@ def check_upcoming_tasks():
     finally:
         db.close()
 
-@shared_task(name="send_push_notification")
+@celery_app.task(name="send_push_notification")
 def send_push_notification(device_token: str, title: str, body: str, data: dict):
     """
     Integration point with Firebase Cloud Messaging (FCM).
@@ -402,7 +401,7 @@ def send_push_notification(device_token: str, title: str, body: str, data: dict)
         JLogger.error("Push Notification Failed", device_token=device_token, error=str(e))
 
 
-@shared_task(name="hard_delete_expired_records")
+@celery_app.task(name="hard_delete_expired_records")
 def hard_delete_expired_records():
     """
     30-Day Rule: Hard delete any records where is_deleted=True 
@@ -474,7 +473,7 @@ def hard_delete_expired_records():
         db.close()
 
 
-@shared_task(name="reset_api_key_limits")
+@celery_app.task(name="reset_api_key_limits")
 def reset_api_key_limits():
     """
     Reset API key rate limits daily.
@@ -510,7 +509,7 @@ def reset_api_key_limits():
         db.close()
 
 
-@shared_task(name="rotate_to_backup_key")
+@celery_app.task(name="rotate_to_backup_key")
 def rotate_to_backup_key(service_name: str, failed_key_id: str, error_reason: str):
     """
     Rotate to backup API key when primary fails.
@@ -562,7 +561,7 @@ def rotate_to_backup_key(service_name: str, failed_key_id: str, error_reason: st
         return {"status": "error", "message": str(e)}
     finally:
         db.close()
-@shared_task(name="analyze_note_semantics_task")
+@celery_app.task(name="analyze_note_semantics_task")
 def analyze_note_semantics_task(note_id: str):
     """Refined background task for deep analysis of note semantics."""
     db = SessionLocal()
@@ -609,7 +608,7 @@ def analyze_note_semantics_task(note_id: str):
     finally:
         db.close()
 
-@shared_task(name="process_ai_query_task")
+@celery_app.task(name="process_ai_query_task")
 def process_ai_query_task(note_id: str, question: str, user_id: str):
     """Handles background AI Q&A for specific notes."""
     db = SessionLocal()
@@ -649,7 +648,7 @@ def process_ai_query_task(note_id: str, question: str, user_id: str):
     finally:
         db.close()
 
-@shared_task(name="generate_note_embeddings_task", bind=True, max_retries=3)
+@celery_app.task(name="generate_note_embeddings_task", bind=True, max_retries=3)
 def generate_note_embeddings_task(self, note_id: str):
     """Regenerates embeddings when note content changes significantly."""
     db = SessionLocal()
@@ -675,7 +674,7 @@ def generate_note_embeddings_task(self, note_id: str):
     finally:
         db.close()
 
-@shared_task(name="generate_productivity_report_task")
+@celery_app.task(name="generate_productivity_report_task")
 def generate_productivity_report_task():
     """Scheduled task to generate weekly reports for all active users."""
     db = SessionLocal()
@@ -717,7 +716,7 @@ def generate_productivity_report_task():
     finally:
         db.close()
 
-@shared_task(name="sync_external_service_task")
+@celery_app.task(name="sync_external_service_task")
 def sync_external_service_task(note_id: str, service_name: str, user_id: str):
     """
     Background worker for third-party integrations (Google Calendar, Notion).

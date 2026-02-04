@@ -1,6 +1,7 @@
 import pytest
 import sys
 import os
+import json
 from unittest.mock import MagicMock
 from dotenv import load_dotenv
 
@@ -27,13 +28,35 @@ from app.db.models import Base
 
 # --- GLOBAL AI MOCKS ---
 # These must be set before any app modules are imported
+# Mock AI libraries defensively
+mock_st = MagicMock()
+mock_st_model = MagicMock()
+mock_st_model.encode.return_value = [0.0] * 384 # Standard for all-MiniLM-L6-v2
+mock_st.SentenceTransformer.return_value = mock_st_model
+sys.modules["sentence_transformers"] = mock_st
+
 sys.modules["deepgram"] = MagicMock()
 sys.modules["deepgram.core"] = MagicMock()
 sys.modules["deepgram.core.api_error"] = MagicMock()
-sys.modules["groq"] = MagicMock()
+
+# Mock Groq to return valid JSON structure
+mock_groq = MagicMock()
+mock_groq_client = MagicMock()
+mock_response = MagicMock()
+mock_response.choices = [MagicMock()]
+mock_response.choices[0].message.content = json.dumps({
+    "summary": "This is a test summary",
+    "topics": ["test"],
+    "entities": [],
+    "action_items": [],
+    "sentiment": "neutral"
+})
+mock_groq_client.chat.completions.create.return_value = mock_response
+mock_groq.Groq.return_value = mock_groq_client
+sys.modules["groq"] = mock_groq
+
 sys.modules["pyannote"] = MagicMock()
 sys.modules["pyannote.audio"] = MagicMock()
-sys.modules["sentence_transformers"] = MagicMock()
 sys.modules["noisereduce"] = MagicMock()
 # sys.modules["torch"] = MagicMock()
 # sys.modules["numpy"] = MagicMock()
