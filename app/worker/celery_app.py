@@ -1,12 +1,15 @@
 from celery import Celery
 import os
+import sys
 from dotenv import load_dotenv
 
-if not os.path.exists("/.dockerenv") and os.path.exists(".env"):
-    load_dotenv()
-
-# Determine broker based on environment - prioritized for testing stability
-is_testing = os.getenv("ENVIRONMENT") == "testing" or os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true"
+# Determine if we are in a testing environment (CI or local pytest)
+is_testing = (
+    os.getenv("ENVIRONMENT") == "testing" or 
+    os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true" or
+    os.getenv("GITHUB_ACTIONS") == "true" or
+    "pytest" in sys.modules
+)
 
 if is_testing:
     broker_url = "memory://"
@@ -15,6 +18,7 @@ else:
     broker_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
     result_backend = os.getenv("REDIS_URL", "redis://redis:6379/1")
 
+# Celery App Instance
 celery_app = Celery(
     "voicenote",
     broker=broker_url,
@@ -28,7 +32,7 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    task_always_eager=os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true",
+    task_always_eager=is_testing,
     task_eager_propagates=True,
     task_track_started=True,
     task_time_limit=600,
