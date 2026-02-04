@@ -2,6 +2,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+# Only load .env if not running in a container
+if not os.path.exists("/.dockerenv") and os.path.exists(".env"):
+    load_dotenv()
 
 # Async URL for FastAPI async endpoints if needed
 # Async URL for FastAPI async endpoints

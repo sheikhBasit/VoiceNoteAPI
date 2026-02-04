@@ -8,10 +8,8 @@ import hashlib
 from typing import List, Tuple, Optional, Dict, Any
 from groq import Groq
 from deepgram import DeepgramClient
-from pyannote.audio import Pipeline
 import torch
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 from app.core.config import ai_config
 from app.schemas.note import NoteAIOutput
@@ -48,23 +46,29 @@ class AIService:
         # Local model for embeddings (Free alternative to OpenAI)
         self.local_embedding_model = None
         
-        # Diarization Pipeline (Optional based on environment)
         self.hf_token = os.getenv("HF_TOKEN")
-        self.diarization_pipeline = None
-        if self.hf_token and os.getenv("ENABLE_AI_PIPELINES", "false") == "true":
+        self._diarization_pipeline = None
+
+    def _get_diarization_pipeline(self):
+        """Lazy load diarization pipeline."""
+        if self._diarization_pipeline is None and self.hf_token and os.getenv("ENABLE_AI_PIPELINES", "false") == "true":
             try:
-                self.diarization_pipeline = Pipeline.from_pretrained(
+                logger.info("Loading Speaker Diarization pipeline...")
+                from pyannote.audio import Pipeline
+                self._diarization_pipeline = Pipeline.from_pretrained(
                     "pyannote/speaker-diarization@2.1",
                     use_auth_token=self.hf_token
                 )
             except Exception as e:
                 logger.error(f"Failed to load speaker diarization: {e}")
+        return self._diarization_pipeline
 
     def _get_local_embedding_model(self):
         if AIService._local_embedding_model is None:
             try:
                 # Using all-MiniLM-L6-v2 which produces 384 dimensions
                 logger.info("Loading local embedding model: all-MiniLM-L6-v2")
+                from sentence_transformers import SentenceTransformer
                 AIService._local_embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
             except Exception as e:
                 logger.error(f"Failed to load local embedding model: {e}")
@@ -134,118 +138,122 @@ class AIService:
         """
         return self.generate_embedding_sync(text)
 
-    def transcribe_with_failover_sync(self, audio_path: str) -> Tuple[str, str]:
-        """Synchronous version of transcription with failover."""
+    def transcribe_with_failover_sync(self, audio_path: str, languages: Optional[List[str]] = None, stt_model: str = "nova") -> Tuple[str, str, List[str], Dict[str, str]]:
+        """
+        STT with failover and explicit model selection.
+        stt_model: 'nova', 'whisper', or 'both'
+        Returns: (primary_transcript, engine_used, languages, all_transcripts_dict)
+        """
         if not os.path.exists(audio_path):
             raise AIServiceError(f"Audio file not found: {audio_path}")
 
         request_id = str(uuid.uuid4())
         settings = self._get_dynamic_settings()
-        preferred_engine = settings["stt_engine"]
+        
+        results = {}
+        primary_transcript = ""
+        engine_used = ""
+        used_langs = languages or ["en"]
 
-        # Try Preferred engine (Force Groq for sync if Deepgram is strictly async in this sdk version)
-        # Actually, let's just use Groq for failover/sync as it's guaranteed sync here
-        try:
-            self.request_tracker.start_request(request_id, "groq")
-            with open(audio_path, "rb") as file:
-                transcription = self.groq_client.audio.transcriptions.create(
-                    file=(os.path.basename(audio_path), file.read()),
-                    model=settings["groq_whisper_model"],
-                    response_format="text",
-                )
-            self.request_tracker.end_request(request_id, True)
-            return transcription, "groq"
-        except Exception as e:
-            self.request_tracker.end_request(request_id, False, str(e))
-            logger.error(f"Sync transcription failed: {e}")
-            raise AIServiceError(f"Transcription failed: {str(e)}")
+        # 1. Prepare Deepgram Logic
+        dg_params = {"model": settings["deepgram_model"], "smart_format": True}
+        if languages:
+            if len(languages) == 1: dg_params["language"] = languages[0]
+            else: dg_params["detect_language"] = True
+        else: dg_params["detect_language"] = True
 
-    def run_full_analysis_sync(self, audio_path: str, user_role: str = "GENERIC", **kwargs) -> NoteAIOutput:
-        """Synchronous orchestration of full audio to analysis pipeline."""
-        transcript, engine = self.transcribe_with_failover_sync(audio_path)
+        # 2. Prepare Groq Logic
+        groq_params = {"model": settings["groq_whisper_model"], "response_format": "text"}
+        if languages: groq_params["language"] = languages[0]
+
+        def run_dg():
+            if not self.dg_client: return None
+            try:
+                with open(audio_path, "rb") as file:
+                    resp = self.dg_client.listen.rest.v1.transcribe_file(
+                        {"buffer": file.read(), "mimetype": "audio/wav"},
+                        dg_params
+                    )
+                    return resp.results.channels[0].alternatives[0].transcript
+            except Exception as e:
+                logger.error(f"Deepgram failed: {e}")
+                return None
+
+        def run_groq():
+            if not self.groq_client: return None
+            try:
+                with open(audio_path, "rb") as file:
+                    return self.groq_client.audio.transcriptions.create(
+                        file=(os.path.basename(audio_path), file.read()), **groq_params
+                    )
+            except Exception as e:
+                logger.error(f"Groq failed: {e}")
+                return None
+
+        # Execute based on preference
+        if stt_model == "both":
+            # Run both sequentially in worker context
+            dg_t = run_dg() if self.dg_client else None
+            groq_t = run_groq() if self.groq_client else None
+            
+            if dg_t: results["deepgram"] = dg_t
+            if groq_t: results["groq"] = groq_t
+            
+            primary_transcript = dg_t or groq_t or ""
+            engine_used = "both"
+        elif stt_model == "whisper":
+            groq_t = run_groq()
+            if groq_t:
+                primary_transcript = groq_t
+                engine_used = "groq"
+                results["groq"] = groq_t
+            else: # Fallback to DG
+                dg_t = run_dg()
+                primary_transcript = dg_t or ""
+                engine_used = "deepgram" if dg_t else "failed"
+                if dg_t: results["deepgram"] = dg_t
+        else: # Default: Nova
+            dg_t = run_dg()
+            if dg_t:
+                primary_transcript = dg_t
+                engine_used = "deepgram"
+                results["deepgram"] = dg_t
+            else: # Fallback to Groq
+                groq_t = run_groq()
+                primary_transcript = groq_t or ""
+                engine_used = "groq" if groq_t else "failed"
+                if groq_t: results["groq"] = groq_t
+                primary_transcript = groq_t or ""
+                engine_used = "groq" if groq_t else "failed"
+
+        logger.info(f"STT Complete: engine={engine_used}, transcript_type={type(primary_transcript)}")
+        if not primary_transcript:
+            raise AIServiceError("All STT engines failed to produce a transcript.")
+
+        return primary_transcript, engine_used, used_langs, results
+
+    def run_full_analysis_sync(self, audio_path: str, user_role: str = "GENERIC", languages: Optional[List[str]] = None, stt_model: str = "nova", **kwargs) -> NoteAIOutput:
+        """Synchronous orchestration with model selection."""
+        transcript, engine, detected_langs, all_transcripts = self.transcribe_with_failover_sync(
+            audio_path, languages=languages, stt_model=stt_model
+        )
         ai_output = self.llm_brain_sync(transcript, user_role, **kwargs)
+        # Store metadata for the worker to save
+        ai_output.metadata = {
+            "engine": engine, 
+            "languages": detected_langs, 
+            "all_transcripts": all_transcripts
+        }
         return ai_output
 
-    async def transcribe_with_failover(self, audio_path: str) -> Tuple[str, str]:
+    async def transcribe_with_failover(self, audio_path: str, languages: Optional[List[str]] = None, stt_model: str = "nova") -> Tuple[str, str, List[str], Dict[str, str]]:
         """
-        Implements PRIMARY (Deepgram) -> FAILOVER (Groq) engine logic.
+        Async wrapper for transcription with model selection.
         """
-        if not os.path.exists(audio_path):
-            raise AIServiceError(f"Audio file not found: {audio_path}")
+        return self.transcribe_with_failover_sync(audio_path, languages=languages, stt_model=stt_model)
 
-        request_id = str(uuid.uuid4())
-        
-        settings = self._get_dynamic_settings()
-        preferred_engine = settings["stt_engine"]
-
-        # Try Preferred engine first
-        if preferred_engine == "deepgram" and self.dg_client:
-            try:
-                self.request_tracker.start_request(request_id, "deepgram")
-                with open(audio_path, "rb") as audio:
-                    response = self.dg_client.listen.v1.media.transcribe_file(
-                        request=audio.read(),
-                        model=settings["deepgram_model"],
-                        smart_format=True,
-                    )
-                    transcript = response.results.channels[0].alternatives[0].transcript
-                    self.request_tracker.end_request(request_id, True)
-                    return transcript, "deepgram"
-            except Exception as e:
-                logger.error(f"Deepgram transcription failed: {e}")
-                self.request_tracker.end_request(request_id, False, str(e))
-        
-        elif preferred_engine == "groq" and self.groq_client:
-            try:
-                self.request_tracker.start_request(request_id, "groq")
-                with open(audio_path, "rb") as audio:
-                    translation = self.groq_client.audio.transcriptions.create(
-                        file=(os.path.basename(audio_path), audio.read()),
-                        model=settings["groq_whisper_model"],
-                        response_format="text",
-                    )
-                    self.request_tracker.end_request(request_id, True)
-                    return translation, "groq"
-            except Exception as e:
-                logger.error(f"Groq transcription failed: {e}")
-                self.request_tracker.end_request(request_id, False, str(e))
-
-        # Ultimate Failover (Reverse of preferred)
-        failover_engine = "groq" if preferred_engine == "deepgram" else "deepgram"
-        
-        if failover_engine == "deepgram" and self.dg_client:
-            try:
-                self.request_tracker.start_request(request_id, "deepgram-failover")
-                with open(audio_path, "rb") as audio:
-                    response = self.dg_client.listen.v1.media.transcribe_file(
-                        request=audio.read(),
-                        model=settings["deepgram_model"],
-                        smart_format=True,
-                    )
-                    transcript = response.results.channels[0].alternatives[0].transcript
-                    self.request_tracker.end_request(request_id, True)
-                    return transcript, "deepgram"
-            except Exception as e:
-                logger.error(f"Deepgram failover failed: {e}")
-
-        elif failover_engine == "groq" and self.groq_client:
-            try:
-                self.request_tracker.start_request(request_id, "groq-failover")
-                with open(audio_path, "rb") as audio:
-                    translation = self.groq_client.audio.transcriptions.create(
-                        file=(os.path.basename(audio_path), audio.read()),
-                        model=settings["groq_whisper_model"],
-                        response_format="text",
-                    )
-                    self.request_tracker.end_request(request_id, True)
-                    return translation, "groq"
-            except Exception as e:
-                logger.error(f"Groq failover failed: {e}")
-
-        raise AIServiceError("All transcription engines failed or are not configured.")
-
-    def llm_brain_sync(self, transcript: str, user_role: str = "GENERIC", user_instruction: str = "", **kwargs) -> NoteAIOutput:
-        """Synchronous structured extraction for Celery worker."""
+    def llm_brain_sync(self, transcript: str, user_role: str = "GENERIC", user_instruction: str = "", note_created_at: Optional[int] = None, user_timezone: str = "UTC", **kwargs) -> NoteAIOutput:
+        """Synchronous structured extraction for Celery worker with timezone-aware priority."""
         # Validation
         transcript = validate_transcript(transcript)
         
@@ -266,6 +274,31 @@ class AIService:
         jargons = kwargs.get("jargons", [])
         if jargons:
             system_prompt += f"\n\nCRITICAL CONTEXT: The following industry-specific terms or 'jargons' are relevant to this user. Use them correctly if they appear phonetically or contextually:\n{', '.join(jargons)}"
+
+        # NEW: Add temporal context for intelligent priority assignment
+        if note_created_at:
+            try:
+                from datetime import datetime
+                import pytz
+                
+                # Convert timestamp to user's local time
+                tz = pytz.timezone(user_timezone)
+                note_time = datetime.fromtimestamp(note_created_at / 1000, tz=tz)
+                current_time = datetime.now(tz)
+                
+                temporal_context = f"""
+
+TEMPORAL CONTEXT (CRITICAL FOR PRIORITY ASSIGNMENT):
+- Note was recorded at: {note_time.strftime('%Y-%m-%d %H:%M:%S %Z')}
+- Current time: {current_time.strftime('%Y-%m-%d %H:%M:%S %Z')}
+- User timezone: {user_timezone}
+- Time elapsed since note: {(current_time - note_time).total_seconds() / 3600:.1f} hours
+
+Use this temporal context to intelligently assign task priorities based on urgency and deadlines.
+"""
+                system_prompt += temporal_context
+            except Exception as e:
+                logger.warning(f"Failed to add temporal context: {e}")
 
         user_content = f"Instruction: {user_instruction or 'Analyze the transcript.'}\n\nTranscript:\n{transcript}"
         settings = self._get_dynamic_settings()
@@ -312,9 +345,9 @@ class AIService:
             raise 
 
     @retry_with_backoff(max_attempts=3)
-    async def llm_brain(self, transcript: str, user_role: str = "GENERIC", user_instruction: str = "", **kwargs) -> NoteAIOutput:
+    async def llm_brain(self, transcript: str, user_role: str = "GENERIC", user_instruction: str = "", note_created_at: Optional[int] = None, user_timezone: str = "UTC", **kwargs) -> NoteAIOutput:
         """Structured extraction using Llama 3.1 on Groq with robust validation."""
-        return self.llm_brain_sync(transcript, user_role, user_instruction, **kwargs)
+        return self.llm_brain_sync(transcript, user_role, user_instruction, note_created_at, user_timezone, **kwargs)
 
     async def run_full_analysis(self, audio_path: str, user_role: str = "GENERIC", **kwargs) -> NoteAIOutput:
         """

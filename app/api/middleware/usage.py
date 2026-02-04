@@ -51,7 +51,7 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
             db = SessionLocal()
             try:
                 user = db.query(User).filter(User.id == user_id).first()
-                if user.tier == SubscriptionTier.PREMIUM:
+                if user and user.tier == SubscriptionTier.PREMIUM:
                     # Premium users get unlimited basic notes access
                     if "/api/v1/notes" in request.url.path:
                         estimated_cost = 0 

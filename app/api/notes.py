@@ -6,7 +6,7 @@ from app.db import models
 from app.schemas import note as note_schema
 from app.schemas.note import NoteSemanticAnalysis
 from app.worker.task import (
-    process_voice_note_pipeline, 
+    note_process_pipeline, 
     analyze_note_semantics_task,
     generate_note_embeddings_task,
     process_ai_query_task
@@ -20,108 +20,147 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.core.config import ai_config
 from app.utils.json_logger import JLogger
+import traceback
 from app.services.ai_service import AIService
 from app.services.search_service import SearchService
 from app.services.analytics_service import AnalyticsService
-from app.core.config import ai_config
-from app.utils.security import verify_device_signature, verify_note_ownership
 from app.services.deletion_service import DeletionService
+from app.utils.security import verify_device_signature, verify_note_ownership
+from app.services.storage_service import StorageService
 from app.services.auth_service import get_current_user
 
-ai_service = AIService()
-search_service = SearchService(ai_service)
-analytics_service = AnalyticsService()
+# Services are instantiated inside endpoints to avoid module-level hangs
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"))
 
 router = APIRouter(prefix="/api/v1/notes", tags=["Notes"])
+
+@router.get("/presigned-url")
+async def get_presigned_url(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    GET /presigned-url: Generate a direct-to-storage upload link.
+    Privacy-First: The audio bypasses the API server and goes straight to MinIO.
+    """
+    note_id = str(uuid.uuid4())
+    storage_key = f"{current_user.id}/{note_id}.wav"
+    
+    storage_service = StorageService()
+    try:
+        upload_url = storage_service.generate_presigned_put_url(storage_key)
+        return {
+            "note_id": note_id,
+            "storage_key": storage_key,
+            "upload_url": upload_url,
+            "expires_in": 3600
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not generate upload link. Storage service is unavailable."
+        )
 
 @router.post("/process", status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("3/minute")
 async def process_note(
     request: Request,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    storage_key: Optional[str] = Form(None), # New: Direct MinIO upload key
+    note_id_override: Optional[str] = Form(None), # New: For Pre-signed flow
     mode: Optional[str] = Form("GENERIC"), # New: Cricket/Quranic Mode
+    languages: Optional[str] = Form(None), # New: Multilingual support (e.g. "en,ur")
+    stt_model: Optional[str] = Form("nova"), # New: nova, whisper, both
+    document_uris: Optional[str] = Form(None), # Client-side document URIs (comma-separated)
+    image_uris: Optional[str] = Form(None), # Client-side image URIs (comma-separated)
     debug_sync: bool = Form(False), # For local developer testing
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
     _sig: bool = Depends(verify_device_signature) # Security requirement
 ):
     """POST /process: Main Upload for audio processing with validation and security."""
-    # ✅ VALIDATION: File type check
-    ALLOWED_EXTENSIONS = {"mp3", "wav", "m4a", "ogg", "flac"}
-    file_ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
     
-    if file_ext not in ALLOWED_EXTENSIONS:
-        JLogger.warning("Unsupported file type upload attempt", 
-                        filename=file.filename, 
-                        extension=file_ext, 
-                        user_id=current_user.id)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail=f"The uploaded file format is not supported. Please provide an audio file in one of the following formats: {', '.join(ALLOWED_EXTENSIONS)}."
-        )
+    # Define allowed file extensions
+    ALLOWED_EXTENSIONS = {"mp3", "wav", "m4a", "ogg", "flac"}
+
+    if file and "." in file.filename:
+        file_ext = file.filename.split(".")[-1].lower()
+        if file_ext not in ALLOWED_EXTENSIONS:
+            JLogger.warning("Unsupported file type upload attempt", 
+                            filename=file.filename, 
+                            extension=file_ext, 
+                            user_id=current_user.id)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=f"The uploaded file format is not supported. Please provide an audio file in one of the following formats: {', '.join(ALLOWED_EXTENSIONS)}."
+            )
+    
+    # ✅ STEP: Handle Note ID (Reuse if from Pre-signed URL flow)
+    note_id = note_id_override if note_id_override else str(uuid.uuid4())
+    temp_path = None
     
     # ✅ VALIDATION: File size check (50MB limit) via stream
     MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
-    
-    note_id = str(uuid.uuid4())
-    JLogger.info("Starting voice note upload", 
-                 note_id=note_id, 
-                 user_id=current_user.id, 
-                 filename=file.filename)
-    
-    if not os.path.exists("uploads"):
-        os.makedirs("uploads")
+
+    if file:
+        # Legacy File Upload Flow
+        if not os.path.exists("uploads"):
+            os.makedirs("uploads")
         
-    temp_path = f"uploads/{note_id}_{file.filename}"
-    total_size = 0
+        file_ext = file.filename.split(".")[-1].lower() if "." in file.filename else ""
+        temp_path = f"uploads/{note_id}_{file.filename}"
+        total_size = 0
+        
+        with open(temp_path, "wb") as buffer:
+            while chunk := await file.read(1024 * 1024):
+                total_size += len(chunk)
+                if total_size > MAX_FILE_SIZE:
+                    os.remove(temp_path)
+                    raise HTTPException(status_code=413, detail="File too large")
+                buffer.write(chunk)
+    elif storage_key:
+        # New Privacy-First Storage Key Flow
+        # storage_key is already in MinIO
+        pass
+    else:
+        raise HTTPException(status_code=400, detail="Missing audio sources. Provide 'file' or 'storage_key'.")
+
+    # Parse client-side URIs if provided
+    doc_uri_list = [d.strip() for d in document_uris.split(",")] if document_uris else []
+    img_uri_list = [i.strip() for i in image_uris.split(",")] if image_uris else []
     
-    with open(temp_path, "wb") as buffer:
-        while chunk := await file.read(1024 * 1024):  # Read in 1MB chunks
-            total_size += len(chunk)
-            if total_size > MAX_FILE_SIZE:
-                os.remove(temp_path)
-                JLogger.warning("File upload too large", 
-                                user_id=current_user.id, 
-                                size_bytes=total_size)
-                raise HTTPException(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail=f"The uploaded file exceeds the maximum allowed size of 50MB. Please optimize the file and try again."
-                )
-            buffer.write(chunk)
+    # Parse languages
+    lang_list = [l.strip() for l in languages.split(",")] if languages else current_user.preferred_languages
 
-    # ✅ STEP: Generate Local URL for Raw audio
-    # Assuming the app runs on port 8000, we'll store relative Path or absolute URL
-    # Relative is safer for different environments
-    raw_audio_url = f"/uploads/{note_id}_{file.filename}"
-    JLogger.info("Note stored locally", note_id=note_id, url=raw_audio_url)
-
-    # ✅ STEP: Create initial record so GET /api/v1/notes/{id} doesn't 404
+    # ✅ STEP: Create initial record
     initial_note = models.Note(
         id=note_id,
         user_id=current_user.id,
-        title=f"Processing: {file.filename}",
+        title=f"Processing: {file.filename if file else 'Storage Key Extraction'}",
         summary="AI is currently analyzing your audio...",
         status=models.NoteStatus.PENDING,
-        raw_audio_url=raw_audio_url,
+        raw_audio_url=storage_key if storage_key else temp_path,
+        languages=lang_list,
+        document_uris=doc_uri_list,  # Client-side URIs
+        image_uris=img_uri_list,     # Client-side URIs
+        stt_model=stt_model,
         timestamp=int(time.time() * 1000),
         updated_at=int(time.time() * 1000)
     )
     db.add(initial_note)
     db.commit()
 
-    # Trigger Celery pipeline with mode support
-    user_role = current_user.primary_role.name if current_user.primary_role else "GENERIC" # [tod]
-    if mode and mode != "GENERIC":
-        user_role = f"{user_role}_{mode}"
+    # Determine Queue (Simplified for now, could use file size or metadata)
+    # Defaulting to 'short' unless we have a specific reason for 'long'
+    target_queue = "short" 
 
+    # Trigger Celery pipeline
     if debug_sync:
         # Run the pipeline synchronously for immediate feedback in the API response
-        result = process_voice_note_pipeline(note_id, temp_path, user_role)
+        result = note_process_pipeline(note_id, temp_path if temp_path else storage_key, mode, document_uris=doc_uri_list, image_uris=img_uri_list, languages=lang_list, stt_model=stt_model)
         return {"note_id": note_id, "message": "Synchronous processing complete", "result": result}
 
-    from app.worker.task import process_voice_note_pipeline
-    process_voice_note_pipeline.delay(note_id, temp_path, user_role)
+    note_process_pipeline.delay(note_id, temp_path if temp_path else storage_key, mode, document_uris=doc_uri_list, image_uris=img_uri_list, languages=lang_list, stt_model=stt_model)
     
     return {"note_id": note_id, "message": f"Processing started in {mode} mode"}
 
@@ -158,6 +197,9 @@ def create_note(
     except Exception as e:
         db.rollback()
         JLogger.error("Failed to create note in database", user_id=current_user.id, error=str(e))
+        if os.getenv("ENVIRONMENT") == "testing":
+            traceback.print_exc()
+            raise e
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error: Failed to save note"
@@ -189,6 +231,7 @@ def get_dashboard_metrics(db: Session = Depends(get_db), current_user: models.Us
     Exposes Topic Heatmap, Task Velocity, and Meeting ROI.
     """
     try:
+        analytics_service = AnalyticsService()
         return analytics_service.get_productivity_pulse(db, current_user.id)
     except Exception as e:
         JLogger.error("Dashboard analytics pulse failed", user_id=current_user.id, error=str(e))
@@ -321,22 +364,66 @@ def delete_note(
         
     return result
 
-@router.post("/{note_id}/ask", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/{note_id}/ask")
 async def ask_ai(
     note_id: str, 
     question: str = Body(..., embed=True), 
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    """POST /{note_id}/ask: Offloaded AI Q&A. Result appears in note.ai_responses."""
+    """
+    POST /{note_id}/ask: Real-time AI Q&A about the note.
+    Returns answer immediately for chat-like experience.
+    """
     db_note = verify_note_ownership(db, current_user, note_id)
     
     if db_note.is_deleted:
         raise HTTPException(status_code=403, detail="Note is deleted")
     
-    # Offload to Celery
-    process_ai_query_task.delay(note_id, question, current_user.id)
-    return {"message": "AI is processing your question", "note_id": note_id}
+    # Get transcript
+    transcript = db_note.transcript
+    if not transcript:
+        raise HTTPException(status_code=400, detail="Note has no transcript")
+    
+    # Generate answer synchronously for real-time chat
+    ai_service = AIService()
+    user_role = current_user.primary_role.value if current_user.primary_role else "GENERIC"
+    
+    # Use LLM to answer the question
+    from app.core.config import ai_config
+    try:
+        response = ai_service.groq_client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": f"You are a helpful AI assistant. Answer questions about the following note:\n\n{transcript}"},
+                {"role": "user", "content": question}
+            ],
+            model="llama-3.1-70b-versatile",
+            temperature=0.3,
+            max_tokens=500
+        )
+        answer = response.choices[0].message.content
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
+    
+    # Save to history
+    new_response = {
+        "question": question,
+        "answer": answer,
+        "timestamp": int(time.time() * 1000)
+    }
+    
+    history = list(db_note.ai_responses) if db_note.ai_responses else []
+    history.append(new_response)
+    db_note.ai_responses = history
+    db.commit()
+    
+    # Return answer immediately
+    return {
+        "question": question,
+        "answer": answer,
+        "timestamp": new_response["timestamp"],
+        "note_id": note_id
+    }
 
 
 @router.post("/search")
@@ -352,6 +439,8 @@ async def search_notes_hybrid(
     Searches local notes first using pgvector, falls back to Web (Tavily) if needed.
     """
     try:
+        ai_service = AIService()
+        search_service = SearchService(ai_service)
         result = await search_service.unified_rag_search(db, current_user.id, query.query)
         return result
     except Exception as e:

@@ -23,10 +23,15 @@ class AISettings(BaseSettings):
     # Validation
     MAX_TRANSCRIPT_LENGTH: int = 100000
     AUDIO_BITRATE_THRESHOLD: int = 128000
+    SHORT_AUDIO_THRESHOLD_SEC: int = 45 # Audio below this goes to 'short' queue
+    SHORT_AUDIO_THRESHOLD_SEC: int = 45 # Audio below this goes to 'short' queue
     
-    # Validation
-    MAX_TRANSCRIPT_LENGTH: int = 100000
-    AUDIO_BITRATE_THRESHOLD: int = 128000
+    # --- STORAGE SETTINGS (NEW) ---
+    MINIO_ENDPOINT: str = Field(default="minio:9000", validation_alias="MINIO_ENDPOINT")
+    MINIO_ACCESS_KEY: str = Field(default="minioadmin", validation_alias="MINIO_ACCESS_KEY")
+    MINIO_SECRET_KEY: str = Field(default="minioadminpassword", validation_alias="MINIO_SECRET_KEY")
+    MINIO_BUCKET_NAME: str = Field(default="incoming", validation_alias="MINIO_BUCKET_NAME")
+    MINIO_SECURE: bool = Field(default=False, validation_alias="MINIO_SECURE")
     
     # --- COMMERCIAL SETTINGS (NEW) ---
     STRIPE_SECRET_KEY: str = Field(default="sk_test_placeholder", validation_alias="STRIPE_SECRET_KEY")
@@ -52,6 +57,62 @@ class AISettings(BaseSettings):
         - title: The specific action item.
         - priority: "HIGH", "MEDIUM", or "LOW".
         - due_date: ISO 8601 format (YYYY-MM-DD) if mentioned, else null.
+        - actions: Object with detected action types (optional)
+    
+    PRIORITY ASSIGNMENT GUIDELINES (CRITICAL):
+    When temporal context is provided (note creation time, current time, user timezone):
+    - Tasks with "today", "now", "urgent", "ASAP", or deadlines within 24-48 hours → HIGH priority
+    - Tasks with deadlines within 1 week → MEDIUM priority
+    - Tasks with vague deadlines ("someday", "eventually", "when I have time") → LOW priority
+    - Consider the time gap between note creation and current time for context
+    - Use user's local timezone to understand "today", "tomorrow", "this week" correctly
+    
+    When no temporal context is provided, use semantic urgency cues from the transcript.
+    
+    TASK ACTION DETECTION (CRITICAL):
+    For each task, detect if it requires specific actions and extract metadata:
+    
+    1. GOOGLE SEARCH: If task involves research, investigation, looking up, or mentions "google/search"
+       - Extract: {"google_search": {"query": "search terms"}}
+       
+    2. EMAIL: If task mentions sending email, emailing someone, or contacting via email
+       - Extract: {"email": {"to": "email@example.com", "name": "Person Name", "subject": "...", "body": "..."}}
+       
+    3. WHATSAPP: If task mentions WhatsApp, messaging, texting, or sending message
+       - Extract: {"whatsapp": {"phone": "+1234567890", "name": "Contact Name", "message": "..."}}
+       
+    4. AI ASSISTANCE: If task needs ChatGPT/Gemini/Claude help or asks to "ask AI"
+       - Extract: {"ai_prompt": {"model": "gemini|chatgpt|claude", "context": "relevant context"}}
+    
+    EXAMPLE OUTPUT:
+    {
+      "title": "Project Planning Meeting",
+      "summary": "Discussed Q1 goals and assigned research tasks.",
+      "priority": "HIGH",
+      "tasks": [
+        {
+          "title": "Research competitor pricing strategies",
+          "priority": "HIGH",
+          "due_date": "2026-02-05",
+          "actions": {
+            "google_search": {"query": "competitor pricing strategies 2026"}
+          }
+        },
+        {
+          "title": "Email John about budget approval",
+          "priority": "MEDIUM",
+          "due_date": null,
+          "actions": {
+            "email": {
+              "to": "john@company.com",
+              "name": "John",
+              "subject": "Budget Approval Request",
+              "body": "Hi John,\\n\\nFollowing up on our meeting regarding the Q1 budget..."
+            }
+          }
+        }
+      ]
+    }
     """
 
     CONFLICT_DETECTOR_PROMPT: str = """

@@ -5,14 +5,12 @@ Analyzes audio quality using multiple metrics and gets LLM recommendations
 for preprocessing improvements.
 """
 
-import librosa
 import numpy as np
-import soundfile as sf
-import noisereduce as nr
 from typing import Dict, Any, Tuple
 from groq import Groq
 from app.utils.json_logger import JLogger
 import os
+import librosa
 
 class AudioQualityAnalyzer:
     """Analyzes audio quality and provides LLM-based recommendations."""
@@ -321,6 +319,7 @@ class AudioQualityAnalyzer:
                 
                 # Noise reduction
                 if 'noise' in rec_lower and 'reduc' in rec_lower:
+                    import noisereduce as nr
                     JLogger.info("Applying noise reduction...")
                     y = nr.reduce_noise(y=y, sr=sr)
                 
@@ -335,6 +334,7 @@ class AudioQualityAnalyzer:
                     y, _ = librosa.effects.trim(y, top_db=30)
             
             # Save processed audio
+            import soundfile as sf
             sf.write(output_path, y, sr)
             JLogger.info(f"Processed audio saved to {output_path}")
             

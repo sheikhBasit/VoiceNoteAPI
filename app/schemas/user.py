@@ -26,6 +26,7 @@ class UserCreate(UserBase):
     token: str
     device_id: str
     device_model: str
+    timezone: Optional[str] = "UTC"  # Optional, defaults to UTC
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None

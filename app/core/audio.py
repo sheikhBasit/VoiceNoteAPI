@@ -1,7 +1,4 @@
-import librosa
-import soundfile as sf
 import numpy as np
-import noisereduce as nr
 from pydub import AudioSegment, effects
 import os
 import logging
@@ -10,59 +7,77 @@ from app.utils.json_logger import JLogger
 
 logger = logging.getLogger(__name__)
 
+from scipy.signal import butter, lfilter
+
+def highpass(audio, sr, cutoff=80):
+    """Remove low-frequency rumble below the cutoff frequency."""
+    b, a = butter(2, cutoff / (sr / 2), btype="high")
+    return lfilter(b, a, audio)
+
 def preprocess_audio_pipeline(input_path: str):
     """
     Advanced enhancement for distant speakers:
-    Noise Reduction -> Dynamic Compression (AGC) -> Normalization -> Resampling
+    Decode -> High-Pass Filter -> Noise Reduction -> Dynamic Compression -> Normalization
     """
-    # 1. Load Audio at 16kHz (Optimal for Groq Whisper v3)
-    # change to mono to simplify processing
+    import librosa
+    import soundfile as sf
+    import noisereduce as nr
+    
+    # 1. Load Audio at 16kHz (Optimal for STT)
     y, sr = librosa.load(input_path, sr=16000, mono=True)
 
-    # 2. Stronger Spectral Noise Reduction
-    # Crucial for distant speakers so we don't amplify the 'hiss' of the room
-    y_denoised = nr.reduce_noise(y=y, sr=sr, prop_decrease=0.85, n_fft=2048)
+    # 2. Rumble removal (HPF 80Hz)
+    # Essential for cleaning up background noise and low-end hum
+    y_hpf = highpass(y, sr, cutoff=80)
 
-    # 3. Aggressive Silence Removal (VAD)
-    # Removing dead air helps the STT focus only on active speech segments
-    yt, _ = librosa.effects.trim(y_denoised, top_db=20)
+    # 3. Spectral Noise Reduction
+    # Crucial for distant speakers: removes 'hiss' without distorting voice
+    y_denoised = nr.reduce_noise(y=y_hpf, sr=sr, prop_decrease=0.8, n_fft=2048)
 
-    # 4. Save intermediate for Pydub's heavy lifting
-    temp_wav = input_path.replace(".mp3", "_temp.wav")
-    sf.write(temp_wav, yt, sr)
+    # 4. Silence Removal (VAD)
+    # Trimming helps the STT focus on speech only
+    y_trimmed, _ = librosa.effects.trim(y_denoised, top_db=20)
+
+    # 5. Save intermediate for Pydub's dynamic processing
+    # Robust extension handling
+    base_path, ext = os.path.splitext(input_path)
+    temp_wav = f"{base_path}_temp.wav"
+    sf.write(temp_wav, y_trimmed, sr)
     
-    # 5. Dynamic Range Compression & Normalization
-    # This is the "Magic" for distant voices
+    # 6. Dynamic Range Compression & Normalization
+    # 'Magic' for distant voices: brings quiet sounds closer to loudest for clarity
     audio_segment = AudioSegment.from_wav(temp_wav)
     
-    # Compress the dynamic range:
-    # This brings the quietest sounds closer to the loudest sounds
-    # without crossing the 0dB distortion threshold.
+    # Dynamic Compression
     compressed_audio = effects.compress_dynamic_range(
         audio_segment, 
-        threshold=-24.0, # Sounds quieter than this are targeted
+        threshold=-24.0, # Target quiet sounds
         ratio=4.0,       # Compression intensity
-        attack=5.0,      # Reaction speed in ms
-        release=50.0     # Recovery speed in ms
+        attack=5.0,      # Reaction in ms
+        release=50.0     # Recovery in ms
     )
 
-    # 6. Final Peak Normalization to -0.1 dB
-    # This stretches the compressed audio to the maximum possible safe volume
+    # 7. Final Peak Normalization to -0.1 dB
+    # Stretch top signals to max safe volume
     final_audio = effects.normalize(compressed_audio, headroom=0.1)
 
-    # 7. Quality Check: Forced Gain Boost if still quiet
+    # 8. Quality Check: Gain Boost if still too quiet
     if final_audio.dBFS < -15:
-        final_audio = final_audio + 10 # Boost by 10dB if distant speakers are still low
+        final_audio = final_audio + 10 # Boost by 10dB for distant speakers
 
-    output_path = input_path.replace(".mp3", "_high_gain.wav")
+    output_path = f"{base_path}_refined.wav"
     final_audio.export(output_path, format="wav")
+    
+    # Clean up temp file
+    if os.path.exists(temp_wav):
+        os.remove(temp_wav)
 
-    # 8. Final Quality Audit
+    # 9. Quality Audit
     analyzer = AudioQualityAnalyzer()
     quality_report = analyzer.analyze_audio_quality(output_path)
     
     JLogger.info(
-        "Preprocessing complete with quality audit",
+        "Preprocessing complete",
         input=input_path,
         output=output_path,
         quality_score=quality_report.get("quality_score"),

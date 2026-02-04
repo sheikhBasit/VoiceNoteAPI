@@ -23,7 +23,8 @@ class NoteCreate(NoteBase):
     transcript_android: str = ""
     audio_url: Optional[str] = None
     raw_audio_url: Optional[str] = None
-    document_urls: List[str] = []
+    document_uris: List[str] = []  # Client-side URIs
+    image_uris: List[str] = []     # Client-side image URIs
     links: List[ExternalLink] = []
     is_encrypted: bool = False
     comparison_notes: str = ""
@@ -38,7 +39,8 @@ class NoteUpdate(BaseModel):
     is_liked: Optional[bool] = None
     is_archived: Optional[bool] = None
     transcript: Optional[str] = None
-    document_urls: Optional[List[str]] = None
+    document_uris: Optional[List[str]] = None  # Client-side URIs
+    image_uris: Optional[List[str]] = None     # Client-side image URIs
     links: Optional[List[ExternalLink]] = None
     is_deleted: Optional[bool] = None
     model_config = ConfigDict(from_attributes=True)
@@ -59,7 +61,8 @@ class NoteResponse(NoteBase):
     transcript: str
     audio_url: Optional[str]
     raw_audio_url: Optional[str]
-    document_urls: List[str] = []
+    document_uris: List[str] = []  # Client-side URIs
+    image_uris: List[str] = []     # Client-side image URIs
     links: List[ExternalLink] = []
     tasks: List[TaskSummary] = []  # Typed list for Pydantic validation
     is_pinned: bool
@@ -77,6 +80,7 @@ class NoteAIOutput(BaseModel):
     priority: Priority
     transcript: str  # Formatted with speaker labels
     tasks: List[dict] = []  # Avoid circular import
+    metadata: Optional[dict] = None
 
 class NoteSemanticAnalysis(BaseModel):
     """Schema for deep semantic insights"""

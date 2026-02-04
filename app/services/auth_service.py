@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Any, Union
 import jwt
 from passlib.context import CryptContext
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -18,7 +18,8 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/admin/login", auto_error=False)
+# Use HTTPBearer instead of OAuth2PasswordBearer for proper Swagger UI integration
+security = HTTPBearer(auto_error=False)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -72,7 +73,7 @@ def mock_send_verification_email(email: str, link: str):
 
 async def get_current_user(
     request: Request,
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
     """
@@ -88,7 +89,12 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    # Support token in header if not found by OAuth2Scheme (for manual testing)
+    # Extract token from HTTPBearer credentials
+    token = None
+    if credentials:
+        token = credentials.credentials
+    
+    # Support token in header if not found (for manual testing)
     if not token:
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
