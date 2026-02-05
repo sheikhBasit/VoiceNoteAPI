@@ -359,5 +359,24 @@ class UsageLog(Base):
     
     cost_estimated = Column(Integer, default=0) # In credits/cents
     status = Column(Integer, default=200) # HTTP Status
-    timestamp = Column(BigInteger, default=lambda: int(time.time() * 1000)) 
+    timestamp = Column(BigInteger, default=lambda: int(time.time() * 1000))
+
+
+class AdminActionLog(Base):
+    """
+    Persistent audit log for admin actions.
+    Tracks all administrative operations for compliance and security.
+    """
+    __tablename__ = "admin_action_logs"
     
+    id = Column(String, primary_key=True)  # UUID
+    admin_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    action = Column(String, nullable=False, index=True)  # e.g., "DELETE_USER", "UPDATE_PERMISSIONS"
+    target_id = Column(String, nullable=True)  # ID of affected resource
+    details = Column(JSONB, default=dict)  # Additional context
+    ip_address = Column(String, nullable=True)  # Request IP
+    user_agent = Column(Text, nullable=True)  # Request user agent
+    timestamp = Column(BigInteger, default=lambda: int(time.time() * 1000), nullable=False, index=True)
+    
+    # Relationship
+    admin = relationship("User", foreign_keys=[admin_id])

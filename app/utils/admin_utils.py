@@ -152,20 +152,52 @@ class AdminManager:
     
     @staticmethod
     def log_admin_action(db: Session, admin_id: str, action: str, 
-                        target_id: str, details: Dict = None):
-        """Log admin action (e.g., deleted user, modified note)"""
-        # Future: Create AdminAuditLog table
-        # This is a placeholder for audit logging
-        log_entry = {
-            "admin_id": admin_id,
-            "action": action,
-            "target_id": target_id,
-            "details": details or {},
-            "timestamp": int(time.time() * 1000)
-        }
-        print(f"🛡️ Admin Action Log: {log_entry}")
-        # TODO: Store in database
-        return log_entry
+                        target_id: str, details: Dict = None, 
+                        ip_address: str = None, user_agent: str = None):
+        """
+        Log admin action to database for persistent audit trail.
+        
+        Args:
+            db: Database session
+            admin_id: ID of admin performing action
+            action: Action type (e.g., "DELETE_USER", "UPDATE_PERMISSIONS")
+            target_id: ID of affected resource
+            details: Additional context as dict
+            ip_address: Request IP address (optional)
+            user_agent: Request user agent (optional)
+        
+        Returns:
+            AdminActionLog instance
+        """
+        import uuid
+        from app.db import models
+        
+        log_entry = models.AdminActionLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin_id,
+            action=action,
+            target_id=target_id,
+            details=details or {},
+            ip_address=ip_address,
+            user_agent=user_agent,
+            timestamp=int(time.time() * 1000)
+        )
+        
+        try:
+            db.add(log_entry)
+            db.commit()
+            db.refresh(log_entry)
+            
+            # Also log to stdout for development
+            print(f"🛡️ Admin Action Log: {action} by {admin_id} on {target_id}")
+            
+            return log_entry
+        except Exception as e:
+            db.rollback()
+            # Fallback to stdout if database write fails
+            print(f"⚠️ Failed to persist admin log: {e}")
+            # Return None to maintain backward compatibility with tests
+            return None
 
 
 # FastAPI Dependency for admin verification

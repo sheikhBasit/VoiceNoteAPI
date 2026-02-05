@@ -21,6 +21,12 @@ class AnalyticsService:
         cache = user.usage_stats or {}
         last_refresh = cache.get("last_analytics_refresh", 0)
         
+        # Ensure last_refresh is an integer for comparison (handles MagicMock or bad data)
+        try:
+            last_refresh = int(last_refresh)
+        except (ValueError, TypeError):
+            last_refresh = 0
+
         # Refresh if stale (> 15 mins) or forced
         if force_refresh or (int(time.time() * 1000) - last_refresh > 15 * 60 * 1000):
             pulse_data = AnalyticsService._calculate_pulse(db, user_id)

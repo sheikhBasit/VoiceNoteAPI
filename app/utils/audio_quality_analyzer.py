@@ -34,18 +34,22 @@ class AudioQualityAnalyzer:
         try:
             JLogger.info("Starting audio quality analysis", audio_path=audio_path)
             # Load audio
+            JLogger.debug("Calling librosa.load", path=audio_path)
             y, sr = librosa.load(audio_path, sr=None)
-            JLogger.debug("Audio loaded", audio_path=audio_path, sample_rate=sr, samples=len(y))
+            JLogger.debug("Audio loaded successfully", sample_rate=sr, length=len(y))
             
             metrics = {}
             
             # 1. Loudness (RMS)
-            rms = librosa.feature.rms(y=y)[0]
+            JLogger.debug("Calculating RMS")
+            rms_feature = librosa.feature.rms(y=y)
+            rms = rms_feature[0]
             metrics['loudness_rms'] = float(np.mean(rms))
             metrics['loudness_std'] = float(np.std(rms))
             metrics['loudness_db'] = float(20 * np.log10(metrics['loudness_rms'] + 1e-10))
             
             # 2. Signal-to-Noise Ratio (SNR) estimation
+            JLogger.debug("Estimating SNR")
             # Use first 0.5s as noise reference (assuming silence/noise at start)
             noise_duration = min(0.5, len(y) / sr * 0.1)  # 10% or 0.5s
             noise_samples = int(noise_duration * sr)
@@ -71,17 +75,20 @@ class AudioQualityAnalyzer:
             metrics['clipping_percentage'] = float(clipped_samples / len(y) * 100)
             
             # 4. Spectral flatness (noise vs tonal content)
+            JLogger.debug("Calculating spectral flatness")
             spectral_flatness = librosa.feature.spectral_flatness(y=y)[0]
             metrics['spectral_flatness_mean'] = float(np.mean(spectral_flatness))
             metrics['spectral_flatness_std'] = float(np.std(spectral_flatness))
             
             # 5. Zero-crossing rate (hiss/white noise detection)
+            JLogger.debug("Calculating zero-crossing rate")
             zcr = librosa.feature.zero_crossing_rate(y)[0]
             metrics['zero_crossing_rate_mean'] = float(np.mean(zcr))
             metrics['zero_crossing_rate_std'] = float(np.std(zcr))
             
             # 6. Speech activity ratio
             # Detect non-silent intervals
+            JLogger.debug("Splitting audio for speech activity")
             intervals = librosa.effects.split(y, top_db=30)
             if len(intervals) > 0:
                 speech_samples = sum(end - start for start, end in intervals)
@@ -90,7 +97,13 @@ class AudioQualityAnalyzer:
                 metrics['speech_activity_ratio'] = 0.0
             
             # 7. Dynamic range
-            metrics['dynamic_range_db'] = float(20 * np.log10(np.max(np.abs(y)) / (np.min(np.abs(y[y != 0])) + 1e-10)))
+            JLogger.debug("Calculating dynamic range")
+            # Avoid division by zero and handle non-existent non-zero samples
+            non_zero_y = np.abs(y[y != 0])
+            if len(non_zero_y) > 0:
+                metrics['dynamic_range_db'] = float(20 * np.log10(np.max(np.abs(y)) / (np.min(non_zero_y) + 1e-10)))
+            else:
+                metrics['dynamic_range_db'] = 0.0
             
             # 8. Silence ratio
             metrics['silence_ratio'] = 1.0 - metrics['speech_activity_ratio']
@@ -115,7 +128,11 @@ class AudioQualityAnalyzer:
             return metrics
             
         except Exception as e:
-            JLogger.error("Error analyzing audio quality", audio_path=audio_path, error=str(e))
+            import traceback
+            JLogger.error("Error analyzing audio quality", 
+                         audio_path=audio_path, 
+                         error=str(e),
+                         traceback=traceback.format_exc())
             return {"error": str(e)}
     
     def _calculate_quality_score(self, metrics: Dict[str, Any]) -> float:

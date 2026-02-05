@@ -143,7 +143,12 @@ async def list_all_users(
             detail="Permission denied: Required permission 'can_view_all_users' is missing"
         )
     
-    users = db.query(models.User).offset(skip).limit(limit).all()
+    from sqlalchemy.orm import joinedload
+    
+    users = db.query(models.User).options(
+        joinedload(models.User.wallet),
+        joinedload(models.User.plan)
+    ).offset(skip).limit(limit).all()
     total = db.query(models.User).count()
     
     # Enhanced user list with usage summaries
@@ -584,7 +589,12 @@ async def get_user_usage_report(
     if not AdminManager.has_permission(admin_user, "can_view_analytics"):
         raise HTTPException(status_code=403, detail="Permission denied")
     
-    user = db.query(models.User).filter(
+    from sqlalchemy.orm import joinedload
+    
+    user = db.query(models.User).options(
+        joinedload(models.User.wallet),
+        joinedload(models.User.plan)
+    ).filter(
         (models.User.id == user_identifier) | (models.User.email == user_identifier)
     ).first()
     
@@ -629,3 +639,46 @@ async def update_user_plan(
     
     AdminManager.log_admin_action(db, admin_user.id, "UPDATE_USER_PLAN", user_id, {"new_plan": plan_id})
     return {"status": "success", "message": f"User {user.email} moved to {plan.name} plan"}
+
+
+# ==================== AUDIT LOGS ====================
+
+@router.get("/audit-logs")
+async def get_audit_logs(
+    admin_id: Optional[str] = Query(None, description="Filter by admin ID"),
+    action: Optional[str] = Query(None, description="Filter by action type"),
+    start_date: Optional[int] = Query(None, description="Start timestamp (ms)"),
+    end_date: Optional[int] = Query(None, description="End timestamp (ms)"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin)
+):
+    """
+    Get audit logs of admin actions.
+    
+    Permission Required: can_view_analytics
+    """
+    if not AdminManager.has_permission(admin_user, "can_view_analytics"):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    
+    query = db.query(models.AdminActionLog)
+    
+    if admin_id:
+        query = query.filter(models.AdminActionLog.admin_id == admin_id)
+    if action:
+        query = query.filter(models.AdminActionLog.action == action)
+    if start_date:
+        query = query.filter(models.AdminActionLog.timestamp >= start_date)
+    if end_date:
+        query = query.filter(models.AdminActionLog.timestamp <= end_date)
+    
+    total = query.count()
+    logs = query.order_by(models.AdminActionLog.timestamp.desc()).offset(offset).limit(limit).all()
+    
+    return {
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "logs": logs
+    }

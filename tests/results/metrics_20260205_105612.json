@@ -1,0 +1,52 @@
+{
+  "timestamp": "2026-02-05T10:56:12.771388",
+  "summary": {
+    "error_validation_empty.wav": {
+      "count": 1,
+      "min": 0.0003643035888671875,
+      "max": 0.0003643035888671875,
+      "mean": 0.0003643035888671875,
+      "total": 0.0003643035888671875,
+      "unit": "seconds"
+    },
+    "error_validation_wrong_format.wav": {
+      "count": 1,
+      "min": 0.30892205238342285,
+      "max": 0.30892205238342285,
+      "mean": 0.30892205238342285,
+      "total": 0.30892205238342285,
+      "unit": "seconds"
+    },
+    "error_validation_corrupted.wav": {
+      "count": 1,
+      "min": 0.0006561279296875,
+      "max": 0.0006561279296875,
+      "mean": 0.0006561279296875,
+      "total": 0.0006561279296875,
+      "unit": "seconds"
+    }
+  },
+  "raw_metrics": [
+    {
+      "timestamp": 1770288972.4608026,
+      "metric_name": "error_validation_empty.wav",
+      "value": 0.0003643035888671875,
+      "unit": "seconds",
+      "metadata": {}
+    },
+    {
+      "timestamp": 1770288972.7697823,
+      "metric_name": "error_validation_wrong_format.wav",
+      "value": 0.30892205238342285,
+      "unit": "seconds",
+      "metadata": {}
+    },
+    {
+      "timestamp": 1770288972.7705004,
+      "metric_name": "error_validation_corrupted.wav",
+      "value": 0.0006561279296875,
+      "unit": "seconds",
+      "metadata": {}
+    }
+  ]
+}

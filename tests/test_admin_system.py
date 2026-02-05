@@ -287,6 +287,22 @@ class TestAdminActionLogging:
     
     def test_log_admin_action(self, db_session):
         """Test logging admin action"""
+        # Create admin user first (required for foreign key)
+        admin_user = models.User(
+            id="admin_001",
+            name="Admin",
+            email="admin@example.com",
+            is_admin=True,
+            admin_permissions=DEFAULT_ADMIN_PERMISSIONS
+        )
+        target_user = models.User(
+            id="user_001",
+            name="Target User",
+            email="target@example.com"
+        )
+        db_session.add_all([admin_user, target_user])
+        db_session.commit()
+        
         log = AdminManager.log_admin_action(
             db=db_session,
             admin_id="admin_001",
@@ -295,14 +311,31 @@ class TestAdminActionLogging:
             details={"reason": "policy_violation"}
         )
         
-        assert log["admin_id"] == "admin_001"
-        assert log["action"] == "DELETE_USER"
-        assert log["target_id"] == "user_001"
-        assert log["details"]["reason"] == "policy_violation"
-        assert log["timestamp"] is not None
+        # log_admin_action now returns AdminActionLog object or None
+        assert log is not None
+        assert log.admin_id == "admin_001"
+        assert log.action == "DELETE_USER"
+        assert log.target_id == "user_001"
+        assert log.details["reason"] == "policy_violation"
+        assert log.timestamp is not None
     
     def test_log_make_admin_action(self, db_session):
         """Test logging make admin action"""
+        # Create admin user first
+        admin_user = models.User(
+            id="admin_001",
+            name="Admin",
+            email="admin@example.com",
+            is_admin=True
+        )
+        target_user = models.User(
+            id="user_002",
+            name="Target User",
+            email="target2@example.com"
+        )
+        db_session.add_all([admin_user, target_user])
+        db_session.commit()
+        
         log = AdminManager.log_admin_action(
             db=db_session,
             admin_id="admin_001",
@@ -311,8 +344,9 @@ class TestAdminActionLogging:
             details={"level": "moderator"}
         )
         
-        assert log["action"] == "MAKE_ADMIN"
-        assert log["details"]["level"] == "moderator"
+        assert log is not None
+        assert log.action == "MAKE_ADMIN"
+        assert log.details["level"] == "moderator"
 
 
 class TestAdminDataAccess:

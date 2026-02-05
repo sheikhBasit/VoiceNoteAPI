@@ -1,0 +1,114 @@
+{
+  "timestamp": "2026-02-05T13:31:47.193185",
+  "summary": {
+    "graceful_handling_empty.wav": {
+      "count": 1,
+      "min": 1.0,
+      "max": 1.0,
+      "mean": 1.0,
+      "total": 1.0,
+      "unit": "score"
+    },
+    "graceful_handling_corrupted.wav": {
+      "count": 1,
+      "min": 0.5,
+      "max": 0.5,
+      "mean": 0.5,
+      "total": 0.5,
+      "unit": "score"
+    },
+    "graceful_handling_wrong_format.wav": {
+      "count": 1,
+      "min": 1.0,
+      "max": 1.0,
+      "mean": 1.0,
+      "total": 1.0,
+      "unit": "score"
+    },
+    "graceful_handling_very_short_0.5s.wav": {
+      "count": 1,
+      "min": 0.5,
+      "max": 0.5,
+      "mean": 0.5,
+      "total": 0.5,
+      "unit": "score"
+    },
+    "graceful_handling_silent_5s.wav": {
+      "count": 1,
+      "min": 0.5,
+      "max": 0.5,
+      "mean": 0.5,
+      "total": 0.5,
+      "unit": "score"
+    },
+    "graceful_handling_pure_noise_30s.wav": {
+      "count": 1,
+      "min": 0.5,
+      "max": 0.5,
+      "mean": 0.5,
+      "total": 0.5,
+      "unit": "score"
+    },
+    "graceful_degradation_success_rate": {
+      "count": 1,
+      "min": 1.0,
+      "max": 1.0,
+      "mean": 1.0,
+      "total": 1.0,
+      "unit": "ratio"
+    }
+  },
+  "raw_metrics": [
+    {
+      "timestamp": 1770298306.929432,
+      "metric_name": "graceful_handling_empty.wav",
+      "value": 1.0,
+      "unit": "score",
+      "metadata": {}
+    },
+    {
+      "timestamp": 1770298306.9299188,
+      "metric_name": "graceful_handling_corrupted.wav",
+      "value": 0.5,
+      "unit": "score",
+      "metadata": {}
+    },
+    {
+      "timestamp": 1770298307.1900034,
+      "metric_name": "graceful_handling_wrong_format.wav",
+      "value": 1.0,
+      "unit": "score",
+      "metadata": {}
+    },
+    {
+      "timestamp": 1770298307.1904166,
+      "metric_name": "graceful_handling_very_short_0.5s.wav",
+      "value": 0.5,
+      "unit": "score",
+      "metadata": {}
+    },
+    {
+      "timestamp": 1770298307.1907153,
+      "metric_name": "graceful_handling_silent_5s.wav",
+      "value": 0.5,
+      "unit": "score",
+      "metadata": {}
+    },
+    {
+      "timestamp": 1770298307.1924286,
+      "metric_name": "graceful_handling_pure_noise_30s.wav",
+      "value": 0.5,
+      "unit": "score",
+      "metadata": {}
+    },
+    {
+      "timestamp": 1770298307.1924436,
+      "metric_name": "graceful_degradation_success_rate",
+      "value": 1.0,
+      "unit": "ratio",
+      "metadata": {
+        "total_tests": 6
+      }
+    }
+  ]
+}

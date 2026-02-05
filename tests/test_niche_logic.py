@@ -75,7 +75,7 @@ async def test_analytics_logic():
     db = MagicMock()
     
     # Mock return values for counts
-    db.query().join().filter().count.side_effect = [10, 5] # total_tasks, completed_tasks
+    db.query.return_value.filter.return_value.count.side_effect = [10, 5, 2] # total_tasks, completed_tasks, recent_notes
     
     # Mock notes for heatmap
     # Mock notes for heatmap
@@ -86,10 +86,8 @@ async def test_analytics_logic():
         MockNote(title="Project Alpha", summary="Meeting about Alpha project", transcript_groq=long_transcript, transcript_deepgram=None, transcript_android=None),
         MockNote(title="Cricket Match", summary="Discussion on Cricket strategy", transcript_groq=long_transcript, transcript_deepgram=None, transcript_android=None)
     ]
-    db.query().filter().all.return_value = mock_notes
-    
-    # Mock recent notes count
-    db.query().filter().count.return_value = 2
+    # Mock the notes query: .order_by(...).limit(...).all()
+    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = mock_notes
 
     result = AnalyticsService.get_productivity_pulse(db, "user_1")
     

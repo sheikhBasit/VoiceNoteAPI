@@ -2,7 +2,9 @@ import pytest
 import sys
 import os
 import json
-from unittest.mock import MagicMock
+from httpx import AsyncClient, ASGITransport
+from fastapi.testclient import TestClient
+from unittest.mock import MagicMock, patch
 from dotenv import load_dotenv
 
 # Load .env dynamically based on project root
@@ -22,74 +24,82 @@ os.environ["REDIS_URL"] = "memory://"
 # Force dummy API keys to ensure AI clients are initialized (they will be mocked)
 os.environ["GROQ_API_KEY"] = "mock-key-for-testing"
 os.environ["DEEPGRAM_API_KEY"] = "mock-key-for-testing"
-os.environ["ENABLE_AI_PIPELINES"] = "true" # Ensure lazy loading paths are hit if needed
-
-if os.getenv("GITHUB_ACTIONS") == "true":
-    print("DEBUG: conftest.py initialized in GITHUB_ACTIONS")
-    print(f"DEBUG: CELERY_TASK_ALWAYS_EAGER={os.environ['CELERY_TASK_ALWAYS_EAGER']}")
+os.environ["ENABLE_AI_PIPELINES"] = "true"
 
 from app.db.session import SessionLocal, sync_engine as engine
-from app.db.models import Base
+from app.db.models import Base  # This registers all models on Base.metadata
 
-# --- GLOBAL AI MOCKS ---
-# These must be set before any app modules are imported
-# Mock AI libraries defensively
-mock_st = MagicMock()
-mock_st_model = MagicMock()
-mock_st_model.encode.return_value = [0.0] * 384 # Standard for all-MiniLM-L6-v2
-mock_st.SentenceTransformer.return_value = mock_st_model
-sys.modules["sentence_transformers"] = mock_st
-
-sys.modules["deepgram"] = MagicMock()
-sys.modules["deepgram.core"] = MagicMock()
-sys.modules["deepgram.core.api_error"] = MagicMock()
-
-# Mock Groq to return valid JSON structure
-mock_groq = MagicMock()
-mock_groq_client = MagicMock()
-mock_response = MagicMock()
-mock_response.choices = [MagicMock()]
-# Ensure the mock object has a content attribute that is a string
-mock_response.choices[0].message.content = json.dumps({
-    "summary": "This is a test summary",
-    "topics": ["test"],
-    "entities": [],
-    "action_items": [],
-    "sentiment": "neutral"
-})
-mock_groq_client.chat.completions.create.return_value = mock_response
-mock_groq.Groq.return_value = mock_groq_client
-sys.modules["groq"] = mock_groq
-
-sys.modules["pyannote"] = MagicMock()
-sys.modules["pyannote.audio"] = MagicMock()
-sys.modules["noisereduce"] = MagicMock()
-sys.modules["scipy"] = MagicMock()
-sys.modules["scipy.signal"] = MagicMock()
-sys.modules["scipy.stats"] = MagicMock()
-sys.modules["librosa"] = MagicMock()
-sys.modules["soundfile"] = MagicMock()
-# sys.modules["torch"] = MagicMock()
-# sys.modules["numpy"] = MagicMock()
-
-# Configure SentenceTransformer Mock - REMOVED (Use real)
-# Configure NoiseReduce Mock - REMOVED (Use real)
-# Mock Soundfile - REMOVED (Use real)
-
-# from app.db.session import SessionLocal, sync_engine as engine
-# from app.db.models import Base
 @pytest.fixture(scope="session", autouse=True)
-def setup_db():
-    """Create a fresh database schema for the test session."""
-    with engine.connect() as conn:
-        from sqlalchemy import text
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-        conn.commit()
+def mock_ai_services():
+    """Globally mock AI services for all tests."""
+    from unittest.mock import patch, MagicMock
     
-    Base.metadata.drop_all(bind=engine) # Ensure clean start
-    Base.metadata.create_all(bind=engine)
+    # 1. Mock sentence_transformers
+    mock_st = MagicMock()
+    mock_st_model = MagicMock()
+    # Mocking numpy-like behavior
+    mock_embedding = MagicMock()
+    mock_embedding.tolist.return_value = [0.0] * 384
+    mock_st_model.encode.return_value = mock_embedding
+    mock_st.SentenceTransformer.return_value = mock_st_model
+    sys.modules["sentence_transformers"] = mock_st
+    
+    # 2. Mock Deepgram
+    mock_dg = MagicMock()
+    sys.modules["deepgram"] = mock_dg
+    sys.modules["deepgram.core"] = MagicMock()
+    sys.modules["deepgram.core.api_error"] = MagicMock()
+    
+    # 3. Mock Groq
+    mock_groq_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = json.dumps({
+        "summary": "This is a test summary",
+        "title": "Test Note",
+        "priority": "MEDIUM",
+        "topics": ["test"],
+        "entities": [],
+        "action_items": [],
+        "sentiment": "neutral",
+        "key_points": ["point 1"],
+        "project_association": "None",
+        "tasks": [{"description": "Action item", "priority": "HIGH", "deadline": None}],
+        "emotional_tone": "Neutral",
+        "logical_patterns": [],
+        "suggested_questions": []
+    })
+    mock_groq_client.chat.completions.create.return_value = mock_response
+    mock_groq_client.audio.transcriptions.create.return_value = "Mock Transcript"
+    
+    # Patch Groq where it's used to avoid import timing issues
+    patchers = [
+        patch("groq.Groq", return_value=mock_groq_client),
+        patch("app.services.ai_service.Groq", return_value=mock_groq_client, create=True)
+    ]
+    for p in patchers: p.start()
+        
     yield
-    Base.metadata.drop_all(bind=engine) # Cleanup after
+    
+    for p in patchers: p.stop()
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_db(mock_ai_services): 
+    """Create a fresh database schema for the test session."""
+    try:
+        with engine.connect() as conn:
+            from sqlalchemy import text
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            conn.commit()
+        
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"DEBUG: setup_db - FAILED with error: {e}")
+        raise
+    
+    yield
+    # No drop_all at end to avoid issues with concurrent runs
 
 @pytest.fixture
 def db():
@@ -97,14 +107,22 @@ def db():
     connection = engine.connect()
     transaction = connection.begin()
     session = SessionLocal(bind=connection)
-    
     yield session
-    
     session.close()
     transaction.rollback()
     connection.close()
 
 @pytest.fixture
 def db_session(db):
-    """Alias for db fixture to support legacy tests."""
     return db
+
+@pytest.fixture
+def client():
+    from app.main import app
+    return TestClient(app)
+
+@pytest.fixture
+async def async_client():
+    from app.main import app
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
