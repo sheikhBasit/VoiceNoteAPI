@@ -49,4 +49,5 @@ class SyncResponse(BaseModel):
     user: UserResponse
     access_token: str
     token_type: str = "bearer"
+    is_new_user: bool = False
     model_config = ConfigDict(from_attributes=True)

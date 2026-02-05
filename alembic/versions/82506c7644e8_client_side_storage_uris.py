@@ -20,9 +20,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    pass
+    # Renames for Note table
+    op.execute("ALTER TABLE notes RENAME COLUMN document_urls TO document_uris")
+    op.execute("ALTER TABLE notes ADD COLUMN IF NOT EXISTS image_uris JSONB DEFAULT '[]'")
+    
+    # Renames for Task table
+    op.execute("ALTER TABLE tasks RENAME COLUMN image_urls TO image_uris")
+    op.execute("ALTER TABLE tasks RENAME COLUMN document_urls TO document_uris")
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    pass
+    op.execute("ALTER TABLE notes RENAME COLUMN document_uris TO document_urls")
+    op.drop_column('notes', 'image_uris')
+    
+    op.execute("ALTER TABLE tasks RENAME COLUMN image_uris TO image_urls")
+    op.execute("ALTER TABLE tasks RENAME COLUMN document_uris TO document_urls")

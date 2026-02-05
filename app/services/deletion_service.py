@@ -80,12 +80,25 @@ class DeletionService:
                 task.deletion_reason = f"Cascade from user deletion: {user_id}"
                 task.can_restore = True
             
-            # Soft delete all notes
+            # Soft delete all notes and their associated tasks
             notes = db.query(Note).filter(
                 and_(Note.user_id == user_id, Note.is_deleted == False)
             ).all()
             
             for note in notes:
+                # Cascade to tasks of this note
+                tasks_of_note = db.query(Task).filter(
+                    and_(Task.note_id == note.id, Task.is_deleted == False)
+                ).all()
+                for t in tasks_of_note:
+                    if not t.is_deleted:
+                        t.is_deleted = True
+                        t.deleted_at = timestamp
+                        t.deleted_by = deleted_by
+                        t.deletion_reason = f"Cascade from note deletion (User cascade): {user_id}"
+                        t.can_restore = True
+                        tasks_count += 1
+                
                 note.is_deleted = True
                 note.deleted_at = timestamp
                 note.deleted_by = deleted_by

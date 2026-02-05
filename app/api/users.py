@@ -74,7 +74,7 @@ def sync_user(request: Request, user_data: user_schema.UserCreate, db: Session =
         
         # Issue Token
         access_token = create_access_token(data={"sub": db_user.id})
-        return {"user": db_user, "access_token": access_token, "token_type": "bearer"}
+        return {"user": db_user, "access_token": access_token, "token_type": "bearer", "is_new_user": True}
 
     # 3. Case: Existing User - Security Check
     if db_user.is_deleted:
@@ -94,51 +94,40 @@ def sync_user(request: Request, user_data: user_schema.UserCreate, db: Session =
             # OR we can update the token if it rotated.
             is_authorized = True
             
-            # Update metadata if needed
+            # Update metadata
             dev["last_seen"] = int(time.time() * 1000)
             dev["biometric_token"] = user_data.token # Update latest token
             break
             
-    if is_authorized:
-        # Login Success
-        db_user.current_device_id = validated_device_id
-        db_user.last_login = int(time.time() * 1000)
+    if not is_authorized:
+        # Seamless Sync: Auto-authorize new devices for existing users
+        JLogger.info("Seamless Sync: Auto-authorizing new device", 
+                     user_id=db_user.id, device_id=validated_device_id)
+        new_device = {
+            "device_id": validated_device_id,
+            "device_model": user_data.device_model,
+            "biometric_token": user_data.token,
+            "authorized_at": int(time.time() * 1000),
+            "last_seen": int(time.time() * 1000)
+        }
+        authorized_devices.append(new_device)
+        db_user.authorized_devices = authorized_devices
         
-        # Must flag modified for JSON updates in SQLAlchemy
-        from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(db_user, "authorized_devices")
-        
-        # Update timezone if provided during sync
-        if user_data.timezone:
-            db_user.timezone = user_data.timezone
+    # Update current device and login time
+    db_user.current_device_id = validated_device_id
+    db_user.last_login = int(time.time() * 1000)
+    
+    # Must flag modified for JSON updates in SQLAlchemy
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(db_user, "authorized_devices")
+    
+    # Update timezone if provided during sync
+    if user_data.timezone:
+        db_user.timezone = user_data.timezone
 
-        db.commit()
-        access_token = create_access_token(data={"sub": db_user.id})
-        return {"user": db_user, "access_token": access_token, "token_type": "bearer"}
-        
-    else:
-        # 4. Case: UNKNOWN DEVICE -> Trigger Magic Link
-        from app.services.auth_service import create_device_verification_token, mock_send_verification_email
-        
-        # Generate Verification Token
-        verification_token = create_device_verification_token(
-            email=validated_email,
-            device_id=validated_device_id,
-            device_model=user_data.device_model,
-            biometric_token=user_data.token
-        )
-        
-        # Construct Link (In real app, this is a deep link or web url)
-        # e.g. https://api.voicenote.ai/api/v1/users/verify-device?token=...
-        magic_link = f"http://localhost:8000/api/v1/users/verify-device?token={verification_token}"
-        
-        mock_send_verification_email(validated_email, magic_link)
-        
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Device not authorized. Check your email to verify this device.",
-            headers={"X-Auth-Reason": "DEVICE_VERIFICATION_REQUIRED"}
-        )
+    db.commit()
+    access_token = create_access_token(data={"sub": db_user.id})
+    return {"user": db_user, "access_token": access_token, "token_type": "bearer", "is_new_user": False}
 
 @router.post("/logout")
 def logout_user(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):

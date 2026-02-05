@@ -10,8 +10,8 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(dotenv_path=os.path.join(PROJECT_ROOT, ".env"))
 
 # Force local DB connection for pytest if not in Docker/CI
-if not os.getenv("DATABASE_URL"):
-    os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5432/voicenote"
+if not os.getenv("DATABASE_URL") or "localhost" in os.getenv("DATABASE_URL", ""):
+    os.environ["DATABASE_URL"] = "postgresql+asyncpg://postgres:password@localhost:5433/voicenote_test"
 
 # Force Celery to be eager in tests to avoid connection errors
 os.environ["CELERY_TASK_ALWAYS_EAGER"] = "True"
@@ -64,6 +64,11 @@ sys.modules["groq"] = mock_groq
 sys.modules["pyannote"] = MagicMock()
 sys.modules["pyannote.audio"] = MagicMock()
 sys.modules["noisereduce"] = MagicMock()
+sys.modules["scipy"] = MagicMock()
+sys.modules["scipy.signal"] = MagicMock()
+sys.modules["scipy.stats"] = MagicMock()
+sys.modules["librosa"] = MagicMock()
+sys.modules["soundfile"] = MagicMock()
 # sys.modules["torch"] = MagicMock()
 # sys.modules["numpy"] = MagicMock()
 

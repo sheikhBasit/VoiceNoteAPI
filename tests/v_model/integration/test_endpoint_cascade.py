@@ -63,6 +63,7 @@ def db_session():
 @pytest.fixture
 def client(db_session):
     from app.services.auth_service import get_current_user
+    from app.utils.security import verify_device_signature
     from fastapi import Request, HTTPException  # Ensure imports
 
     def override_get_db():
@@ -81,9 +82,11 @@ def client(db_session):
     
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[verify_device_signature] = lambda: True
     yield TestClient(app)
     del app.dependency_overrides[get_db]
     del app.dependency_overrides[get_current_user]
+    del app.dependency_overrides[verify_device_signature]
 
 class TestEndpointCascadeIntegration:
     """Integration tests for API endpoints."""
