@@ -152,7 +152,7 @@ test:
 
 test-quick:
 	@echo "⚡ Running quick tests (unit + fast integration)..."
-	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/test_core.py tests/test_main.py tests/test_new_endpoints.py -v -m "not load and not stress and not performance"
+	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/test_main.py tests/test_new_endpoints.py -v -m "not load and not stress and not performance"
 
 test-fast:
 	@echo "⚡ Running failed tests first..."
@@ -219,7 +219,7 @@ clean:
 	@echo "🧹 Cleaning up..."
 	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@rm -rf uploads/* 2>/dev/null || true
-	@rm -f .pytest_cache 2>/dev/null || true
+	@rm -f .pytest_cache test.db 2>/dev/null || true
 	@rm -rf htmlcov/ .coverage 2>/dev/null || true
 	@echo "✅ Cleanup complete!"
 
