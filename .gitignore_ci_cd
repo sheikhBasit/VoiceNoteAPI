@@ -1,0 +1,143 @@
+# Environment Files - NEVER COMMIT SECRETS
+.env
+.env.local
+.env.production
+.env.staging
+.env.dev
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.vscode
+*.sublime-project
+*.sublime-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+ENV/
+env/
+.venv
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+.coverage.*
+*.cover
+*.py,cover
+.mypy_cache/
+.dmypy.json
+dmypy.json
+test-results/
+results/
+
+# Logging
+*.log
+logs/
+*.log.*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+test.db
+*.sql
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Uploads & Generated Files
+uploads/
+temp/
+tmp/
+cache/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SSL Certificates (keep only in secure locations)
+*.pem
+*.key
+*.crt
+certs/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backups
+backups/
+*.backup
+*.bak
+
+# Local development
+.env.personal
+.env.dev.local
+local_settings.py
+
+# API Keys & Secrets (security)
+credentials.json
+secrets.json
+secret_key.txt
+
+# Monitoring & Metrics
+prometheus/
+grafana/
+
+# CI/CD
+.github/workflows/*.local
+ci-temp/
+
+# IDE specific
+.vscode/settings.json
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries
+.idea/libraries
+.idea/shelf
+
+# Node (if using frontend)
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+
+# Build artifacts
+*.tar
+*.tar.gz
+*.zip

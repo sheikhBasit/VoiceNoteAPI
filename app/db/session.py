@@ -36,7 +36,15 @@ if "sqlite" not in ASYNC_DATABASE_URL or os.getenv("USE_ASYNCSQLITE", "false") =
         pass # aiosqlite not installed, logic falls back to sync if no async endpoints called
 
 # Sync Setup
-sync_engine = create_engine(SYNC_DATABASE_URL, echo=False, connect_args=connect_args if "sqlite" in SYNC_DATABASE_URL else {})
+sync_engine = create_engine(
+    SYNC_DATABASE_URL, 
+    echo=False, 
+    connect_args=connect_args if "sqlite" in SYNC_DATABASE_URL else {},
+    pool_size=20, # Increased from default 5
+    max_overflow=10, 
+    pool_pre_ping=True, # Verify connection health before use
+    pool_recycle=3600 # Prevent stale connections
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
 
 Base = declarative_base()

@@ -48,9 +48,11 @@ class NoteUpdate(BaseModel):
 
 class TaskSummary(BaseModel):
     id: str
+    title: Optional[str] = None
     description: str
     is_done: bool
     priority: Priority
+    actions: Optional[dict] = None
     model_config = ConfigDict(from_attributes=True)
 
 class NoteResponse(NoteBase):
@@ -71,6 +73,8 @@ class NoteResponse(NoteBase):
     is_deleted: bool
     deleted_at: Optional[int] = None
     is_encrypted: bool = False
+    tags: List[str] = []
+    semantic_analysis: Optional[dict] = None
     model_config = ConfigDict(from_attributes=True)
 
 class NoteAIOutput(BaseModel):
@@ -80,6 +84,7 @@ class NoteAIOutput(BaseModel):
     priority: Priority
     transcript: str  # Formatted with speaker labels
     tasks: List[dict] = []  # Avoid circular import
+    tags: List[str] = [] # New
     metadata: Optional[dict] = None
 
 class NoteSemanticAnalysis(BaseModel):

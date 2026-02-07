@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, BigInteger, Boolean, ForeignKey, Enum, Text, JSON, Integer
+from sqlalchemy import Column, String, BigInteger, Boolean, ForeignKey, Enum, Text, JSON, Integer, Index
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
 from .session import Base
@@ -146,10 +146,16 @@ class Note(Base):
     embedding_version = Column(Integer, default=1) # Cache versioning
     languages = Column(JSONB, default=lambda: []) # New: Langs detected or hinted
     stt_model = Column(String, default="nova") # New: nova, whisper, both
+    tags = Column(JSONB, default=list) # New: Dynamic AI-generated categories
     
     # AI Background Results (NEW)
     semantic_analysis = Column(JSONB, nullable=True) # Result of background analysis
     ai_responses = Column(JSONB, default=lambda: [])      # History of Q&A task results
+    
+    # Index for JSONB tags if we want to search by them effectively
+    __table_args__ = (
+        Index('ix_notes_tags', tags, postgresql_using='gin'),
+    )
     
     # Relationships with CASCADE deletion
     user = relationship("User", back_populates="notes")
@@ -176,7 +182,8 @@ class Task(Base):
     id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     note_id = Column(String, ForeignKey("notes.id", ondelete="CASCADE"), index=True, nullable=True)
-    description = Column(Text)
+    title = Column(String) # Brief title
+    description = Column(Text) # Detailed instructions
     is_done = Column(Boolean, default=False, index=True)
     deadline = Column(BigInteger, nullable=True, index=True)
     priority = Column(Enum(Priority), default=Priority.MEDIUM, index=True)

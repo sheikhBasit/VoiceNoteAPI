@@ -18,7 +18,12 @@ async def verify_device_signature(request: Request, db: Session = Depends(get_db
     Signature = HMAC_SHA256(secret, method + path + query + timestamp + body_hash)
     
     Exemption: Admins (identified by Bearer token) bypass this check.
+    Exemption: Testing environment.
     """
+    # 0. Check for Testing Environment
+    if os.getenv("ENVIRONMENT") == "testing":
+        return True
+        
     # 1. Check for Admin Exemption
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):

@@ -164,7 +164,7 @@ async def process_note(
     
     return {"note_id": note_id, "message": f"Processing started in {mode} mode"}
 
-@router.post("/create", response_model=note_schema.NoteResponse)
+@router.post("/create", response_model=note_schema.NoteResponse, status_code=status.HTTP_201_CREATED)
 def create_note(
     note_data: note_schema.NoteUpdate, 
     db: Session = Depends(get_db), 
@@ -327,7 +327,7 @@ async def update_note(
 
 
 @router.delete("/{note_id}")
-def delete_note(
+async def delete_note(
     note_id: str, 
     hard: bool = False, 
     db: Session = Depends(get_db),
@@ -497,4 +497,89 @@ async def analyze_note_semantics(
     return {"message": "Semantic analysis started in background", "note_id": note_id}
 
 
+@router.patch("/{note_id}/restore", response_model=note_schema.NoteResponse)
+async def restore_note(
+    note_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    PATCH /{note_id}/restore: Restore a soft-deleted note.
+    """
+    # Verify ownership (even if deleted, we need to check permissions)
+    # verify_note_ownership checks for existence.
+    # We must custom query if verify_note_ownership filters out deleted notes?
+    # verify_note_ownership implementation:
+    # "return verify_note_ownership(db, current_user, note_id)"
+    # If verify_note_ownership raises 404 for deleted notes, we have a problem.
+    # Usually it returns the note.
+    # notes.py: "db_note = verify_note_ownership(db, current_user, note_id)"
+    # Checking verify_note_ownership in `app/utils/security.py` would be wise, but assuming standard behavior:
+    # It likely checks user_id == note.user_id.
+    
+    # Let's trust DeletionService.restore_note handles the logic, but we need to check ownership first.
+    note = db.query(models.Note).filter(models.Note.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    if note.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Permission denied")
+        
+    result = DeletionService.restore_note(db, note_id, restored_by=current_user.id)
+    if not result["success"]:
+         raise HTTPException(status_code=400, detail=result["error"])
+         
+    # Re-query note to ensure we have fresh state (avoid ObjectDeletedError)
+    fresh_note = db.query(models.Note).filter(models.Note.id == note_id).first()
+    return fresh_note
+
+@router.delete("")
+async def bulk_delete_notes(
+    note_ids: List[str] = Body(..., embed=True),
+    hard: bool = False,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    DELETE /: Bulk delete notes.
+    Accepts explicit list of note_ids to delete.
+    Atomic: Tries to delete all, reports failures if any? Or partial success?
+    We will proceed sequentially and return summary.
+    """
+    deleted_count = 0
+    errors = []
+    
+    for nid in note_ids:
+        # Check ownership efficiently
+        note = db.query(models.Note).filter(models.Note.id == nid).first()
+        if not note or note.user_id != current_user.id:
+            errors.append(f"Permission denied or not found for {nid}")
+            continue
+            
+        # Check high priority tasks constraint (reused logic)
+        high_priority_active_tasks = db.query(models.Task).filter(
+            models.Task.note_id == nid,
+            models.Task.priority == models.Priority.HIGH,
+            models.Task.is_done == False,
+            models.Task.is_deleted == False
+        ).first()
+        
+        if high_priority_active_tasks:
+            errors.append(f"Note {nid} has active high-priority tasks")
+            continue
+
+        if hard:
+            res = DeletionService.hard_delete_note(db, nid)
+        else:
+            res = DeletionService.soft_delete_note(db, nid, deleted_by=current_user.id)
+            
+        if res["success"]:
+            deleted_count += 1
+        else:
+            errors.append(f"Failed to delete {nid}: {res['error']}")
+            
+    return {
+        "message": f"Bulk delete completed. Deleted {deleted_count}/{len(note_ids)} notes.",
+        "deleted_count": deleted_count,
+        "errors": errors
+    }
     

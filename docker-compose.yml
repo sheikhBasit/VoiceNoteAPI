@@ -172,7 +172,7 @@ services:
     restart: unless-stopped
     command: celery -A app.worker.celery_app beat -l info
     healthcheck:
-      test: [ "CMD-SHELL", "ps aux | grep 'celery beat' | grep -v grep" ]
+      test: [ "CMD-SHELL", "pgrep -f 'celery.*beat' || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3

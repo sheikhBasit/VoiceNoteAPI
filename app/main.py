@@ -1,5 +1,6 @@
 from app.utils.json_logger import JLogger
 from fastapi import FastAPI, Request, Depends
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -32,6 +33,9 @@ app = FastAPI(
     }
 )
 
+# Apply Compression (Speeds up large JSON responses like notes lists)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # Add security scheme for Swagger UI
 from fastapi.openapi.utils import get_openapi
 
@@ -55,18 +59,42 @@ def custom_openapi():
         }
     }
     
-    # Replace all HTTPBearer references with BearerAuth
-    for path in openapi_schema.get("paths", {}).values():
-        for operation in path.values():
-            if isinstance(operation, dict) and "security" in operation:
-                # Replace HTTPBearer with BearerAuth
-                operation["security"] = [
-                    {"BearerAuth": []} if "HTTPBearer" in sec else sec
-                    for sec in operation["security"]
-                ]
+    # Endpoints that do NOT require authentication
+    public_endpoints = {
+        "/api/v1/users/sync": ["post"],
+        "/api/v1/users/verify-device": ["get"],
+        "/api/v1/users/request-device-auth": ["post"],
+    }
     
-    # Apply security globally to all endpoints (fallback)
-    openapi_schema["security"] = [{"BearerAuth": []}]
+    # Replace all HTTPBearer references with BearerAuth
+    # And remove security from public endpoints
+    for path, operations in openapi_schema.get("paths", {}).items():
+        for method, operation in operations.items():
+            if isinstance(operation, dict):
+                # Check if this is a public endpoint
+                is_public = False
+                for public_path, public_methods in public_endpoints.items():
+                    if path.lower() == public_path.lower() and method.lower() in public_methods:
+                        is_public = True
+                        break
+                
+                if is_public:
+                    # Remove security requirement from public endpoints
+                    if "security" in operation:
+                        del operation["security"]
+                elif "security" in operation:
+                    # Replace HTTPBearer with BearerAuth for protected endpoints
+                    operation["security"] = [
+                        {"BearerAuth": []} if "HTTPBearer" in sec else sec
+                        for sec in operation["security"]
+                    ]
+                else:
+                    # Add security to endpoints that have dependencies but no explicit security
+                    if method.lower() not in ["options", "head"]:
+                        operation["security"] = [{"BearerAuth": []}]
+    
+    # Do NOT apply security globally - let endpoints define their own
+    # openapi_schema["security"] = [{"BearerAuth": []}]
     
     app.openapi_schema = openapi_schema
     return app.openapi_schema
@@ -179,6 +207,14 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error: A critical failure occurred. Our engineers have been notified."},
     )
 
+from fastapi.exceptions import RequestValidationError
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc)},
+    )
+
 # Register routers
 app.include_router(users.router)
 app.include_router(notes.router)
@@ -241,7 +277,13 @@ class RequestBodyCacheMiddleware:
 
 @app.on_event("startup")
 async def startup_event():
-    pass
+    """Warm up AI services and local models."""
+    JLogger.info("Application starting up: Warming up AI models...")
+    from app.services.ai_service import AIService
+    service = AIService()
+    # Pre-load local embedding model (SentenceTransformer)
+    service._get_local_embedding_model()
+    JLogger.info("Model warmup complete.")
 
 app.add_middleware(RequestBodyCacheMiddleware)
 

@@ -10,18 +10,22 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from fastapi import Request, Body, status
 from app.utils.json_logger import JLogger
+from app.utils.user_roles import is_admin
+from app.api.dependencies import require_analytics_access
 from app.worker.task import process_ai_query_task
 from app.services.auth_service import get_current_user
 import os
+import time
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI & Insights"])
 # ai_service is instantiated inside endpoints to avoid module-level hangs
 # ai_service = AIService()
 
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"))
+ai_service = AIService()
 
 @router.post("/search", response_model=List[note_schema.NoteResponse])
-@limiter.limit("5/hour")
+@limiter.limit("60/minute")
 async def semantic_search(
     request: Request, 
     query: str, 
@@ -29,8 +33,9 @@ async def semantic_search(
     current_user: models.User = Depends(get_current_user)
 ):
     user_id = current_user.id
-    ai_service = AIService()
+    start_time = time.time()
     query_vector = ai_service.generate_embedding_sync(query)
+    embedding_time = time.time() - start_time
     
     # EXEMPTION: Admins can search across all notes
     query_obj = db.query(models.Note).filter(
@@ -38,18 +43,23 @@ async def semantic_search(
         models.Note.is_encrypted == False
     )
     
-    if not current_user.is_admin:
+    if not is_admin(current_user):  # Using new utility function
         query_obj = query_obj.filter(models.Note.user_id == user_id)
         
+    # Use cosine_distance to match the HNSW index (vector_cosine_ops)
     results = query_obj.order_by(
-        models.Note.embedding.l2_distance(query_vector)
+        models.Note.embedding.cosine_distance(query_vector)
     ).limit(5).all()
+    
+    search_time = time.time() - (start_time + embedding_time)
     
     JLogger.info("Semantic search performed", 
                  user_id=user_id, 
-                 is_admin=current_user.is_admin,
+                 is_admin=is_admin(current_user), 
                  query=query, 
-                 results_count=len(results))
+                 results_count=len(results),
+                 embedding_time_ms=int(embedding_time * 1000),
+                 search_time_ms=int(search_time * 1000))
     
     return results
 
@@ -75,7 +85,7 @@ def get_user_stats(
         models.Note.is_deleted == False
     )
     
-    if not current_user.is_admin:
+    if not is_admin(current_user):  # Using new utility function
         task_query = task_query.filter(models.Task.user_id == user_id)
         note_query = note_query.filter(models.Note.user_id == user_id)
 
@@ -85,6 +95,6 @@ def get_user_stats(
     return {
         "high_priority_pending_tasks": high_priority_count,
         "total_active_notes": total_notes,
-        "scope": "GLOBAL" if current_user.is_admin else "PRIVATE",
+        "scope": "GLOBAL" if is_admin(current_user) else "PRIVATE",  # Using new utility function
         "suggestion": f"You have {high_priority_count} critical items. Should I summarize them?"
     }

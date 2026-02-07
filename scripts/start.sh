@@ -7,4 +7,4 @@ alembic -c /app/alembic.ini upgrade head || echo "Migration skipped or failed, c
 
 # Start application
 echo "Starting application..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app

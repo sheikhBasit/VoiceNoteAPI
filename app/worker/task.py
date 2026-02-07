@@ -4,6 +4,7 @@ import json
 import uuid
 from app.core.audio import preprocess_audio_pipeline
 from app.services.ai_service import AIService
+from app.utils.ai_service_utils import AIServiceError
 from app.services.calendar_service import CalendarService # New
 from app.db.session import SessionLocal
 from app.db.models import Note, Task, NoteStatus, Priority, User
@@ -83,30 +84,39 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
             actual_local_path = local_tmp_path
             JLogger.info("Worker: Downloaded file from MinIO", note_id=note_id, storage_key=local_file_path)
 
-        # Robustness Check: If local file is gone, fallback to raw_audio_url
-        if not os.path.exists(actual_local_path):
-            JLogger.warning("Local file missing in worker, attempting fallback to raw_audio_url", note_id=note_id)
+        # WAIT for file to be ready (Docker volume sync/flush lag)
+        max_waits = 10
+        wait_count = 0
+        while wait_count < max_waits:
+            if os.path.exists(actual_local_path) and os.path.getsize(actual_local_path) > 0:
+                break
+            JLogger.info("Worker: File is empty or missing, waiting for sync...", path=actual_local_path, attempt=wait_count)
+            time.sleep(1)
+            wait_count += 1
+
+        # Robustness Check: If local file is still gone or empty, attempt recovery if possible
+        if not os.path.exists(actual_local_path) or os.path.getsize(actual_local_path) == 0:
+            JLogger.warning("Local file missing or empty in worker after wait, attempting recovery", note_id=note_id, path=actual_local_path)
             note = db.query(Note).filter(Note.id == note_id).first()
             if note and note.raw_audio_url:
-                local_tmp_path = os.path.join(tempfile.gettempdir(), f"fallback_{note_id}.wav")
-                if note.raw_audio_url.startswith("uploads/"):
-                     # It was a file, but maybe missing in this worker? (Shared volumes help here)
-                     actual_local_path = note.raw_audio_url
-                else:
-                    from app.services.storage_service import StorageService
-                    StorageService().download_file(note.raw_audio_url, local_tmp_path)
-                    actual_local_path = local_tmp_path
-                response = requests.get(note.raw_audio_url)
-                if response.status_code == 200:
-                    with open(local_file_path, "wb") as f:
-                        f.write(response.content)
-                    JLogger.info("Successfully recovered audio from Cloudinary", note_id=note_id)
-                else:
-                    raise FileNotFoundError(f"Local file missing and fallback failed for {note_id}")
+                # If it's a URL (http), try to download it
+                if note.raw_audio_url.startswith("http"):
+                    try:
+                        response = requests.get(note.raw_audio_url, timeout=30)
+                        if response.status_code == 200:
+                            os.makedirs(os.path.dirname(actual_local_path), exist_ok=True)
+                            with open(actual_local_path, "wb") as f:
+                                f.write(response.content)
+                            JLogger.info("Successfully recovered audio from URL", note_id=note_id, url=note.raw_audio_url)
+                    except Exception as e:
+                        JLogger.error("Failed to recover audio from URL", note_id=note_id, error=str(e))
+                elif not os.path.exists(actual_local_path):
+                    # It was a local path but is still missing
+                    raise FileNotFoundError(f"Local file {actual_local_path} missing in worker for note {note_id}")
             else:
-                raise FileNotFoundError(f"Local file missing and no raw_audio_url available for {note_id}")
+                raise FileNotFoundError(f"Local file {actual_local_path} missing or empty and no recovery URL for {note_id}")
 
-        processed_path = preprocess_audio_pipeline(local_file_path)
+        processed_path = preprocess_audio_pipeline(actual_local_path)
 
         # 3. Update audio_url with processed path (as a local URL)
         audio_url = f"/{processed_path}"
@@ -129,7 +139,7 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
             stt_model=stt_model,
             user_instruction=user_instr, 
             jargons=user_jargons,
-            note_created_at=note.created_at,  # NEW: Pass note creation timestamp
+            note_created_at=note.timestamp,  # NEW: Pass note creation timestamp
             user_timezone=user_timezone  # NEW: Pass user timezone for temporal context
         )
         JLogger.info("Worker: AI analysis complete", note_id=note_id, tasks_found=len(analysis.tasks))
@@ -160,6 +170,7 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
         note.transcript_android = analysis.transcript # Global fallback
         note.audio_url = audio_url
         note.embedding = embedding
+        note.tags = analysis.tags # NEW: Save AI generated tags
         note.embedding_version = 1 # Initial cache version
         note.status = NoteStatus.DONE
         broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "SAVING_NOTE", "message": "Saving note insights and generated tasks..."})
@@ -232,19 +243,29 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
                     message=wa_data.get("message", "")
                 )
             
+            # Generate Map action
+            if "map" in actions_metadata:
+                map_data = actions_metadata["map"]
+                suggested_actions["map"] = ActionGenerator.generate_map_link(
+                    location=map_data.get("location", ""),
+                    query=map_data.get("query", "")
+                )
+
             # Generate AI Prompt action
             if "ai_prompt" in actions_metadata:
                 ai_data = actions_metadata["ai_prompt"]
                 suggested_actions["ai_prompt"] = ActionGenerator.generate_ai_prompt(
                     model=ai_data.get("model", "chatgpt"),
-                    task_description=t_data["description"] if isinstance(t_data, dict) else t_data.description,
-                    context=note.summary or ""
+                    task_description=t_data.get("description") if isinstance(t_data, dict) else t_data.description,
+                    context=note.summary or "",
+                    custom_prompt=ai_data.get("prompt")
                 )
             
             new_task = Task(
                 id=str(uuid.uuid4()),
                 user_id=note.user_id,
                 note_id=note_id,
+                title=t_data.get("title") or t_data.get("description", "Task")[:100],
                 description=t_data["description"] if isinstance(t_data, dict) else t_data.description,
                 priority=getattr(Priority, t_data["priority"] if isinstance(t_data, dict) else t_data.priority, Priority.MEDIUM),
                 deadline=t_data["deadline"] if isinstance(t_data, dict) else t_data.deadline,
@@ -252,6 +273,7 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
             )
             db.add(new_task)
             extracted_tasks.append({
+                "title": new_task.title,
                 "description": new_task.description,
                 "deadline": new_task.deadline
             })
@@ -262,21 +284,57 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
         broadcast_ws_update(note_owner_id, "PIPELINE_STEP", {"note_id": note_id, "step": "FINALIZING", "message": "Checking for calendar conflicts and finalizing tasks..."})
         user = db.query(Note).filter(Note.id == note_id).first().user
         if user and extracted_tasks:
-            events = CalendarService.get_user_events(user.id)
-
-            # NEW: Using optimized synchronous conflict detection (Mapping 'title' to context)
-            conflicts = ai_service.detect_conflicts_sync(analysis.summary, [str(e.get('title', '')) for e in events])
+            # NEW: Parallel Conflict Detection (Speed Optimization)
+            from concurrent.futures import ThreadPoolExecutor
             
-            for conflict in conflicts:
-                # Get first available biometric token for notification
+            def check_schedule():
+                events = CalendarService.get_user_events(user.id)
+                return ai_service.detect_conflicts_sync(
+                    analysis.summary, 
+                    [str(e.get('title', '')) for e in events], 
+                    context_type="schedule"
+                )
+            
+            def check_notes():
+                similar_notes = db.query(Note).filter(
+                    Note.user_id == user.id,
+                    Note.id != note_id,
+                    Note.is_deleted == False
+                ).order_by(
+                    Note.embedding.cosine_distance(embedding)
+                ).limit(5).all()
+                
+                return ai_service.detect_conflicts_sync(
+                    analysis.summary, 
+                    [f"Title: {n.title}\nSummary: {n.summary}" for n in similar_notes], 
+                    context_type="previous_notes"
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                future_schedule = executor.submit(check_schedule)
+                future_notes = executor.submit(check_notes)
+                
+                schedule_conflicts = future_schedule.result()
+                note_conflicts = future_notes.result()
+
+            # Combine and notify
+            all_conflicts = [
+                {"type": "SCHEDULE", **c} for c in schedule_conflicts
+            ] + [
+                {"type": "FACTUAL", **c} for c in note_conflicts
+            ]
+
+            for conflict in all_conflicts:
+                # Get device token
                 device_token = "mock_token"
                 if user.authorized_devices:
                     device_token = user.authorized_devices[0].get("biometric_token", "mock_token")
                 
+                msg_prefix = "📅 Schedule" if conflict["type"] == "SCHEDULE" else "⚠️ Factual"
                 send_push_notification.delay(
                     device_token,
-                    title="📅 Schedule Conflict Alert!",
-                    body=f"Conflict: {conflict.get('fact', 'Unknown')} vs {conflict.get('conflict', 'Existing event')}",
+                    title=f"{msg_prefix} Conflict Alert!",
+                    body=f"{conflict['explanation']} (Fact: {conflict['fact']} vs {conflict['conflict']})",
                     data={"type": "CONFLICT", "conflict": conflict}
                 )
 
@@ -287,6 +345,16 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
             os.remove(local_file_path)
             
         return {"status": "success", "note_id": note_id, "conflicts_found": len(conflicts) if 'conflicts' in locals() else 0}
+
+    except AIServiceError as e:
+        JLogger.warning("Worker: AI Service Error (Likely silent or invalid audio)", note_id=note_id, error=str(e))
+        db.query(Note).filter(Note.id == note_id).update({
+            "status": NoteStatus.DONE,
+            "summary": f"Note processed but no speech was detected: {str(e)}",
+            "title": "Empty Note"
+        })
+        db.commit()
+        broadcast_ws_update(note_owner_id, "NOTE_STATUS", {"note_id": note_id, "status": "DONE", "message": str(e)})
 
     except Exception as exc:
         JLogger.exception("Worker: Note processing pipeline failed", note_id=note_id)
@@ -735,3 +803,15 @@ def sync_external_service_task(note_id: str, service_name: str, user_id: str):
     finally:
         db.close()
 
+from celery.signals import worker_ready
+
+@worker_ready.connect
+def warmup_worker(sender, **kwargs):
+    """Warm up AI models on worker startup."""
+    try:
+        JLogger.info("Worker ready: Warming up AI embedding model...")
+        service = AIService()
+        service._get_local_embedding_model()
+        JLogger.info("Worker warmup complete.")
+    except Exception as e:
+        JLogger.error("Worker warmup failed", error=str(e))

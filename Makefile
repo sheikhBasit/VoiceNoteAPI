@@ -1,46 +1,69 @@
-# VoiceNote Docker Compose Commands
+# VoiceNote Docker Compose Commands & Development Tools
 # Variables
 COMPOSE=docker compose
 API_SERVICE=api
 WORKER_SERVICE=celery_worker
 BEAT_SERVICE=celery_beat
 
-.PHONY: help build up down restart logs test clean seed seed-sql seed-python db-shell db-reset health status run
+.PHONY: help build up down restart logs test clean seed seed-sql seed-python db-shell db-reset health status run dev format lint test-quick test-fast install-hooks
 
 help:
 	@echo "========================================="
-	@echo "VoiceNote AI Backend - Docker Commands"
+	@echo "VoiceNote AI Backend - Development CLI"
 	@echo "========================================="
-	@echo "Build & Deployment:"
+	@echo ""
+	@echo "🚀 QUICK START:"
+	@echo "  make dev                - Start development environment"
+	@echo "  make install-hooks      - Setup git hooks for CI/CD"
+	@echo ""
+	@echo "🏗️  BUILD & DEPLOYMENT:"
 	@echo "  make build              - Build all Docker containers"
-	@echo "  make up                 - Start all services (detached)"
+	@echo "  make build-no-cache     - Build without cache"
+	@echo "  make up                 - Start all services"
 	@echo "  make down               - Stop all services"
 	@echo "  make restart            - Restart all services"
-	@echo "  make status             - Show status of all services"
+	@echo "  make status             - Show service status"
 	@echo ""
-	@echo "Logs & Debugging:"
-	@echo "  make logs               - View real-time logs (all services)"
+	@echo "📊 LOGS & DEBUGGING:"
+	@echo "  make logs               - View all logs"
 	@echo "  make logs-api           - View API logs only"
 	@echo "  make logs-worker        - View Celery Worker logs"
 	@echo "  make logs-beat          - View Celery Beat logs"
 	@echo "  make logs-db            - View Database logs"
 	@echo ""
-	@echo "Database Management:"
+	@echo "🗄️  DATABASE MANAGEMENT:"
 	@echo "  make seed               - Seed database (SQL + Python)"
-	@echo "  make seed-sql           - Seed via SQL scripts only"
+	@echo "  make seed-sql           - Seed via SQL scripts"
 	@echo "  make seed-python        - Seed via Python ORM"
 	@echo "  make db-shell           - Open PostgreSQL shell"
 	@echo "  make db-reset           - Reset database completely"
 	@echo "  make db-backup          - Backup database"
 	@echo ""
-	@echo "Testing & Quality:"
+	@echo "🧪 TESTING:"
 	@echo "  make test               - Run all tests"
+	@echo "  make test-quick         - Run fast tests only (unit + quick integration)"
+	@echo "  make test-fast          - Run failed tests first"
 	@echo "  make test-admin         - Run admin system tests"
 	@echo "  make test-coverage      - Run tests with coverage report"
+	@echo "  make test-watch         - Run tests in watch mode"
 	@echo ""
-	@echo "Maintenance:"
-	@echo "  make clean              - Clean temporary files"
+	@echo "✨ CODE QUALITY:"
+	@echo "  make format             - Auto-format code (Black + isort)"
+	@echo "  make lint               - Run code quality checks"
+	@echo "  make lint-fix           - Auto-fix linting issues"
+	@echo "  make security-check     - Run security scan"
+	@echo ""
+	@echo "⚙️  DEVELOPMENT:"
+	@echo "  make shell              - Open API container shell"
+	@echo "  make shell-worker       - Open Celery worker shell"
+	@echo "  make fresh-start        - Fresh start (clean, build, seed)"
+	@echo "  make run                - Run API locally (without containers)"
 	@echo "  make health             - Health check all services"
+	@echo ""
+	@echo "📦 UTILITIES:"
+	@echo "  make clean              - Clean temporary files"
+	@echo "  make install-hooks      - Install pre-push git hooks"
+	@echo ""
 	@echo "========================================="
 
 # Build
@@ -127,6 +150,10 @@ test:
 	@echo "🧪 Running all tests..."
 	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/ -v
 
+test-quick:
+	@echo "⚡ Running quick tests (unit + fast integration)..."
+	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/test_core.py tests/test_main.py tests/test_new_endpoints.py -v -m "not load and not stress and not performance"
+
 test-fast:
 	@echo "⚡ Running failed tests first..."
 	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/ --last-failed --maxfail=1 -v
@@ -138,6 +165,34 @@ test-admin:
 test-coverage:
 	@echo "🧪 Running tests with coverage..."
 	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/ --cov=app --cov-report=html --cov-report=term
+
+test-watch:
+	@echo "👀 Running tests in watch mode..."
+	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest-watch tests/ -- -v
+
+# Code Quality & Formatting
+format:
+	@echo "📝 Formatting code with Black and isort..."
+	$(COMPOSE) run --rm -T $(API_SERVICE) python -m black app/ tests/
+	$(COMPOSE) run --rm -T $(API_SERVICE) python -m isort app/ tests/
+	@echo "✅ Code formatted!"
+
+lint:
+	@echo "🔍 Running linting checks..."
+	$(COMPOSE) run --rm -T $(API_SERVICE) python -m flake8 app/ tests/ --count --max-complexity=10 --max-line-length=127
+	$(COMPOSE) run --rm -T $(API_SERVICE) python -m pylint app/ --exit-zero --disable=all --enable=C,E,F,W
+	@echo "✅ Lint check complete!"
+
+lint-fix:
+	@echo "🔧 Auto-fixing linting issues..."
+	$(COMPOSE) run --rm -T $(API_SERVICE) python -m black app/ tests/
+	$(COMPOSE) run --rm -T $(API_SERVICE) python -m isort app/ tests/
+	@echo "✅ Linting issues fixed!"
+
+security-check:
+	@echo "🔐 Running security scan..."
+	$(COMPOSE) run --rm -T $(API_SERVICE) bandit -r app/ -ll -ii
+	@echo "✅ Security check complete!"
 
 # Health Check
 health:
@@ -181,11 +236,33 @@ fresh-start: clean build up seed
 	@make health
 
 # Development mode (useful for hot reload)
-dev:
-	@echo "👨‍💻 Starting in development mode..."
-# Start both infrastructure (Docker) and API (Local venv)
+dev: up seed
+	@echo "👨‍💻 Development environment ready!"
+	@echo ""
+	@echo "Available commands:"
+	@echo "  make logs       - View logs"
+	@echo "  make test-quick - Run fast tests"
+	@echo "  make format     - Format code"
+	@echo "  make lint       - Check code quality"
+	@echo ""
+	@make health
+
 run:
 	@echo "🚀 Starting infrastructure..."
 	@docker compose up -d db redis
+	@echo "⏳ Waiting for services to be ready..."
+	@sleep 5
 	@echo "📡 Starting FastAPI server..."
 	@.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Git Hooks & Pre-push checks
+install-hooks:
+	@echo "📝 Installing git hooks..."
+	@if [ -f scripts/pre-push-check.sh ]; then \
+		chmod +x scripts/pre-push-check.sh; \
+		cp scripts/pre-push-check.sh .git/hooks/pre-push; \
+		chmod +x .git/hooks/pre-push; \
+		echo "✅ Pre-push hook installed!"; \
+	else \
+		echo "❌ pre-push-check.sh not found!"; \
+	fi

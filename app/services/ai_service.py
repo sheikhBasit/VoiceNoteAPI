@@ -6,8 +6,7 @@ import uuid
 import logging
 import hashlib
 from typing import List, Tuple, Optional, Dict, Any
-from groq import Groq
-from deepgram import DeepgramClient
+from functools import lru_cache
 import torch
 import numpy as np
 
@@ -32,22 +31,30 @@ logger = logging.getLogger("VoiceNote")
 
 class AIService:
     _local_embedding_model = None  # Class-level singleton
+    _groq_client = None
+    _dg_client = None
 
     def __init__(self):
-        # AI Clients with graceful environment handling
+        # AI API Keys from environment
         self.groq_api_key = os.getenv("GROQ_API_KEY")
-        self.groq_client = Groq(api_key=self.groq_api_key) if self.groq_api_key else None
-        
         self.dg_api_key = os.getenv("DEEPGRAM_API_KEY")
-        self.dg_client = DeepgramClient() if self.dg_api_key else None
-        
-        self.request_tracker = get_request_tracker()
-        
-        # Local model for embeddings (Free alternative to OpenAI)
-        self.local_embedding_model = None
-        
         self.hf_token = os.getenv("HF_TOKEN")
+        self.request_tracker = get_request_tracker()
         self._diarization_pipeline = None
+
+    @property
+    def groq_client(self):
+        if AIService._groq_client is None and self.groq_api_key:
+            from groq import Groq
+            AIService._groq_client = Groq(api_key=self.groq_api_key)
+        return AIService._groq_client
+
+    @property
+    def dg_client(self):
+        if AIService._dg_client is None and self.dg_api_key:
+            from deepgram import DeepgramClient
+            AIService._dg_client = DeepgramClient(api_key=self.dg_api_key)
+        return AIService._dg_client
 
     def _get_diarization_pipeline(self):
         """Lazy load diarization pipeline."""
@@ -118,18 +125,26 @@ class AIService:
                 "deepgram_model": ai_config.DEEPGRAM_MODEL
             }
 
+    @lru_cache(maxsize=100)
+    def _generate_embedding_cached(self, text: str) -> List[float]:
+        """Internal cached method for embedding generation."""
+        model = self._get_local_embedding_model()
+        if not model:
+            return []
+        
+        # CPU-bound computation
+        embedding = model.encode(text)
+        return embedding.tolist()
+
     def generate_embedding_sync(self, text: str) -> List[float]:
-        """Synchronous version for Celery worker."""
+        """
+        Synchronous wrapper that uses LRU cache.
+        """
         if not text or not text.strip():
             return [0.0] * 384
-        model = self._get_local_embedding_model()
-        if model:
-            try:
-                embedding = model.encode(text)
-                return embedding.tolist()
-            except Exception as e:
-                logger.warning(f"Local embedding failed: {e}")
-        return [0.0] * 384
+            
+        emb = self._generate_embedding_cached(text)
+        return emb if emb else [0.0] * 384
 
     async def generate_embedding(self, text: str) -> List[float]:
         """
@@ -170,9 +185,12 @@ class AIService:
             if not self.dg_client: return None
             try:
                 with open(audio_path, "rb") as file:
-                    resp = self.dg_client.listen.rest.v1.transcribe_file(
-                        {"buffer": file.read(), "mimetype": "audio/wav"},
-                        dg_params
+                    buffer_data = file.read()
+                    # For SDK v5.x (Generated version)
+                    resp = self.dg_client.listen.v1.media.transcribe_file(
+                        buffer_data,
+                        model=settings["deepgram_model"],
+                        smart_format=True,
                     )
                     return resp.results.channels[0].alternatives[0].transcript
             except Exception as e:
@@ -228,7 +246,16 @@ class AIService:
 
         logger.info(f"STT Complete: engine={engine_used}, transcript_type={type(primary_transcript)}")
         if not primary_transcript:
-            raise AIServiceError("All STT engines failed to produce a transcript.")
+            error_details = []
+            if not self.dg_client: error_details.append("Deepgram client missing")
+            if not self.groq_client: error_details.append("Groq client missing")
+            
+            # Check if results had keys but empty values (silence)
+            is_silence = any(v == "" for v in results.values())
+            if is_silence:
+                raise AIServiceError("STT silent: The audio contains no detectable speech.")
+            
+            raise AIServiceError(f"All STT engines failed. Details: {', '.join(error_details) if error_details else 'Unknown error (check logs)'}")
 
         return primary_transcript, engine_used, used_langs, results
 
@@ -327,18 +354,28 @@ Use this temporal context to intelligently assign task priorities based on urgen
             
             tasks = []
             for t in data.get("tasks", []):
+                # Robust extraction for title and description
+                task_title = t.get("title") or t.get("description", "Task")[:100]
+                task_description = t.get("description") or t.get("title", "No description provided.")
                 tasks.append({
-                    "description": t.get("description") or t.get("title", "Task")[:200],
+                    "title": task_title,
+                    "description": task_description,
                     "priority": t.get("priority", "MEDIUM").upper(),
-                    "deadline": t.get("deadline") or t.get("due_date")
+                    "deadline": t.get("deadline") or t.get("due_date"),
+                    "actions": t.get("actions", {}) # Pass through actions
                 })
+
+            tags = data.get("tags") or []
+            if isinstance(tags, str):
+                tags = [t.strip() for t in tags.split(",") if t.strip()]
 
             return NoteAIOutput(
                 title=title,
                 summary=summary,
                 priority=priority,
                 transcript=transcript,
-                tasks=tasks
+                tasks=tasks,
+                tags=tags
             )
         except Exception as e:
             logger.error(f"LLM brain failed for {user_role}: {e}")
@@ -361,17 +398,35 @@ Use this temporal context to intelligently assign task priorities based on urgen
         
         return ai_output
 
-    def detect_conflicts_sync(self, new_summary: str, existing_notes: list[str]) -> list[dict]:
-        """Synchronous version for Celery worker."""
-        if not existing_notes or not self.groq_client:
+    def detect_conflicts_sync(self, new_summary: str, context_items: List[str], context_type: str = "schedule") -> List[Dict]:
+        """
+        Detect contradictions between a new summary and existing context (events or notes).
+        """
+        if not context_items or not self.groq_client:
             return []
 
-        context_notes = existing_notes[-10:]
-        formatted_notes = "\n---\n".join([f"Note {i+1}: {note}" for i, note in enumerate(context_notes)])
-        prompt = ai_config.CONFLICT_DETECTOR_PROMPT.format(
-            new_summary=new_summary,
-            existing_notes=formatted_notes
-        )
+        # Optimization: Limit context
+        final_context = context_items[-15:]
+        formatted_context = "\n---\n".join([f"Item {i+1}: {item}" for i, item in enumerate(final_context)])
+        
+        prompt = f"""
+        Role: CONFLICT_DETECTOR
+        Task: Identify any contradictions or major inconsistencies between the NEW_STORY and the EXISTING_{context_type.upper()}.
+        
+        NEW_STORY (Current Note Summary):
+        {new_summary}
+        
+        EXISTING_{context_type.upper()}:
+        {formatted_context}
+        
+        Return a JSON object with a 'conflicts' key containing a list:
+        {{
+            "conflicts": [
+                {{"fact": "statement A", "conflict": "statement B", "explanation": "why they conflict", "severity": "HIGH/MEDIUM"}}
+            ]
+        }}
+        If no conflicts, return {{"conflicts": []}}.
+        """
 
         try:
             response = self.groq_client.chat.completions.create(
@@ -382,7 +437,7 @@ Use this temporal context to intelligently assign task priorities based on urgen
             data = validate_json_response(response.choices[0].message.content)
             return data.get("conflicts", [])
         except Exception as e:
-            logger.error(f"Sync conflict detection failed: {e}")
+            logger.error(f"Sync conflict detection failed ({context_type}): {e}")
             return []
 
     @retry_with_backoff(max_attempts=2)

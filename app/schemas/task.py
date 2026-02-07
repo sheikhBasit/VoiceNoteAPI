@@ -24,6 +24,7 @@ class LinkEntity(BaseModel):
     url: HttpUrl # Validates proper URL format
 
 class TaskBase(BaseModel):
+    title: Optional[str] = Field(None, description="Brief punchy title")
     description: str = Field(..., min_length=1)
     priority: Priority = Priority.MEDIUM
     deadline: Optional[int] = None
@@ -41,6 +42,7 @@ class TaskCreate(TaskBase):
     note_id: Optional[str] = None
 
 class TaskUpdate(BaseModel):
+    title: Optional[str] = None
     description: Optional[str] = None
     priority: Optional[Priority] = None
     deadline: Optional[int] = None
@@ -56,6 +58,7 @@ class TaskUpdate(BaseModel):
 class SuggestedActions(BaseModel):
     """Smart action suggestions for tasks."""
     google_search: Optional[dict] = None  # {"query": "...", "url": "..."}
+    map: Optional[dict] = None # {"location": "...", "url": "..."}
     email: Optional[dict] = None  # {"to": "...", "subject": "...", "body": "...", "mailto_link": "..."}
     whatsapp: Optional[dict] = None  # {"phone": "...", "message": "...", "deeplink": "..."}
     ai_prompt: Optional[dict] = None  # {"model": "...", "prompt": "...", "chat_url": "..."}

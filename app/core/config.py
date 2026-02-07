@@ -50,11 +50,13 @@ class AISettings(BaseSettings):
     Analyze the transcription and return a structured JSON object.
     
     OUTPUT JSON FORMAT (STRICT):
-    - title: Catchy, relevant title (max 10 words).
+    - title: Catchy, relevant title for the whole note (max 10 words).
     - summary: 2-3 sentence concise summary explaining the core value.
     - priority: "HIGH", "MEDIUM", or "LOW" based on urgency.
+    - tags: List of 2-4 strings (categories like "Business", "Personal", "Shopping", "Idea").
     - tasks: List of objects:
-        - title: The specific action item.
+        - title: A very short, punchy title for the task (e.g. "Email John").
+        - description: A detailed description of exactly what needs to be done.
         - priority: "HIGH", "MEDIUM", or "LOW".
         - due_date: ISO 8601 format (YYYY-MM-DD) if mentioned, else null.
         - actions: Object with detected action types (optional)
@@ -69,46 +71,48 @@ class AISettings(BaseSettings):
     
     When no temporal context is provided, use semantic urgency cues from the transcript.
     
-    TASK ACTION DETECTION (CRITICAL):
-    For each task, detect if it requires specific actions and extract metadata:
+    TASK ACTION DETECTION (PROACTIVE & AGGRESSIVE):
+    For each task, proactively detect if it requires specific actions. 
     
-    1. GOOGLE SEARCH: If task involves research, investigation, looking up, or mentions "google/search"
+    1. GOOGLE SEARCH: Generate if the task involves research, investigation, finding info, or could benefit from external guides.
        - Extract: {"google_search": {"query": "search terms"}}
        
-    2. EMAIL: If task mentions sending email, emailing someone, or contacting via email
+    2. MAP: If task mentions a specific place, address, store, or "go to X", "at X".
+       - Extract: {"map": {"location": "Place Name", "query": "Store or Address near town"}}
+
+    3. EMAIL: If task mentions sending email, emailing someone, or contacting via email.
        - Extract: {"email": {"to": "email@example.com", "name": "Person Name", "subject": "...", "body": "..."}}
        
-    3. WHATSAPP: If task mentions WhatsApp, messaging, texting, or sending message
+    4. WHATSAPP: If task mentions WhatsApp, messaging, texting, or sending message.
        - Extract: {"whatsapp": {"phone": "+1234567890", "name": "Contact Name", "message": "..."}}
        
-    4. AI ASSISTANCE: If task needs ChatGPT/Gemini/Claude help or asks to "ask AI"
-       - Extract: {"ai_prompt": {"model": "gemini|chatgpt|claude", "context": "relevant context"}}
+    5. AI ASSISTANCE (LLM PROMPT): If task needs ChatGPT/Gemini/Claude help or asks to "ask AI". Always provide a helpful starting prompt.
+       - Extract: {"ai_prompt": {"model": "gemini|chatgpt|claude|gpt-4", "prompt": "Specialized query", "context": "relevant context"}}
     
     EXAMPLE OUTPUT:
     {
-      "title": "Project Planning Meeting",
-      "summary": "Discussed Q1 goals and assigned research tasks.",
-      "priority": "HIGH",
+      "title": "Grocery & Planning",
+      "summary": "Need to buy milk and research new personal growth strategies.",
+      "priority": "MEDIUM",
+      "tags": ["Shopping", "Self Improvement", "Planning"],
       "tasks": [
         {
-          "title": "Research competitor pricing strategies",
-          "priority": "HIGH",
-          "due_date": "2026-02-05",
-          "actions": {
-            "google_search": {"query": "competitor pricing strategies 2026"}
-          }
-        },
-        {
-          "title": "Email John about budget approval",
+          "title": "Buy Milk",
+          "description": "Stop at the grocery store to buy organic milk.",
           "priority": "MEDIUM",
           "due_date": null,
           "actions": {
-            "email": {
-              "to": "john@company.com",
-              "name": "John",
-              "subject": "Budget Approval Request",
-              "body": "Hi John,\\n\\nFollowing up on our meeting regarding the Q1 budget..."
-            }
+            "map": {"location": "Grocery Store", "query": "Grocery stores nearby"}
+          }
+        },
+        {
+          "title": "Self Reflection",
+          "description": "Sit down and ask questions about current achievements and improvements.",
+          "priority": "LOW",
+          "due_date": null,
+          "actions": {
+            "google_search": {"query": "effective self reflection questions for personal growth"},
+            "ai_prompt": {"model": "gpt-4", "prompt": "Provide 10 deep self-reflection questions for personal achievements"}
           }
         }
       ]

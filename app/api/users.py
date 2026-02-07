@@ -10,6 +10,11 @@ from app.utils.users_validation import (
     ValidationError
 )
 from app.services.deletion_service import DeletionService
+from app.api.dependencies import (
+    require_admin,
+    require_user_management,
+    require_user_deletion,
+)
 from typing import Optional
 import time
 import os
@@ -236,6 +241,41 @@ def search_users(
             detail="Internal server error: Failed to serialize user data"
         )
 
+@router.get("/{user_id}", response_model=user_schema.UserResponse)
+@limiter.limit("60/minute")
+def get_user_profile_by_id(
+    request: Request,
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    GET /{user_id}: Get public user profile
+    
+    Returns basic info about an active user
+    Only includes public fields (name, email, created_at, primary_role)
+    """
+    try:
+        user = db.query(models.User).filter(
+            models.User.id == user_id,
+            models.User.is_deleted == False
+        ).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID '{user_id}' not found or has been deleted"
+            )
+        
+        return user
+    except Exception as e:
+        JLogger.error("Failed to fetch user profile", user_id=user_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Failed to fetch user profile"
+        )
+
+
+
 @router.patch("/me", response_model=user_schema.UserResponse)
 def update_user_settings(
     update_data: user_schema.UserUpdate, 
@@ -286,29 +326,23 @@ def update_user_settings(
 
 @router.delete("/me")
 def delete_user_account(
-    hard: bool = False, 
-    admin_id: Optional[str] = None, 
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(get_current_user),
     _sig: bool = Depends(verify_device_signature)
 ):
-    """DELETE /me: Handles account deletion via DeletionService."""
+    """
+    DELETE /me: Soft-delete user account (reversible)
+    
+    Only allows soft-delete (account can be restored by admin)
+    Hard deletion is admin-only through /admin endpoint
+    """
     user_id = current_user.id
-    if hard:
-        if not admin_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail="Permission denied: Admin ID must be provided to perform a hard account deletion"
-            )
-        admin = db.query(models.User).filter(models.User.id == admin_id, models.User.is_admin == True).first()
-        if not admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail="Permission denied: Administrative privileges are required for this operation"
-            )
-        result = DeletionService.hard_delete_user(db, user_id, admin_id=admin_id)
-    else:
-        result = DeletionService.soft_delete_user(db, user_id, deleted_by=user_id, reason="User self-deletion")
+    
+    result = DeletionService.soft_delete_user(
+        db, user_id, 
+        deleted_by=user_id, 
+        reason="User self-deletion"
+    )
     
     if not result["success"]:
         JLogger.error("Failed to delete user account", user_id=user_id, error=result["error"])
@@ -317,7 +351,7 @@ def delete_user_account(
             detail=f"Deactivation failed: {result['error']}"
         )
     
-    JLogger.info("User account deleted", user_id=user_id, hard=hard, admin_id=admin_id)
+    JLogger.info("User account deleted (soft)", user_id=user_id)
     return result
 
 @router.patch("/{user_id}/restore")

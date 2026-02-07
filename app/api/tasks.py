@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, BackgroundTasks, status, Query
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, BackgroundTasks, status, Query, Body
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import uuid
@@ -528,3 +528,74 @@ def duplicate_task(
 
 # ============ STATISTICS & ANALYTICS ============
 
+
+@router.patch("/{task_id}/restore", response_model=task_schema.TaskResponse)
+def restore_task(
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """PATCH /{task_id}/restore: Restore soft-deleted task."""
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Permission denied")
+        
+    result = DeletionService.restore_task(db, task_id, restored_by=current_user.id)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["error"])
+        
+    db.refresh(task)
+    return task
+
+@router.patch("/{task_id}/complete", response_model=task_schema.TaskResponse)
+def toggle_task_completion(
+    task_id: str,
+    is_done: bool = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    PATCH /{task_id}/complete: Toggle task completion status.
+    Explicit endpoint for UI convenience.
+    """
+    task = verify_task_ownership(db, current_user, task_id)
+    
+    if task.is_deleted:
+         raise HTTPException(status_code=400, detail="Cannot complete a deleted task")
+         
+    task.is_done = is_done
+    task.updated_at = int(time.time() * 1000)
+    db.commit()
+    db.refresh(task)
+    return task
+
+@router.delete("")
+def bulk_delete_tasks(
+    task_ids: List[str] = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """DELETE /: Bulk delete tasks."""
+    deleted_count = 0
+    errors = []
+    
+    for tid in task_ids:
+        # Check ownership
+        task = db.query(models.Task).filter(models.Task.id == tid).first()
+        if not task or task.user_id != current_user.id:
+            errors.append(f"Permission denied or not found for {tid}")
+            continue
+            
+        res = DeletionService.soft_delete_task(db, tid, deleted_by=current_user.id)
+        if res["success"]:
+            deleted_count += 1
+        else:
+            errors.append(f"Failed to delete {tid}: {res['error']}")
+            
+    return {
+        "message": f"Bulk delete completed. Deleted {deleted_count}/{len(task_ids)} tasks.",
+        "deleted_count": deleted_count,
+        "errors": errors
+    }

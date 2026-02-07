@@ -13,6 +13,26 @@ class ActionGenerator:
     """Generates ready-to-use action links and templates."""
     
     @staticmethod
+    def generate_map_link(location: str, query: str = "") -> Dict[str, str]:
+        """
+        Generate Google Maps URL.
+        
+        Args:
+            location: The name of the place
+            query: Specific search query for the area
+            
+        Returns:
+            Dict with location details and maps URL
+        """
+        search_term = query or location
+        encoded_query = quote_plus(search_term)
+        return {
+            "location": location,
+            "query": search_term,
+            "url": f"https://www.google.com/maps/search/?api=1&query={encoded_query}"
+        }
+    
+    @staticmethod
     def generate_google_search(query: str) -> Dict[str, str]:
         """
         Generate Google search URL.
@@ -95,33 +115,41 @@ class ActionGenerator:
     def generate_ai_prompt(
         model: str, 
         task_description: str, 
-        context: str = ""
+        context: str = "",
+        custom_prompt: Optional[str] = None
     ) -> Dict[str, str]:
         """
         Generate optimized AI prompt.
         
         Args:
-            model: AI model name (gemini, chatgpt, claude)
+            model: AI model name (gemini, chatgpt, claude, gpt-4)
             task_description: Task description
             context: Additional context from note
+            custom_prompt: Optional custom prompt from LLM
             
         Returns:
             Dict with model, prompt, and chat URL
         """
-        # Prompt templates optimized for each model
-        prompt_templates = {
-            "gemini": f"Help me with this task: {task_description}\n\nContext: {context}",
-            "chatgpt": f"I need assistance with: {task_description}\n\nAdditional context: {context}",
-            "claude": f"Task: {task_description}\n\nBackground: {context}\n\nPlease provide a detailed approach."
-        }
-        
         model_lower = model.lower()
-        prompt = prompt_templates.get(model_lower, prompt_templates["chatgpt"])
+        
+        # Use custom prompt if provided, else use template
+        if custom_prompt:
+            prompt = custom_prompt
+        else:
+            # Prompt templates optimized for each model
+            prompt_templates = {
+                "gemini": f"Help me with this task: {task_description}\n\nContext: {context}",
+                "chatgpt": f"I need assistance with: {task_description}\n\nAdditional context: {context}",
+                "gpt-4": f"I need assistance with: {task_description}\n\nAdditional context: {context}",
+                "claude": f"Task: {task_description}\n\nBackground: {context}\n\nPlease provide a detailed approach."
+            }
+            prompt = prompt_templates.get(model_lower, prompt_templates["chatgpt"])
         
         # Chat URLs for each model
         chat_urls = {
             "gemini": "https://gemini.google.com/",
             "chatgpt": "https://chat.openai.com/",
+            "gpt-4": "https://chat.openai.com/?model=gpt-4",
             "claude": "https://claude.ai/"
         }
         

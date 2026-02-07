@@ -19,6 +19,15 @@ from app.utils.admin_utils import AdminManager
 from app.utils.ai_service_utils import AIServiceError
 from app.services.auth_service import create_access_token, verify_password, get_current_active_admin
 from app.schemas import billing as billing_schema
+from app.api.dependencies import (
+    require_admin,
+    require_admin_management,
+    require_user_management,
+    require_user_deletion,
+    require_analytics_access,
+    require_moderation_access,
+    require_permission,
+)
 from typing import List, Optional
 import time
 
@@ -31,13 +40,13 @@ router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 async def make_user_admin(
     user_id: str,
     level: str = Query("full", pattern="^(full|moderator|viewer)$"),
-    admin_user: models.User = Depends(get_current_active_admin),
+    admin_user: models.User = Depends(require_admin_management),
     db: Session = Depends(get_db)
 ):
     """
     Promote user to admin role
     
-    Permission Required: can_manage_admins
+    **Authorization:** Admin + can_manage_admins permission
     
     Args:
         user_id: User to promote
@@ -47,11 +56,7 @@ async def make_user_admin(
         Updated user with admin role
     """
     try:
-        if not AdminManager.has_permission(admin_user, "can_manage_admins"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail="Permission denied: Required permission 'can_manage_admins' is missing"
-            )
+        # Admin and permission already verified by dependency!
         
         updated_user = AdminManager.grant_admin_role(
             db=db,
@@ -80,26 +85,16 @@ async def make_user_admin(
 @router.post("/users/{user_id}/remove-admin")
 async def remove_user_admin(
     user_id: str,
-    admin_user: models.User = Depends(get_current_active_admin),
+    admin_user: models.User = Depends(require_admin_management),
     db: Session = Depends(get_db)
 ):
     """
     Revoke admin role from user
     
-    Permission Required: can_manage_admins
+    **Authorization:** Admin + can_manage_admins permission
     """
     try:
-        if not AdminManager.is_admin(admin_user):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail="Permission denied: Administrative privileges required"
-            )
-        
-        if not AdminManager.has_permission(admin_user, "can_manage_admins"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail="Permission denied: Required permission 'can_manage_admins' is missing"
-            )
+        # Admin and permission already verified by dependency!
         
         updated_user = AdminManager.revoke_admin_role(db=db, user_id=user_id)
         
@@ -354,6 +349,431 @@ async def delete_user_as_admin(
         "message": "User deleted",
         "user_id": user_id
     }
+
+
+@router.get("/users/{user_id}")
+async def get_user_details_admin(
+    user_id: str,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin)
+):
+    """
+    Get detailed admin view of user account
+    
+    Permission Required: can_view_all_users
+    
+    Returns:
+    - User account details
+    - Admin status and permissions
+    - Device list
+    - Usage statistics
+    - Wallet/subscription info
+    - Last login time
+    """
+    if not AdminManager.is_admin(admin_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Administrative privileges required"
+        )
+    
+    if not AdminManager.has_permission(admin_user, "can_view_all_users"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Required permission 'can_view_all_users' is missing"
+        )
+    
+    try:
+        from sqlalchemy.orm import joinedload
+        
+        user = db.query(models.User).options(
+            joinedload(models.User.wallet),
+            joinedload(models.User.plan)
+        ).filter(models.User.id == user_id).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID '{user_id}' not found"
+            )
+        
+        # Count user content
+        notes_count = db.query(models.Note).filter(
+            models.Note.user_id == user_id
+        ).count()
+        tasks_count = db.query(models.Task).filter(
+            models.Task.user_id == user_id
+        ).count()
+        
+        return {
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "is_admin": user.is_admin,
+                "admin_permissions": user.admin_permissions if user.is_admin else None,
+                "is_deleted": user.is_deleted,
+                "deleted_at": user.deleted_at if user.is_deleted else None,
+                "created_at": user.created_at,
+                "updated_at": user.updated_at,
+                "last_login": user.last_login,
+            },
+            "subscription": {
+                "plan": user.plan.name if user.plan else "NONE",
+                "tier": user.tier.value if user.tier else "GUEST",
+                "balance": user.wallet.balance if user.wallet else 0,
+                "monthly_limit": user.wallet.monthly_limit if user.wallet else 0,
+                "used_this_month": user.wallet.used_this_month if user.wallet else 0
+            },
+            "devices": user.authorized_devices or [],
+            "content": {
+                "notes_count": notes_count,
+                "tasks_count": tasks_count
+            },
+            "usage": user.usage_stats or {},
+            "timestamp": int(time.time() * 1000)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        JLogger.error("Failed to fetch user details", user_id=user_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Failed to fetch user details"
+        )
+
+
+@router.patch("/users/{user_id}", response_model=user_schema.UserResponse)
+async def update_user_details_admin(
+    user_id: str,
+    update_data: user_schema.UserUpdate,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin)
+):
+    """
+    Update user details (Admin)
+    
+    Permission Required: can_delete_users (as proxy for full user write access)
+    """
+    if not AdminManager.is_admin(admin_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Administrative privileges required"
+        )
+    
+    # Using can_delete_users as it implies high-level user management rights
+    if not AdminManager.has_permission(admin_user, "can_delete_users"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Required permission 'can_delete_users' is missing"
+        )
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User with ID '{user_id}' not found"
+        )
+    
+    # Import validation explicitly to avoid circular dependencies at module level if any
+    from app.utils.users_validation import (
+        validate_email, validate_work_hours, validate_work_days, 
+        validate_jargons, validate_system_prompt, validate_name,
+        ValidationError
+    )
+
+    update_dict = {}
+    for key, value in update_data.model_dump(exclude_unset=True).items():
+        if value is None: continue
+        try:
+            if key == "name" and value:
+                update_dict[key] = validate_name(value)
+            elif key == "email" and value:
+                # Check if email is taken by another user
+                existing = db.query(models.User).filter(models.User.email == value, models.User.id != user_id).first()
+                if existing:
+                    raise HTTPException(status_code=400, detail="Email already in use")
+                update_dict[key] = validate_email(value)
+            elif key == "system_prompt" and value:
+                update_dict[key] = validate_system_prompt(value)
+            elif key == "work_start_hour" and value is not None:
+                end_hour = update_data.work_end_hour or user.work_end_hour
+                validated = validate_work_hours(value, end_hour)
+                update_dict["work_start_hour"] = validated[0]
+            elif key == "work_end_hour" and value is not None:
+                start_hour = update_data.work_start_hour or user.work_start_hour
+                validated = validate_work_hours(start_hour, value)
+                update_dict["work_end_hour"] = validated[1]
+            elif key == "timezone" and value:
+                 # Basic timezone validation could go here, for now trust schema or add validation
+                 update_dict[key] = value
+            elif key == "primary_role" and value:
+                 # Role validation handled by Enum in schema usually, but logic here:
+                 update_dict[key] = value
+            else:
+                update_dict[key] = value
+        except ValidationError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=f"Validation failed for '{key}': {str(e)}"
+            )
+    
+    try:
+        for key, value in update_dict.items():
+            setattr(user, key, value)
+        
+        user.updated_at = int(time.time() * 1000)
+        db.commit()
+        db.refresh(user)
+
+        AdminManager.log_admin_action(
+            db=db,
+            admin_id=admin_user.id,
+            action="UPDATE_USER",
+            target_id=user_id,
+            details={"updates": list(update_dict.keys())}
+        )
+        
+        return user
+    except Exception as e:
+        db.rollback()
+        JLogger.error("Failed to update user", user_id=user_id, admin_id=admin_user.id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Failed to update user"
+        )
+
+@router.delete("/users/{user_id}/hard")
+async def hard_delete_user_as_admin(
+    user_id: str,
+    confirmation: str = Query("", description="Must equal user_id for confirmation"),
+    reason: str = Query(""),
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin)
+):
+    """
+    Hard delete user account permanently (IRREVERSIBLE)
+    
+    Permission Required: can_delete_users
+    
+    WARNING: This permanently deletes:
+    - User account
+    - All notes
+    - All tasks
+    - All audit logs
+    - Cannot be undone!
+    
+    Args:
+        user_id: User to delete
+        confirmation: Must match user_id to prevent accidental deletion
+        reason: Reason for deletion (stored in audit)
+    """
+    if not AdminManager.is_admin(admin_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Administrative privileges required"
+        )
+    
+    if not AdminManager.has_permission(admin_user, "can_delete_users"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Required permission 'can_delete_users' is missing"
+        )
+    
+    # Safety check: require confirmation
+    if confirmation != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Confirmation mismatch: confirmation must equal user_id to prevent accidental deletion"
+        )
+    
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=f"User with ID '{user_id}' not found"
+        )
+    
+    try:
+        from app.services.deletion_service import DeletionService
+        
+        # Perform hard delete via service
+        result = DeletionService.hard_delete_user(
+            db=db, 
+            user_id=user_id, 
+            admin_id=admin_user.id
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Hard delete failed: {result.get('error', 'Unknown error')}"
+            )
+        
+        AdminManager.log_admin_action(
+            db=db,
+            admin_id=admin_user.id,
+            action="HARD_DELETE_USER",
+            target_id=user_id,
+            details={
+                "reason": reason,
+                "notes_deleted": result.get("notes_deleted", 0),
+                "tasks_deleted": result.get("tasks_deleted", 0)
+            }
+        )
+        
+        return {
+            "status": "success",
+            "message": "User permanently deleted (irreversible)",
+            "user_id": user_id,
+            "deleted_items": {
+                "notes": result.get("notes_deleted", 0),
+                "tasks": result.get("tasks_deleted", 0),
+                "deleted_at": int(time.time() * 1000)
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        JLogger.error("Hard delete user failed", user_id=user_id, admin_id=admin_user.id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Hard delete operation failed"
+        )
+
+
+@router.patch("/users/{user_id}/restore")
+async def restore_user_as_admin(
+    user_id: str,
+    reason: str = Query(""),
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin)
+):
+    """
+    Restore a soft-deleted user account (admin only)
+    
+    Permission Required: can_manage_admins
+    
+    Restores:
+    - User account status
+    - User's soft-deleted notes
+    """
+    if not AdminManager.is_admin(admin_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Administrative privileges required"
+        )
+    
+    if not AdminManager.has_permission(admin_user, "can_manage_admins"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Required permission 'can_manage_admins' is missing"
+        )
+    
+    try:
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID '{user_id}' not found"
+            )
+        
+        if not user.is_deleted:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User account is not deleted"
+            )
+        
+        # Restore user
+        user.is_deleted = False
+        user.deleted_at = None
+        
+        # Restore user's notes
+        notes_restored = db.query(models.Note).filter(
+            models.Note.user_id == user_id,
+            models.Note.is_deleted == True
+        ).update(
+            {"is_deleted": False, "deleted_at": None}
+        )
+        
+        db.commit()
+        
+        AdminManager.log_admin_action(
+            db=db,
+            admin_id=admin_user.id,
+            action="RESTORE_USER",
+            target_id=user_id,
+            details={"reason": reason, "notes_restored": notes_restored}
+        )
+        
+        return {
+            "status": "success",
+            "message": "User account restored",
+            "user_id": user_id,
+            "restored_at": int(time.time() * 1000),
+            "notes_restored": notes_restored
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        JLogger.error("Restore user failed", user_id=user_id, admin_id=admin_user.id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Restore operation failed"
+        )
+
+
+@router.get("/users/{user_id}/devices")
+async def get_user_devices(
+    user_id: str,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin)
+):
+    """
+    Get list of user's authorized devices
+    
+    Permission Required: can_view_all_users
+    
+    Returns:
+    - Device list with timestamps
+    - Current active device
+    - Device authorization history
+    """
+    if not AdminManager.is_admin(admin_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Administrative privileges required"
+        )
+    
+    if not AdminManager.has_permission(admin_user, "can_view_all_users"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Permission denied: Required permission 'can_view_all_users' is missing"
+        )
+    
+    try:
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID '{user_id}' not found"
+            )
+        
+        return {
+            "user_id": user_id,
+            "current_device_id": user.current_device_id,
+            "devices": user.authorized_devices or [],
+            "total_devices": len(user.authorized_devices or []),
+            "timestamp": int(time.time() * 1000)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        JLogger.error("Failed to fetch user devices", user_id=user_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error: Failed to fetch user devices"
+        )
 
 
 # ==================== PERMISSION MANAGEMENT ====================
