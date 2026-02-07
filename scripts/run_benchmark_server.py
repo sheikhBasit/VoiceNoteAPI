@@ -3,7 +3,7 @@ import os
 import sys
 import uvicorn
 from unittest.mock import MagicMock
-
+from importlib import MockModule
 # --- 1. SET ENV VARS ---
 os.environ["DATABASE_URL"] = "sqlite:///./benchmark.db"
 os.environ["REDIS_URL"] = "memory://"

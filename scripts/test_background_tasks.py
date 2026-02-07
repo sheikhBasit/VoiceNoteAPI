@@ -5,7 +5,7 @@ import uuid
 import os
 import jwt
 from datetime import UTC, datetime, timedelta
-
+from dotenv import load_dotenv
 # Load .env
 load_dotenv()
 
