@@ -16,7 +16,9 @@ class UserBase(BaseModel):
     work_start_hour: int = 9
     work_end_hour: int = 17
     work_days: List[int] = [2, 3, 4, 5, 6]
+    work_days: List[int] = [2, 3, 4, 5, 6]
     timezone: str = "UTC"
+    profile_picture_url: Optional[str] = None
     # Admin fields (NEW)
     # is_admin: bool = False
     # admin_permissions: Optional[Dict[str, Any]] = None
@@ -48,6 +50,7 @@ class AdminLogin(BaseModel):
 class SyncResponse(BaseModel):
     user: UserResponse
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
     is_new_user: bool = False
     model_config = ConfigDict(from_attributes=True)

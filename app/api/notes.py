@@ -240,6 +240,58 @@ def get_dashboard_metrics(db: Session = Depends(get_db), current_user: models.Us
             detail="Internal server error: Analytics pulse failed to load"
         )
 
+@router.get("/autocomplete", response_model=List[str])
+def search_autocomplete(
+    q: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    GET /autocomplete: Suggest note titles or tags.
+    Fast prefix search for mobile search bar.
+    """
+    # 1. Search Titles
+    titles = db.query(models.Note.title).filter(
+        models.Note.user_id == current_user.id,
+        models.Note.title.ilike(f"%{q}%"),
+        models.Note.is_deleted == False
+    ).limit(5).all()
+    
+    # Flatten list of tuples
+    suggestions = [t[0] for t in titles]
+    
+    return suggestions
+
+@router.patch("/move")
+def bulk_move_notes(
+    note_ids: List[str] = Body(..., embed=True),
+    folder_id: Optional[str] = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    PATCH /move: Bulk move notes to a folder.
+    pass folder_id=None to move to 'Uncategorized'.
+    """
+    # 1. Verify Folder (if provided)
+    if folder_id:
+        folder = db.query(models.Folder).filter(
+            models.Folder.id == folder_id,
+            models.Folder.user_id == current_user.id
+        ).first()
+        if not folder:
+            raise HTTPException(status_code=404, detail="Folder not found")
+
+    # 2. Update Notes
+    updated_count = db.query(models.Note).filter(
+        models.Note.id.in_(note_ids),
+        models.Note.user_id == current_user.id
+    ).update({models.Note.folder_id: folder_id}, synchronize_session=False)
+    
+    db.commit()
+    
+    return {"message": f"Moved {updated_count} notes successfully"}
+
 @router.get("/{note_id}", response_model=note_schema.NoteResponse)
 def get_note(note_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """GET /{note_id}: Returns full note detail (ownership validated)."""
@@ -582,4 +634,6 @@ async def bulk_delete_notes(
         "deleted_count": deleted_count,
         "errors": errors
     }
+
+
     

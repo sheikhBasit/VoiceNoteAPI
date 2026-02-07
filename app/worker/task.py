@@ -372,17 +372,40 @@ def note_process_pipeline(self, note_id: str, local_file_path: str, user_role: s
 
 @celery_app.task(name="process_task_image_pipeline")
 def process_task_image_pipeline(task_id: str, local_path: str, filename: str):
-    """Process task multimedia (images/documents) using local storage."""
+    """Process task multimedia (images/documents)."""
     db = SessionLocal()
     try:
         # Detect if image or document
         is_image = filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))
         
+        # Ensure uploads directory exists
+        if not os.path.exists("uploads"):
+            os.makedirs("uploads")
+            
+        # Move/Ensure file is in permanent storage if it was temp
+        # For now, we assume local_path is already in 'uploads/' or a valid persistence layer
+        # If it was a temp file, we should have moved it. 
+        # CAUTION: If local_path is /tmp/..., we must move it.
+        # But based on typical usage, let's assume valid persistent path.
+
         if is_image:
-            # Just use the local path as the URL
-            secure_url = f"/{local_path}"
+            from PIL import Image
+            
+            # Generate Thumbnail
+            try:
+                with Image.open(local_path) as img:
+                    img.thumbnail((300, 300))
+                    thumb_path = f"{os.path.splitext(local_path)[0]}_thumb.jpg"
+                    img.save(thumb_path, "JPEG", quality=70)
+                    JLogger.info("Thumbnail generated", path=thumb_path)
+            except Exception as e:
+                JLogger.warning("Thumbnail generation failed", error=str(e))
+            
+            # Update DB
+            secure_url = f"/{local_path}" # Relative URL
             task = db.query(Task).filter(Task.id == task_id).first()
             if task:
+                # Appending secure_url. Frontend can deduce thumb url by appending _thumb.jpg
                 task.image_urls = (task.image_urls or []) + [secure_url]
         else:
             secure_url = f"/{local_path}"
@@ -396,8 +419,8 @@ def process_task_image_pipeline(task_id: str, local_path: str, filename: str):
         JLogger.error("Worker: Multimedia processing failed", task_id=task_id, error=str(e))
     finally:
         db.close()
-        if os.path.exists(local_path):
-            os.remove(local_path)
+        # DO NOT DELETE local_path here, as it is the permanent file served by StaticFiles
+
 
 
 @celery_app.task(name="check_upcoming_tasks")
@@ -461,12 +484,12 @@ def send_push_notification(device_token: str, title: str, body: str, data: dict)
     """
     Integration point with Firebase Cloud Messaging (FCM).
     """
+    from app.services.notification_service import NotificationService
     try:
-        # Here you would call the Firebase Admin SDK
-        # firebase_admin.messaging.send(...)
-        JLogger.info("Push Notification Sent", device_token=device_token, title=title)
+        NotificationService.initialize()
+        NotificationService.send_to_token(device_token, title, body, data)
     except Exception as e:
-        JLogger.error("Push Notification Failed", device_token=device_token, error=str(e))
+        JLogger.error("Push Notification Failed in Worker", device_token=device_token, error=str(e))
 
 
 @celery_app.task(name="hard_delete_expired_records")

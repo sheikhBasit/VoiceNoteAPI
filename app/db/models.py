@@ -48,6 +48,7 @@ class User(Base):
     id = Column(String, primary_key=True) # UUID (not just device ID anymore)
     name = Column(String)
     email = Column(String, unique=True, index=True)
+    profile_picture_url = Column(String, nullable=True) # New: Profile Picture
     
     # Auth & Device Management
     # Stores list of dicts: [{"device_id": "...", "device_model": "...", "biometric_token": "...", "authorized_at": 123}]
@@ -102,6 +103,29 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True  # Use database-level CASCADE
     )
+    folders = relationship(
+        "Folder",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+
+
+class Folder(Base):
+    __tablename__ = "folders"
+
+    id = Column(String, primary_key=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name = Column(String, nullable=False)
+    color = Column(String, default="#FFFFFF") # Hex color for UI
+    icon = Column(String, default="folder") # Icon name/emoji
+    
+    created_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    
+    user = relationship("User", back_populates="folders")
+    notes = relationship("Note", back_populates="folder")
+
 
 
 class Note(Base):
@@ -109,6 +133,7 @@ class Note(Base):
     
     id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    folder_id = Column(String, ForeignKey("folders.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String)
     summary = Column(Text)
     
@@ -159,6 +184,7 @@ class Note(Base):
     
     # Relationships with CASCADE deletion
     user = relationship("User", back_populates="notes")
+    folder = relationship("Folder", back_populates="notes")
     tasks = relationship(
         "Task", 
         back_populates="note", 

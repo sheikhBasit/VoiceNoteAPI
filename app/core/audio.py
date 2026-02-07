@@ -23,6 +23,19 @@ def preprocess_audio_pipeline(input_path: str):
     import soundfile as sf
     import noisereduce as nr
     
+    # 0. TRANSCODE TO WAV IF NEEDED (e.g. m4a, 3gp, aac)
+    base_path, ext = os.path.splitext(input_path)
+    if ext.lower() not in ['.wav', '.wave']:
+        try:
+            temp_wav_input = f"{base_path}_converted.wav"
+            JLogger.info(f"Transcoding {ext} to WAV for processing: {input_path}")
+            audio = AudioSegment.from_file(input_path)
+            audio.export(temp_wav_input, format="wav")
+            input_path = temp_wav_input # Use the converted file
+        except Exception as e:
+            JLogger.error(f"Failed to transcode {ext} file: {e}")
+            raise e
+
     # 1. Load Audio at 16kHz (Optimal for STT)
     y, sr = librosa.load(input_path, sr=16000, mono=True)
 
@@ -89,3 +102,6 @@ def preprocess_audio_pipeline(input_path: str):
         os.remove(temp_wav)
 
     return output_path
+    # Cleanup converted/temp wav if it was created
+    if 'temp_wav_input' in locals() and os.path.exists(temp_wav_input) and temp_wav_input != output_path:
+        os.remove(temp_wav_input)

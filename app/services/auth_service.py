@@ -13,9 +13,12 @@ import hmac
 import hashlib
 
 # Configuration
+# Configuration
 SECRET_KEY = os.getenv("DEVICE_SECRET_KEY", "your-secret-key-keep-it-safe")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 hours for access token (shortened from 1 week)
+REFRESH_TOKEN_EXPIRE_DAYS = 30 # Long lived for mobile
+SECRET_KEY_REFRESH = os.getenv("REFRESH_SECRET_KEY", "refresh-secret-key-change-me")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Use HTTPBearer instead of OAuth2PasswordBearer for proper Swagger UI integration
@@ -27,9 +30,37 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY_REFRESH, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def refresh_access_token(refresh_token: str, db: Session):
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY_REFRESH, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None or payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+            
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user or user.is_deleted:
+            raise HTTPException(status_code=401, detail="User validation failed")
+            
+        new_access = create_access_token({"sub": user_id})
+        return {"access_token": new_access, "token_type": "bearer"}
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 def verify_password(plain_password, hashed_password):
     if not hashed_password:

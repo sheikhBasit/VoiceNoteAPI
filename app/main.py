@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db.session import get_db
-from app.api import users, notes, tasks, ai, admin, testing, meetings, webhooks, websocket
+from app.api import users, notes, tasks, ai, admin, testing, meetings, webhooks, websocket, folders
 import logging
 import os
 
@@ -221,6 +221,7 @@ app.include_router(notes.router)
 app.include_router(tasks.router)
 app.include_router(ai.router)
 app.include_router(admin.router)  # NEW: Admin endpoints
+app.include_router(folders.router) # NEW: Folders management
 
 # Testing endpoints - only in non-production environments
 if os.getenv("ENVIRONMENT", "development") != "production":

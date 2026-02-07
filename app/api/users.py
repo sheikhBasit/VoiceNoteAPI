@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db import models
@@ -22,7 +22,8 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.utils.json_logger import JLogger
 from app.utils.security import verify_device_signature
-from app.services.auth_service import create_access_token, get_current_user
+from app.services.auth_service import create_access_token, get_current_user, create_refresh_token, refresh_access_token
+import shutil
 
 limiter = Limiter(key_func=get_remote_address, storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0")) 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
@@ -77,9 +78,17 @@ def sync_user(request: Request, user_data: user_schema.UserCreate, db: Session =
         db.commit()
         db.refresh(db_user)
         
-        # Issue Token
+        # Issue Tokens
         access_token = create_access_token(data={"sub": db_user.id})
-        return {"user": db_user, "access_token": access_token, "token_type": "bearer", "is_new_user": True}
+        refresh_token = create_refresh_token(data={"sub": db_user.id})
+        
+        return {
+            "user": db_user, 
+            "access_token": access_token, 
+            "refresh_token": refresh_token,
+            "token_type": "bearer", 
+            "is_new_user": True
+        }
 
     # 3. Case: Existing User - Security Check
     if db_user.is_deleted:
@@ -131,8 +140,18 @@ def sync_user(request: Request, user_data: user_schema.UserCreate, db: Session =
         db_user.timezone = user_data.timezone
 
     db.commit()
+    
+    # Issue Tokens
     access_token = create_access_token(data={"sub": db_user.id})
-    return {"user": db_user, "access_token": access_token, "token_type": "bearer", "is_new_user": False}
+    refresh_token = create_refresh_token(data={"sub": db_user.id})
+    
+    return {
+        "user": db_user, 
+        "access_token": access_token, 
+        "refresh_token": refresh_token,
+        "token_type": "bearer", 
+        "is_new_user": False
+    }
 
 @router.post("/logout")
 def logout_user(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -406,3 +425,50 @@ def update_user_role(user_id: str, role: str, admin_id: str, db: Session = Depen
     db.commit()
     JLogger.info("User role updated by admin", user_id=validated_user_id, new_role=role, admin_id=admin_id)
     return user_schema.UserResponse.model_validate(user)
+from app.services.auth_service import refresh_access_token
+
+@router.post("/refresh")
+def refresh_token(
+    refresh_token: str = Query(..., alias="token"),
+    db: Session = Depends(get_db)
+):
+    """
+    Refresh Access Token using a valid Refresh Token.
+    """
+    return refresh_access_token(refresh_token, db)
+
+@router.patch("/me/profile-picture", response_model=user_schema.UserResponse)
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload and update profile picture.
+    """
+    # 1. Validation
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(400, detail="File must be an image")
+    
+    # 2. Save File
+    upload_dir = "uploads/profiles"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Secure filename
+    ext = os.path.splitext(file.filename)[1]
+    if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
+        ext = ".jpg" 
+        
+    filename = f"{current_user.id}_{int(time.time())}{ext}"
+    file_path = os.path.join(upload_dir, filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # 3. Update User
+    current_user.profile_picture_url = f"/{file_path}"
+    db.commit()
+    db.refresh(current_user)
+    
+    JLogger.info("Profile picture updated", user_id=current_user.id, path=file_path)
+    return current_user
