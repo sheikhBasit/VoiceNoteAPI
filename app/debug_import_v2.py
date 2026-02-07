@@ -1,5 +1,5 @@
 import time
-import sys
+
 
 def trace_import(module_name):
     print(f"[{time.time()}] Starting import of {module_name}...")
@@ -8,6 +8,7 @@ def trace_import(module_name):
         print(f"[{time.time()}] Finished import of {module_name}.")
     except Exception as e:
         print(f"[{time.time()}] ERROR importing {module_name}: {e}")
+
 
 print("--- Detailed Import Trace ---")
 trace_import("app.db.models")

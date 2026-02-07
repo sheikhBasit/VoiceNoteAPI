@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class AISettingsBase(BaseModel):
     llm_model: str = "llama-3.1-70b-versatile"
@@ -12,8 +14,10 @@ class AISettingsBase(BaseModel):
     deepgram_model: str = "nova-3"
     semantic_analysis_prompt: Optional[str] = None
 
+
 class AISettingsUpdate(AISettingsBase):
     pass
+
 
 class AISettingsResponse(AISettingsBase):
     updated_at: int

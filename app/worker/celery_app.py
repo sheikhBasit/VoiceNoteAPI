@@ -1,16 +1,16 @@
-from celery import Celery
 import os
 import sys
-from dotenv import load_dotenv
+
+from celery import Celery
 
 # Determine if we are in a testing environment (CI or local pytest)
 # We check multiple sources to be absolutely sure
 is_testing = (
-    os.getenv("ENVIRONMENT") == "testing" or 
-    os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true" or
-    os.getenv("GITHUB_ACTIONS") == "true" or
-    "pytest" in sys.modules or
-    os.path.basename(sys.argv[0]) == "pytest"
+    os.getenv("ENVIRONMENT") == "testing"
+    or os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true"
+    or os.getenv("GITHUB_ACTIONS") == "true"
+    or "pytest" in sys.modules
+    or os.path.basename(sys.argv[0]) == "pytest"
 )
 
 # Debug print for CI logs (can be removed after CI is green)
@@ -27,11 +27,7 @@ else:
     result_backend = os.getenv("REDIS_URL", "redis://redis:6379/1")
 
 # Celery App Instance
-celery_app = Celery(
-    "voicenote",
-    broker=broker_url,
-    backend=result_backend
-)
+celery_app = Celery("voicenote", broker=broker_url, backend=result_backend)
 
 # Optimization for audio processing
 celery_app.conf.update(
@@ -54,7 +50,7 @@ celery_app.conf.update(
         "celery": {"exchange": "celery", "routing_key": "celery"},
     },
     task_default_queue="celery",
-    imports=["app.worker.task"] # Explicit import
+    imports=["app.worker.task"],  # Explicit import
 )
 
 # Extra enforcement for testing

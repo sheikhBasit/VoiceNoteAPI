@@ -2,9 +2,9 @@
 Integration test configuration and global mocks.
 """
 
-import pytest
 import sys
 from unittest.mock import MagicMock
+
 from sqlalchemy.types import UserDefinedType
 
 # --- High-Level Mocks to stop dependency chain ---
@@ -26,16 +26,21 @@ sys.modules["pyannote.audio"] = MagicMock()
 sys.modules["cloudinary"] = MagicMock()
 sys.modules["cloudinary.uploader"] = MagicMock()
 
+
 # Mock pgvector for SQLAlchemy Column initialization
 class MockVector(UserDefinedType):
     def __init__(self, dim=None):
         self.dim = dim
+
     def get_col_spec(self, **kw):
         return "TEXT"
+
     def bind_processor(self, dialect):
         return lambda x: str(x)
+
     def result_processor(self, dialect, coltype):
         return lambda x: x
+
 
 mock_vector_mod = MagicMock()
 mock_vector_mod.Vector = MockVector

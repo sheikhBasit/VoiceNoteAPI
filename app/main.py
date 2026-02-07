@@ -1,26 +1,42 @@
-from app.utils.json_logger import JLogger
-from fastapi import FastAPI, Request, Depends
-from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from app.db.session import get_db
-from app.api import users, notes, tasks, ai, admin, testing, meetings, webhooks, websocket, folders
 import logging
 import os
 
-from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.api import (
+    admin,
+    ai,
+    folders,
+    meetings,
+    notes,
+    tasks,
+    testing,
+    users,
+    webhooks,
+    websocket,
+)
+from app.db.session import get_db
+from app.utils.json_logger import JLogger
+
 
 # Suppress excessive health/metrics logs
 class EndpointFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
-        return record.getMessage().find("/health") == -1 and record.getMessage().find("/metrics") == -1
+        return (
+            record.getMessage().find("/health") == -1
+            and record.getMessage().find("/metrics") == -1
+        )
+
 
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 # Initialize Celery app to ensure config (e.g. eager mode) is applied to current_app
-from app.worker.celery_app import celery_app
 
 app = FastAPI(
     title="VoiceNote AI API",
@@ -28,9 +44,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url=None,
     redoc_url=None,
-    swagger_ui_parameters={
-        "persistAuthorization": True
-    }
+    swagger_ui_parameters={"persistAuthorization": True},
 )
 
 # Apply Compression (Speeds up large JSON responses like notes lists)
@@ -38,6 +52,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Add security scheme for Swagger UI
 from fastapi.openapi.utils import get_openapi
+
 
 def custom_openapi():
     if app.openapi_schema:
@@ -48,24 +63,24 @@ def custom_openapi():
         description=app.description,
         routes=app.routes,
     )
-    
+
     # Define BearerAuth security scheme
     openapi_schema["components"]["securitySchemes"] = {
         "BearerAuth": {
             "type": "http",
             "scheme": "bearer",
             "bearerFormat": "JWT",
-            "description": "Enter your JWT token from /api/v1/users/sync"
+            "description": "Enter your JWT token from /api/v1/users/sync",
         }
     }
-    
+
     # Endpoints that do NOT require authentication
     public_endpoints = {
         "/api/v1/users/sync": ["post"],
         "/api/v1/users/verify-device": ["get"],
         "/api/v1/users/request-device-auth": ["post"],
     }
-    
+
     # Replace all HTTPBearer references with BearerAuth
     # And remove security from public endpoints
     for path, operations in openapi_schema.get("paths", {}).items():
@@ -74,10 +89,13 @@ def custom_openapi():
                 # Check if this is a public endpoint
                 is_public = False
                 for public_path, public_methods in public_endpoints.items():
-                    if path.lower() == public_path.lower() and method.lower() in public_methods:
+                    if (
+                        path.lower() == public_path.lower()
+                        and method.lower() in public_methods
+                    ):
                         is_public = True
                         break
-                
+
                 if is_public:
                     # Remove security requirement from public endpoints
                     if "security" in operation:
@@ -92,14 +110,16 @@ def custom_openapi():
                     # Add security to endpoints that have dependencies but no explicit security
                     if method.lower() not in ["options", "head"]:
                         operation["security"] = [{"BearerAuth": []}]
-    
+
     # Do NOT apply security globally - let endpoints define their own
     # openapi_schema["security"] = [{"BearerAuth": []}]
-    
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
+
 app.openapi = custom_openapi
+
 
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
@@ -109,7 +129,7 @@ async def custom_swagger_ui_html():
         oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
         swagger_js_url="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js",
         swagger_css_url="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css",
-        swagger_ui_parameters={"syntaxHighlight.theme": "obsidian"}
+        swagger_ui_parameters={"syntaxHighlight.theme": "obsidian"},
     )
     dark_css = """
     <style>
@@ -140,7 +160,10 @@ async def custom_swagger_ui_html():
         .swagger-ui .topbar { background-color: #1a1a1a !important; }
     </style>
     """
-    return HTMLResponse(response.body.decode("utf-8").replace("</head>", dark_css + "</head>"))
+    return HTMLResponse(
+        response.body.decode("utf-8").replace("</head>", dark_css + "</head>")
+    )
+
 
 @app.get("/redoc", include_in_schema=False)
 async def redoc_html():
@@ -196,18 +219,26 @@ async def redoc_html():
     </html>
     """)
 
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     # Log the full traceback for engineers
-    JLogger.exception("Unhandled exception caught by global handler", 
-                      path=request.url.path, 
-                      method=request.method)
+    JLogger.exception(
+        "Unhandled exception caught by global handler",
+        path=request.url.path,
+        method=request.method,
+    )
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error: A critical failure occurred. Our engineers have been notified."},
+        content={
+            "detail": "Internal server error: A critical failure occurred. Our engineers have been notified."
+        },
     )
 
+
 from fastapi.exceptions import RequestValidationError
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
@@ -215,13 +246,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": str(exc)},
     )
 
+
 # Register routers
 app.include_router(users.router)
 app.include_router(notes.router)
 app.include_router(tasks.router)
 app.include_router(ai.router)
 app.include_router(admin.router)  # NEW: Admin endpoints
-app.include_router(folders.router) # NEW: Folders management
+app.include_router(folders.router)  # NEW: Folders management
 
 # Testing endpoints - only in non-production environments
 if os.getenv("ENVIRONMENT", "development") != "production":
@@ -230,7 +262,8 @@ if os.getenv("ENVIRONMENT", "development") != "production":
 else:
     JLogger.info("Testing endpoints disabled (production environment)")
 
-from app.api import webhooks, meetings, websocket # NEW
+from app.api import meetings, webhooks, websocket  # NEW
+
 app.include_router(webhooks.router)
 app.include_router(meetings.router)
 app.include_router(websocket.router)
@@ -241,12 +274,12 @@ if not os.path.exists("uploads"):
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 from prometheus_fastapi_instrumentator import Instrumentator
-from app.api.middleware.usage import UsageTrackingMiddleware # NEW
+
+from app.api.middleware.usage import UsageTrackingMiddleware  # NEW
 
 Instrumentator().instrument(app).expose(app)
-app.add_middleware(UsageTrackingMiddleware) # NEW: Usage Metering
+app.add_middleware(UsageTrackingMiddleware)  # NEW: Usage Metering
 
-from starlette.types import Message
 
 class RequestBodyCacheMiddleware:
     def __init__(self, app):
@@ -276,17 +309,21 @@ class RequestBodyCacheMiddleware:
         else:
             await self.app(scope, receive, send)
 
+
 @app.on_event("startup")
 async def startup_event():
     """Warm up AI services and local models."""
     JLogger.info("Application starting up: Warming up AI models...")
     from app.services.ai_service import AIService
+
     service = AIService()
     # Pre-load local embedding model (SentenceTransformer)
     service._get_local_embedding_model()
     JLogger.info("Model warmup complete.")
 
+
 app.add_middleware(RequestBodyCacheMiddleware)
+
 
 @app.get("/")
 def read_root():
@@ -298,9 +335,10 @@ def read_root():
             "notes": "/api/v1/notes",
             "tasks": "/api/v1/tasks",
             "ai": "/api/v1/ai",
-            "admin": "/api/v1/admin"
-        }
+            "admin": "/api/v1/admin",
+        },
     }
+
 
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):
@@ -311,5 +349,9 @@ def health_check(db: Session = Depends(get_db)):
     except Exception as e:
         return JSONResponse(
             status_code=503,
-            content={"status": "unhealthy", "database": "disconnected", "error": str(e)}
+            content={
+                "status": "unhealthy",
+                "database": "disconnected",
+                "error": str(e),
+            },
         )

@@ -1,7 +1,8 @@
-import numpy as np
-from pydub import AudioSegment, effects
-import os
 import logging
+import os
+
+from pydub import AudioSegment, effects
+
 from app.utils.audio_quality_analyzer import AudioQualityAnalyzer
 from app.utils.json_logger import JLogger
 
@@ -9,10 +10,12 @@ logger = logging.getLogger(__name__)
 
 from scipy.signal import butter, lfilter
 
+
 def highpass(audio, sr, cutoff=80):
     """Remove low-frequency rumble below the cutoff frequency."""
     b, a = butter(2, cutoff / (sr / 2), btype="high")
     return lfilter(b, a, audio)
+
 
 def preprocess_audio_pipeline(input_path: str):
     """
@@ -20,18 +23,18 @@ def preprocess_audio_pipeline(input_path: str):
     Decode -> High-Pass Filter -> Noise Reduction -> Dynamic Compression -> Normalization
     """
     import librosa
-    import soundfile as sf
     import noisereduce as nr
-    
+    import soundfile as sf
+
     # 0. TRANSCODE TO WAV IF NEEDED (e.g. m4a, 3gp, aac)
     base_path, ext = os.path.splitext(input_path)
-    if ext.lower() not in ['.wav', '.wave']:
+    if ext.lower() not in [".wav", ".wave"]:
         try:
             temp_wav_input = f"{base_path}_converted.wav"
             JLogger.info(f"Transcoding {ext} to WAV for processing: {input_path}")
             audio = AudioSegment.from_file(input_path)
             audio.export(temp_wav_input, format="wav")
-            input_path = temp_wav_input # Use the converted file
+            input_path = temp_wav_input  # Use the converted file
         except Exception as e:
             JLogger.error(f"Failed to transcode {ext} file: {e}")
             raise e
@@ -56,18 +59,18 @@ def preprocess_audio_pipeline(input_path: str):
     base_path, ext = os.path.splitext(input_path)
     temp_wav = f"{base_path}_temp.wav"
     sf.write(temp_wav, y_trimmed, sr)
-    
+
     # 6. Dynamic Range Compression & Normalization
     # 'Magic' for distant voices: brings quiet sounds closer to loudest for clarity
     audio_segment = AudioSegment.from_wav(temp_wav)
-    
+
     # Dynamic Compression
     compressed_audio = effects.compress_dynamic_range(
-        audio_segment, 
-        threshold=-24.0, # Target quiet sounds
-        ratio=4.0,       # Compression intensity
-        attack=5.0,      # Reaction in ms
-        release=50.0     # Recovery in ms
+        audio_segment,
+        threshold=-24.0,  # Target quiet sounds
+        ratio=4.0,  # Compression intensity
+        attack=5.0,  # Reaction in ms
+        release=50.0,  # Recovery in ms
     )
 
     # 7. Final Peak Normalization to -0.1 dB
@@ -76,11 +79,11 @@ def preprocess_audio_pipeline(input_path: str):
 
     # 8. Quality Check: Gain Boost if still too quiet
     if final_audio.dBFS < -15:
-        final_audio = final_audio + 10 # Boost by 10dB for distant speakers
+        final_audio = final_audio + 10  # Boost by 10dB for distant speakers
 
     output_path = f"{base_path}_refined.wav"
     final_audio.export(output_path, format="wav")
-    
+
     # Clean up temp file
     if os.path.exists(temp_wav):
         os.remove(temp_wav)
@@ -88,13 +91,13 @@ def preprocess_audio_pipeline(input_path: str):
     # 9. Quality Audit
     analyzer = AudioQualityAnalyzer()
     quality_report = analyzer.analyze_audio_quality(output_path)
-    
+
     JLogger.info(
         "Preprocessing complete",
         input=input_path,
         output=output_path,
         quality_score=quality_report.get("quality_score"),
-        quality_category=quality_report.get("quality_category")
+        quality_category=quality_report.get("quality_category"),
     )
 
     # Cleanup
@@ -103,5 +106,9 @@ def preprocess_audio_pipeline(input_path: str):
 
     return output_path
     # Cleanup converted/temp wav if it was created
-    if 'temp_wav_input' in locals() and os.path.exists(temp_wav_input) and temp_wav_input != output_path:
+    if (
+        "temp_wav_input" in locals()
+        and os.path.exists(temp_wav_input)
+        and temp_wav_input != output_path
+    ):
         os.remove(temp_wav_input)

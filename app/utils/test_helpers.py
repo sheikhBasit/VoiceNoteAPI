@@ -4,17 +4,25 @@ Test Helper Utilities - Wraps validation functions for test compatibility
 Maps test expectations to actual implementation.
 """
 
-from app.utils.users_validation import ValidationError
 from app.utils.ai_service_utils import AIServiceError
+from app.utils.users_validation import ValidationError
 
 # Make AIServiceError available from users_validation for test compatibility
-__all__ = ['validate_email', 'validate_device_model', 'validate_transcript', 
-           'validate_title', 'validate_password', 'ValidationError', 'AIServiceError']
+__all__ = [
+    "validate_email",
+    "validate_device_model",
+    "validate_transcript",
+    "validate_title",
+    "validate_password",
+    "ValidationError",
+    "AIServiceError",
+]
 
 
 def validate_email(email: str):
     """Validate email - wraps users_validation."""
     from app.utils.users_validation import validate_email as _validate_email
+
     try:
         return _validate_email(email)
     except ValidationError as e:
@@ -23,7 +31,10 @@ def validate_email(email: str):
 
 def validate_device_model(model: str):
     """Validate device model - wraps users_validation."""
-    from app.utils.users_validation import validate_device_model as _validate_device_model
+    from app.utils.users_validation import (
+        validate_device_model as _validate_device_model,
+    )
+
     try:
         return _validate_device_model(model)
     except ValidationError as e:
@@ -39,12 +50,20 @@ def validate_transcript(text: str):
     if len(text) < 1:
         raise AIServiceError("Transcript cannot be empty")
     # Check for dangerous patterns - SQL injection
-    dangerous_patterns = ['DROP TABLE', 'DELETE FROM', 'TRUNCATE', 'DROP', 'DELETE', 'UPDATE', 'INSERT']
+    dangerous_patterns = [
+        "DROP TABLE",
+        "DELETE FROM",
+        "TRUNCATE",
+        "DROP",
+        "DELETE",
+        "UPDATE",
+        "INSERT",
+    ]
     for pattern in dangerous_patterns:
         if pattern.upper() in text.upper():
             raise AIServiceError("Dangerous content detected in transcript")
     # Check for XSS patterns
-    xss_patterns = ['<script', '<img', 'javascript:', 'onerror=', 'onclick=', 'onload=']
+    xss_patterns = ["<script", "<img", "javascript:", "onerror=", "onclick=", "onload="]
     for pattern in xss_patterns:
         if pattern in text.lower():
             raise AIServiceError("XSS detected in transcript")
@@ -60,10 +79,10 @@ def validate_title(title: str):
     if len(title) < 1:
         raise AIServiceError("Title cannot be empty")
     # Check for dangerous patterns
-    if '<script>' in title.lower() or '<img' in title.lower():
+    if "<script>" in title.lower() or "<img" in title.lower():
         raise AIServiceError("Dangerous HTML detected in title")
     # Check for XSS patterns
-    xss_patterns = ['<script', 'javascript:', 'onerror=', 'onclick=', 'onload=']
+    xss_patterns = ["<script", "javascript:", "onerror=", "onclick=", "onload="]
     for pattern in xss_patterns:
         if pattern in title.lower():
             raise AIServiceError("XSS detected in title")
@@ -82,6 +101,7 @@ def validate_password(password: str):
 def validate_json_response(response: str):
     """Validate JSON response."""
     import json
+
     if not response or not response.strip():
         raise AIServiceError("Empty response")
     try:

@@ -1,19 +1,19 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, status
-from sqlalchemy.orm import Session
-from app.db.session import get_db
-from app.services.websocket_manager import manager
-from app.services.auth_service import get_current_user_ws # We need a WS-specific auth
 import logging
+
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.services.auth_service import get_current_user_ws  # We need a WS-specific auth
+from app.services.websocket_manager import manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ws", tags=["Real-time Sync"])
 
+
 @router.websocket("/{user_id}")
 async def websocket_endpoint(
-    websocket: WebSocket, 
-    user_id: str, 
-    token: str = None,
-    db: Session = Depends(get_db)
+    websocket: WebSocket, user_id: str, token: str = None, db: Session = Depends(get_db)
 ):
     """
     Main WebSocket handle.
@@ -26,8 +26,8 @@ async def websocket_endpoint(
     try:
         user = await get_current_user_ws(token, db)
         if user.id != user_id:
-             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-             return
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
     except Exception:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return

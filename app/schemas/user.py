@@ -1,7 +1,9 @@
+from typing import List, Optional
+
 from pydantic import BaseModel, ConfigDict
+
 from app.db.models import UserRole
-from typing import Optional, List, Dict, Any
-import json
+
 
 class UserBase(BaseModel):
     id: str
@@ -23,12 +25,14 @@ class UserBase(BaseModel):
     # is_admin: bool = False
     # admin_permissions: Optional[Dict[str, Any]] = None
 
+
 class UserCreate(UserBase):
     id: Optional[str] = None
     token: str
     device_id: str
     device_model: str
     timezone: Optional[str] = "UTC"  # Optional, defaults to UTC
+
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -38,14 +42,17 @@ class UserUpdate(BaseModel):
     work_end_hour: Optional[int] = None
     timezone: Optional[str] = None
 
+
 class UserResponse(UserBase):
     last_login: Optional[int] = None
     is_deleted: bool = False
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
+
 class AdminLogin(BaseModel):
     username: str
     password: str
+
 
 class SyncResponse(BaseModel):
     user: UserResponse

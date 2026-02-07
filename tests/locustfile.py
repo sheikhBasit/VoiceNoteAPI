@@ -1,19 +1,24 @@
-from locust import HttpUser, task, between
 import uuid
 
+from locust import HttpUser, between, task
+
+
 class VoiceNoteLoadTester(HttpUser):
-    wait_time = between(1, 5) # Simulate human delay
+    wait_time = between(1, 5)  # Simulate human delay
 
     def on_start(self):
         """Setup a fake biometric session for the virtual user."""
         self.user_id = f"load_user_{uuid.uuid4()}"
         self.headers = {"X-Device-Token": "test_secret_token"}
         # Register user
-        self.client.post("/api/v1/users/sync", json={
-            "id": self.user_id,
-            "token": "test_secret_token",
-            "name": "Load User"
-        })
+        self.client.post(
+            "/api/v1/users/sync",
+            json={
+                "id": self.user_id,
+                "token": "test_secret_token",
+                "name": "Load User",
+            },
+        )
 
     @task(3)
     def view_notes(self):
@@ -24,9 +29,9 @@ class VoiceNoteLoadTester(HttpUser):
     def semantic_search(self):
         """Simulate AI vector search (High CPU usage)."""
         self.client.post(
-            "/api/v1/ai/search", 
+            "/api/v1/ai/search",
             params={"query": "budget plans", "user_id": self.user_id},
-            headers=self.headers
+            headers=self.headers,
         )
 
     @task(1)
@@ -37,5 +42,5 @@ class VoiceNoteLoadTester(HttpUser):
             "/api/v1/notes/process",
             headers=self.headers,
             data={"user_id": self.user_id},
-            files={"file": ("stress_test.mp3", file_content)}
+            files={"file": ("stress_test.mp3", file_content)},
         )

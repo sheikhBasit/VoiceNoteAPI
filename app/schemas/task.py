@@ -1,11 +1,14 @@
-from pydantic import BaseModel, ConfigDict, Field, EmailStr, HttpUrl
-from typing import List, Optional
 from enum import Enum
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl
+
 
 class Priority(str, Enum):
     HIGH = "HIGH"
     MEDIUM = "MEDIUM"
     LOW = "LOW"
+
 
 class CommunicationType(str, Enum):
     WHATSAPP = "WHATSAPP"
@@ -14,32 +17,37 @@ class CommunicationType(str, Enum):
     MEET = "MEET"
     SLACK = "SLACK"
 
+
 class ContactEntity(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
-    email: Optional[EmailStr] = None # Validates email format automatically
+    email: Optional[EmailStr] = None  # Validates email format automatically
+
 
 class LinkEntity(BaseModel):
     title: str
-    url: HttpUrl # Validates proper URL format
+    url: HttpUrl  # Validates proper URL format
+
 
 class TaskBase(BaseModel):
     title: Optional[str] = Field(None, description="Brief punchy title")
     description: str = Field(..., min_length=1)
     priority: Priority = Priority.MEDIUM
     deadline: Optional[int] = None
-    
+
     # Use default_factory to avoid mutable default issues
     assigned_entities: List[ContactEntity] = Field(default_factory=list)
     image_uris: List[str] = Field(default_factory=list)  # Client-side URIs
     document_uris: List[str] = Field(default_factory=list)  # Client-side URIs
     external_links: List[LinkEntity] = Field(default_factory=list)
-    
+
     communication_type: Optional[CommunicationType] = None
     is_action_approved: bool = False
 
+
 class TaskCreate(TaskBase):
     note_id: Optional[str] = None
+
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
@@ -55,13 +63,22 @@ class TaskUpdate(BaseModel):
     is_action_approved: bool = False
     is_deleted: Optional[bool] = None
 
+
 class SuggestedActions(BaseModel):
     """Smart action suggestions for tasks."""
+
     google_search: Optional[dict] = None  # {"query": "...", "url": "..."}
-    map: Optional[dict] = None # {"location": "...", "url": "..."}
-    email: Optional[dict] = None  # {"to": "...", "subject": "...", "body": "...", "mailto_link": "..."}
-    whatsapp: Optional[dict] = None  # {"phone": "...", "message": "...", "deeplink": "..."}
-    ai_prompt: Optional[dict] = None  # {"model": "...", "prompt": "...", "chat_url": "..."}
+    map: Optional[dict] = None  # {"location": "...", "url": "..."}
+    email: Optional[dict] = (
+        None  # {"to": "...", "subject": "...", "body": "...", "mailto_link": "..."}
+    )
+    whatsapp: Optional[dict] = (
+        None  # {"phone": "...", "message": "...", "deeplink": "..."}
+    )
+    ai_prompt: Optional[dict] = (
+        None  # {"model": "...", "prompt": "...", "chat_url": "..."}
+    )
+
 
 class TaskResponse(TaskBase):
     id: str

@@ -4,18 +4,18 @@ JSON Logger for VoiceNoteAPI
 Structured logging with JSON format for better debugging and monitoring.
 """
 
-from datetime import UTC, datetime
 import json
 import logging
 import os
 import sys
+from datetime import UTC, datetime
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 
 class JsonFormatter(logging.Formatter):
     """Custom JSON formatter for structured logging."""
-    
+
     def format(self, record):
         log_record = {
             "timestamp": datetime.now(UTC).isoformat(),
@@ -32,25 +32,25 @@ class JsonFormatter(logging.Formatter):
         extra_fields = getattr(record, "structured_data", None)
         if extra_fields:
             log_record.update(extra_fields)
-        
+
         # Add exception info if present
         if record.exc_info:
             log_record["exception"] = self.formatException(record.exc_info)
-        
+
         return json.dumps(log_record)
 
 
 class JsonLogger:
     """
     Structured JSON logger for VoiceNoteAPI.
-    
+
     Usage:
         from app.utils.json_logger import JLogger
-        
+
         JLogger.info("Processing audio file", file_id="123", duration=30.5)
         JLogger.error("Failed to process", error="Invalid format", file_id="456")
     """
-    
+
     def __init__(self, name="app"):
         self._logger = logging.getLogger(name)
 
@@ -86,11 +86,11 @@ class JsonLogger:
     def error(self, message, **fields):
         """Log error level message with optional structured fields."""
         self._log(logging.ERROR, message, **fields)
-    
+
     def critical(self, message, **fields):
         """Log critical level message with optional structured fields."""
         self._log(logging.CRITICAL, message, **fields)
-    
+
     def exception(self, message, **fields):
         """Log exception with traceback."""
         self._logger.exception(

@@ -1,13 +1,16 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
 from functools import lru_cache
 from typing import List
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class AISettings(BaseSettings):
     """
     Centralized AI and System configurations.
     Validation is handled by Pydantic.
     """
+
     # LLM Parameters
     LLM_MODEL: str = "llama-3.3-70b-versatile"
     LLM_FAST_MODEL: str = "llama-3.1-8b-instant"
@@ -15,35 +18,49 @@ class AISettings(BaseSettings):
     TEMPERATURE: float = 0.3
     MAX_TOKENS: int = 4096
     TOP_P: float = 0.9
-    
+
     # STT Models
     GROQ_WHISPER_MODEL: str = "whisper-large-v3-turbo"
     DEEPGRAM_MODEL: str = "nova-3"
-    
+
     # Validation
     MAX_TRANSCRIPT_LENGTH: int = 100000
     AUDIO_BITRATE_THRESHOLD: int = 128000
-    SHORT_AUDIO_THRESHOLD_SEC: int = 45 # Audio below this goes to 'short' queue
-    SHORT_AUDIO_THRESHOLD_SEC: int = 45 # Audio below this goes to 'short' queue
-    
+    SHORT_AUDIO_THRESHOLD_SEC: int = 45  # Audio below this goes to 'short' queue
+    SHORT_AUDIO_THRESHOLD_SEC: int = 45  # Audio below this goes to 'short' queue
+
     # --- STORAGE SETTINGS (NEW) ---
     MINIO_ENDPOINT: str = Field(default="minio:9000", validation_alias="MINIO_ENDPOINT")
-    MINIO_ACCESS_KEY: str = Field(default="minioadmin", validation_alias="MINIO_ACCESS_KEY")
-    MINIO_SECRET_KEY: str = Field(default="minioadminpassword", validation_alias="MINIO_SECRET_KEY")
-    MINIO_BUCKET_NAME: str = Field(default="incoming", validation_alias="MINIO_BUCKET_NAME")
+    MINIO_ACCESS_KEY: str = Field(
+        default="minioadmin", validation_alias="MINIO_ACCESS_KEY"
+    )
+    MINIO_SECRET_KEY: str = Field(
+        default="minioadminpassword", validation_alias="MINIO_SECRET_KEY"
+    )
+    MINIO_BUCKET_NAME: str = Field(
+        default="incoming", validation_alias="MINIO_BUCKET_NAME"
+    )
     MINIO_SECURE: bool = Field(default=False, validation_alias="MINIO_SECURE")
-    
+
     # --- COMMERCIAL SETTINGS (NEW) ---
-    STRIPE_SECRET_KEY: str = Field(default="sk_test_placeholder", validation_alias="STRIPE_SECRET_KEY")
-    STRIPE_WEBHOOK_SECRET: str = Field(default="whsec_placeholder", validation_alias="STRIPE_WEBHOOK_SECRET")
-    STRIPE_PRICE_ID_PRO: str = Field(default="price_placeholder", validation_alias="STRIPE_PRICE_ID_PRO")
-    
+    STRIPE_SECRET_KEY: str = Field(
+        default="sk_test_placeholder", validation_alias="STRIPE_SECRET_KEY"
+    )
+    STRIPE_WEBHOOK_SECRET: str = Field(
+        default="whsec_placeholder", validation_alias="STRIPE_WEBHOOK_SECRET"
+    )
+    STRIPE_PRICE_ID_PRO: str = Field(
+        default="price_placeholder", validation_alias="STRIPE_PRICE_ID_PRO"
+    )
+
     RECALL_AI_API_KEY: str = Field(default="", validation_alias="RECALL_AI_API_KEY")
     DAILY_CO_API_KEY: str = Field(default="", validation_alias="DAILY_CO_API_KEY")
-    
+
     GOOGLE_CLIENT_ID: str = Field(default="", validation_alias="GOOGLE_CLIENT_ID")
-    GOOGLE_CLIENT_SECRET: str = Field(default="", validation_alias="GOOGLE_CLIENT_SECRET")
-    
+    GOOGLE_CLIENT_SECRET: str = Field(
+        default="", validation_alias="GOOGLE_CLIENT_SECRET"
+    )
+
     # AI Prompts
     EXTRACTION_SYSTEM_PROMPT: str = """
     You are an advanced AI Note-Taker. Your goal is to convert messy meeting or lecture transcripts into structured insights.
@@ -151,10 +168,9 @@ class AISettings(BaseSettings):
     TRUSTED_HOSTS: List[str] = ["*"]
     # Tell Pydantic to read from .env
     model_config = SettingsConfigDict(
-        env_file=".env", 
-        env_file_encoding="utf-8",
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
+
 
 @lru_cache()
 def get_ai_settings():
@@ -163,5 +179,6 @@ def get_ai_settings():
     repeatedly reading the .env file from disk.
     """
     return AISettings()
-    
+
+
 ai_config = get_ai_settings()

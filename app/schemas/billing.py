@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Any
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict
+
 
 class ServicePlanBase(BaseModel):
     id: str
@@ -10,13 +12,16 @@ class ServicePlanBase(BaseModel):
     can_use_rag: bool = True
     max_storage_mb: int = 500
 
+
 class ServicePlanCreate(ServicePlanBase):
     pass
+
 
 class ServicePlanResponse(ServicePlanBase):
     created_at: int
     updated_at: int
     model_config = ConfigDict(from_attributes=True)
+
 
 class UsageLogResponse(BaseModel):
     id: int
@@ -26,6 +31,7 @@ class UsageLogResponse(BaseModel):
     cost_estimated: int
     timestamp: int
     model_config = ConfigDict(from_attributes=True)
+
 
 class UserUsageSummary(BaseModel):
     user_id: str
