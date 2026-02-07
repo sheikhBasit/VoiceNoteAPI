@@ -40,9 +40,7 @@ def auth_context():
             "email": test_user_payload["email"],
             "user_id": data["user"]["id"],
         }
-
-    # Debug print if auth fails
-    print(f"Auth failed: {sync_response.status_code} - {sync_response.text}")
+    
     return None
 
 
@@ -68,8 +66,6 @@ class TestNoteCreation:
                 "priority": "HIGH",
             },
         )
-        if response.status_code != 201:
-            print(f"Create failed: {response.json()}")
         assert response.status_code == 201
         data = response.json()
         if data["title"] != "Test Note":

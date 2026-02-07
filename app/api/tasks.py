@@ -370,6 +370,16 @@ def update_task(
         task.updated_at = int(time.time() * 1000)
         db.commit()
         db.refresh(task)
+
+        # NEW: Bridging to Calendar/Notion on approval (Phase 3 Requirement)
+        if "is_action_approved" in update_data and update_data["is_action_approved"] is True:
+            from app.worker.task import sync_external_service_task
+
+            # Trigger background sync for multiple services
+            # In production, we'd check user preferences for which services are enabled
+            sync_external_service_task.delay(task.id, "google_calendar", current_user.id)
+            sync_external_service_task.delay(task.id, "notion", current_user.id)
+
     except Exception as e:
         db.rollback()
         JLogger.error("Task patch failed in database", task_id=task_id, error=str(e))

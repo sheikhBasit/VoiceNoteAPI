@@ -6,8 +6,6 @@ from typing import Any, Dict, List
 import redis.asyncio as redis
 from fastapi import WebSocket
 
-
-
 logger = logging.getLogger(__name__)
 
 

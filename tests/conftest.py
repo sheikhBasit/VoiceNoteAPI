@@ -11,6 +11,7 @@ def mock_package(name):
     mock = MagicMock()
     mock.__path__ = []
     mock.__all__ = []
+    mock.__spec__ = MagicMock()  # Fix for Python 3.11+
     sys.modules[name] = mock
     return mock
 
@@ -148,14 +149,29 @@ os.environ["SENTENCE_TRANSFORMERS_HOME"] = "/tmp/models"
 def setup_test_env():
     """Setup environment variables for testing"""
     # Create test DB
+    import app.db.models  # Register models
     from app.db.session import Base
     from app.db.session import sync_engine as engine
+
+    if os.path.exists("./test.db"):
+        os.remove("./test.db")
 
     Base.metadata.create_all(bind=engine)
     yield
     # Cleanup
     if os.path.exists("./test.db"):
         os.remove("./test.db")
+
+
+@pytest.fixture
+def db_session():
+    """Provides a fresh database session for each test"""
+    from app.db.session import SessionLocal
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 @pytest.fixture(autouse=True)

@@ -4,8 +4,7 @@ import json
 import uuid
 import os
 import jwt
-from datetime import datetime, timedelta
-from dotenv import load_dotenv
+from datetime import UTC, datetime, timedelta
 
 # Load .env
 load_dotenv()
@@ -16,7 +15,7 @@ SECRET_KEY = os.getenv("DEVICE_SECRET_KEY", "your-secret-key-keep-it-safe")
 ALGORITHM = "HS256"
 
 def create_test_token(user_id: str):
-    expire = datetime.utcnow() + timedelta(days=1)
+    expire = datetime.now(UTC) + timedelta(days=1)
     to_encode = {"sub": user_id, "exp": expire}
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 

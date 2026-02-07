@@ -41,6 +41,7 @@ class UserUpdate(BaseModel):
     work_start_hour: Optional[int] = None
     work_end_hour: Optional[int] = None
     timezone: Optional[str] = None
+    profile_picture_url: Optional[str] = None
 
 
 class UserResponse(UserBase):

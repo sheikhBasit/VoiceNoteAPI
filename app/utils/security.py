@@ -123,13 +123,31 @@ def verify_note_ownership(db: Session, user: Any, note_id: str):
             detail=f"Voice note with ID '{note_id}' not found",
         )
 
-    # 2. Ownership Check (Exempt Admins)
-    if not is_user_admin and note.user_id != user_id:
-        JLogger.warning("Ownership violation attempt", user_id=user_id, note_id=note_id)
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permission denied: You do not own this voice note",
+    # 2. Ownership & Participation Check (B2B Shared Folders)
+    if is_user_admin:
+        return note
+
+    if note.user_id == user_id:
+        return note
+
+    # Check for Shared Folder Participation (Phase 5 Requirement)
+    if note.folder_id:
+        participant = (
+            db.query(models.folder_participants)
+            .filter(
+                models.folder_participants.c.folder_id == note.folder_id,
+                models.folder_participants.c.user_id == user_id,
+            )
+            .first()
         )
+        if participant:
+            return note
+
+    JLogger.warning("Ownership/Participation violation attempt", user_id=user_id, note_id=note_id)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Permission denied: You do not own this voice note and it is not in a shared folder you participate in.",
+    )
 
     return note
 
@@ -151,32 +169,35 @@ def verify_task_ownership(db: Session, user: Any, task_id: str):
             detail=f"Task with ID '{task_id}' not found",
         )
 
-    # 2. Ownership Check
+    # 2. Ownership & Participation Check
     if is_user_admin:
         return task
 
-    # Check task.user_id first (manual tasks may not have a parent note)
-    if task.user_id:
-        if task.user_id != user_id:
-            JLogger.warning(
-                "Task ownership violation attempt", user_id=user_id, task_id=task_id
+    # Check direct ownership
+    if task.user_id == user_id:
+        return task
+
+    # Check parent note's folder for shared participation
+    note = db.query(models.Note).filter(models.Note.id == task.note_id).first()
+    if note:
+        if note.user_id == user_id:
+            return task
+        if note.folder_id:
+            participant = (
+                db.query(models.folder_participants)
+                .filter(
+                    models.folder_participants.c.folder_id == note.folder_id,
+                    models.folder_participants.c.user_id == user_id,
+                )
+                .first()
             )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Permission denied: You do not have authority over this task",
-            )
-    else:
-        # Fallback for old tasks that might not have user_id populated yet
-        note = db.query(models.Note).filter(models.Note.id == task.note_id).first()
-        if not note or note.user_id != user_id:
-            JLogger.warning(
-                "Task ownership violation attempt (legacy check)",
-                user_id=user_id,
-                task_id=task_id,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Permission denied: You do not have authority over this task",
-            )
+            if participant:
+                return task
+
+    JLogger.warning("Task access violation attempt", user_id=user_id, task_id=task_id)
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Permission denied: You do not have authority over this task.",
+    )
 
     return task

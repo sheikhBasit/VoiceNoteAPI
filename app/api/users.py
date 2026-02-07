@@ -253,6 +253,20 @@ def get_user_profile(
     return current_user
 
 
+@router.get("/balance")
+def get_user_balance(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """GET /balance: Returns current wallet balance."""
+    wallet = db.query(models.Wallet).filter(models.Wallet.user_id == current_user.id).first()
+    return {
+        "user_id": current_user.id,
+        "balance": wallet.balance if wallet else 0,
+        "currency": wallet.currency if wallet else "USD"
+    }
+
+
 @router.get("/search", response_model=list)
 @limiter.limit("30/minute")
 def search_users(
@@ -505,31 +519,57 @@ async def upload_profile_picture(
     db: Session = Depends(get_db),
 ):
     """
-    Upload and update profile picture.
+    Upload and update profile picture with professional optimization.
     """
     # 1. Validation
     if not file.content_type.startswith("image/"):
         raise HTTPException(400, detail="File must be an image")
 
-    # 2. Save File
+    # 2. Setup paths
     upload_dir = "uploads/profiles"
     os.makedirs(upload_dir, exist_ok=True)
 
-    # Secure filename
-    ext = os.path.splitext(file.filename)[1]
+    ext = os.path.splitext(file.filename)[1].lower()
     if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
         ext = ".jpg"
 
     filename = f"{current_user.id}_{int(time.time())}{ext}"
-    file_path = os.path.join(upload_dir, filename)
+    temp_path = os.path.join(upload_dir, f"temp_{filename}")
+    final_path = os.path.join(upload_dir, filename)
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # 3. Save temp file and process
+    try:
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    # 3. Update User
-    current_user.profile_picture_url = f"/{file_path}"
-    db.commit()
-    db.refresh(current_user)
+        # Professional compression using ImageService
+        from app.services.image_service import ImageService
 
-    JLogger.info("Profile picture updated", user_id=current_user.id, path=file_path)
-    return current_user
+        success = ImageService.process_image(
+            temp_path, final_path, max_size=(512, 512), quality=80
+        )
+
+        if not success:
+            # Fallback to copy if processing fails for some reason
+            shutil.copy(temp_path, final_path)
+
+        # 4. Clean up temp
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+        # 5. Update User
+        current_user.profile_picture_url = f"/{final_path}"
+        db.commit()
+        db.refresh(current_user)
+
+        JLogger.info(
+            "Profile picture updated", user_id=current_user.id, path=final_path
+        )
+        return current_user
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        JLogger.error(
+            "Profile picture upload failed", user_id=current_user.id, error=str(e)
+        )
+        raise HTTPException(500, detail="Failed to upload and process profile picture")

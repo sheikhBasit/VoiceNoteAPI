@@ -6,6 +6,9 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -13,14 +16,16 @@ from app.api import (
     admin,
     ai,
     folders,
-    meetings,
+    integrations,
     notes,
     tasks,
     testing,
     users,
+    sync,
     webhooks,
     websocket,
 )
+from app.api.middleware.usage import UsageTrackingMiddleware  # NEW
 from app.db.session import get_db
 from app.utils.json_logger import JLogger
 
@@ -37,6 +42,29 @@ class EndpointFilter(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 # Initialize Celery app to ensure config (e.g. eager mode) is applied to current_app
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for startup and shutdown events.
+    Replaces deprecated @app.on_event("startup").
+    """
+    # Startup: Warm up AI services
+    JLogger.info("Application starting up: Warming up AI models...")
+    try:
+        from app.services.ai_service import AIService
+        service = AIService()
+        # Pre-load local embedding model (SentenceTransformer)
+        service._get_local_embedding_model()
+        JLogger.info("Model warmup complete.")
+    except Exception as e:
+        JLogger.error(f"Startup warmup failed: {e}")
+    
+    yield
+    
+    # Shutdown: Clean up resources if needed
+    JLogger.info("Application shutting down...")
 
 app = FastAPI(
     title="VoiceNote AI API",
@@ -44,6 +72,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url=None,
     redoc_url=None,
+    lifespan=lifespan,
     swagger_ui_parameters={"persistAuthorization": True},
 )
 
@@ -51,7 +80,6 @@ app = FastAPI(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Add security scheme for Swagger UI
-from fastapi.openapi.utils import get_openapi
 
 
 def custom_openapi():
@@ -236,9 +264,6 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-from fastapi.exceptions import RequestValidationError
-
-
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
@@ -251,9 +276,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 app.include_router(users.router)
 app.include_router(notes.router)
 app.include_router(tasks.router)
+app.include_router(sync.router)
 app.include_router(ai.router)
 app.include_router(admin.router)  # NEW: Admin endpoints
 app.include_router(folders.router)  # NEW: Folders management
+app.include_router(integrations.router)
+app.include_router(webhooks.router)
+app.include_router(websocket.router)
 
 # Testing endpoints - only in non-production environments
 if os.getenv("ENVIRONMENT", "development") != "production":
@@ -262,20 +291,11 @@ if os.getenv("ENVIRONMENT", "development") != "production":
 else:
     JLogger.info("Testing endpoints disabled (production environment)")
 
-from app.api import meetings, webhooks, websocket  # NEW
-
-app.include_router(webhooks.router)
-app.include_router(meetings.router)
-app.include_router(websocket.router)
-
 # Mount static files for local storage access
 if not os.path.exists("uploads"):
     os.makedirs("uploads")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-from prometheus_fastapi_instrumentator import Instrumentator
-
-from app.api.middleware.usage import UsageTrackingMiddleware  # NEW
 
 Instrumentator().instrument(app).expose(app)
 app.add_middleware(UsageTrackingMiddleware)  # NEW: Usage Metering
@@ -310,16 +330,6 @@ class RequestBodyCacheMiddleware:
             await self.app(scope, receive, send)
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Warm up AI services and local models."""
-    JLogger.info("Application starting up: Warming up AI models...")
-    from app.services.ai_service import AIService
-
-    service = AIService()
-    # Pre-load local embedding model (SentenceTransformer)
-    service._get_local_embedding_model()
-    JLogger.info("Model warmup complete.")
 
 
 app.add_middleware(RequestBodyCacheMiddleware)

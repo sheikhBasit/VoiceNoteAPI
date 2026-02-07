@@ -61,6 +61,15 @@ class TaskSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class NoteResponseSummary(BaseModel):
+    """Minimal representation of a note for lists/previews"""
+
+    id: str
+    title: str
+    timestamp: int
+    model_config = ConfigDict(from_attributes=True)
+
+
 class NoteResponse(NoteBase):
     id: str
     user_id: str
@@ -81,6 +90,7 @@ class NoteResponse(NoteBase):
     is_encrypted: bool = False
     tags: List[str] = []
     semantic_analysis: Optional[dict] = None
+    related_notes: List[NoteResponseSummary] = []  # NEW: Top 3 semantic links
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -109,6 +119,8 @@ class NoteSemanticAnalysis(BaseModel):
 
 class SearchQuery(BaseModel):
     query: str
+    limit: Optional[int] = 10
+    offset: Optional[int] = 0
 
 
 class TopicHeatmapItem(BaseModel):

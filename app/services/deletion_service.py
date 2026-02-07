@@ -293,7 +293,8 @@ class DeletionService:
         db: Session, note_id: str, admin_id: str = None
     ) -> Dict[str, Any]:
         """
-        Permanently delete note and its audio file.
+        Permanently delete note and its associated audio files from ALL storage.
+        Checks both local 'uploads' and MinIO storage service.
         """
         JLogger.info("Starting HARD DELETE note", note_id=note_id)
 
@@ -302,30 +303,33 @@ class DeletionService:
             if not note:
                 return {"success": False, "error": "Note not found"}
 
-            # File Cleanup logic
-            file_path = None
-            # Standard logic: raw_audio_url = "uploads/xyz"
-            if note.raw_audio_url and (
-                note.raw_audio_url.startswith("uploads/")
-                or note.raw_audio_url.startswith("/app/uploads/")
-            ):
-                file_path = note.raw_audio_url.replace(
-                    "/app/", ""
-                )  # Adjust for container path if needed
+            raw_url = note.raw_audio_url
 
-            # Safety check: Prevent deleting outside uploads
-            if file_path and ".." not in file_path and os.path.exists(file_path):
+            # --- 1. LOCAL FILE CLEANUP ---
+            if raw_url and os.path.exists(raw_url) and "uploads/" in raw_url:
                 try:
-                    os.remove(file_path)
-                    JLogger.info("Deleted audio file", path=file_path)
-                except Exception as file_error:
+                    os.remove(raw_url)
+                    JLogger.info("Deleted local audio file", path=raw_url)
+                except Exception as e:
                     JLogger.error(
-                        "Failed to delete audio file",
-                        path=file_path,
-                        error=str(file_error),
+                        "Failed to delete local file", path=raw_url, error=str(e)
                     )
 
-            # Hard delete from DB
+            # --- 2. STORAGE SERVICE (MINIO) CLEANUP ---
+            # MinIO keys follow user_id/note_id format, usually don't have 'uploads/' prefix
+            if raw_url and "/" in raw_url and "uploads/" not in raw_url:
+                try:
+                    from app.services.storage_service import StorageService
+
+                    storage = StorageService()
+                    storage.delete_file(raw_url)
+                    JLogger.info("Deleted file from MinIO storage", key=raw_url)
+                except Exception as e:
+                    JLogger.error(
+                        "Failed to delete from MinIO", key=raw_url, error=str(e)
+                    )
+
+            # --- 3. DATABASE PURGE ---
             db.delete(note)
             db.commit()
 

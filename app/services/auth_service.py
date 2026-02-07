@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Optional
 
 import jwt
@@ -16,9 +16,7 @@ from app.utils.json_logger import JLogger
 # Configuration
 SECRET_KEY = os.getenv("DEVICE_SECRET_KEY", "your-secret-key-keep-it-safe")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = (
-    60 * 24
-)  # 24 hours for access token (shortened from 1 week)
+ACCESS_TOKEN_EXPIRE_MINUTES = 60  # Short-lived access token for security
 REFRESH_TOKEN_EXPIRE_DAYS = 30  # Long lived for mobile
 SECRET_KEY_REFRESH = os.getenv("REFRESH_SECRET_KEY", "refresh-secret-key-change-me")
 
@@ -30,9 +28,9 @@ security = HTTPBearer(auto_error=False)
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -41,9 +39,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        expire = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY_REFRESH, algorithm=ALGORITHM)
     return encoded_jwt
@@ -60,8 +58,15 @@ def refresh_access_token(refresh_token: str, db: Session):
         if not user or user.is_deleted:
             raise HTTPException(status_code=401, detail="User validation failed")
 
+        # Implement Token Rotation: Issue BOTH a new Access AND a new Refresh token
         new_access = create_access_token({"sub": user_id})
-        return {"access_token": new_access, "token_type": "bearer"}
+        new_refresh = create_refresh_token({"sub": user_id})
+
+        return {
+            "access_token": new_access,
+            "refresh_token": new_refresh,
+            "token_type": "bearer",
+        }
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token expired")
     except Exception:
@@ -82,7 +87,7 @@ def create_device_verification_token(
     email: str, device_id: str, device_model: str, biometric_token: str
 ):
     """Generates a short-lived token (15 mins) to verify a new device."""
-    expire = datetime.utcnow() + timedelta(minutes=15)
+    expire = datetime.now(UTC) + timedelta(minutes=15)
     to_encode = {
         "sub": email,
         "type": "device_verification",
@@ -127,6 +132,11 @@ async def get_current_user(
     2. User existence in DB.
     3. Biometric token consistency for mobile users (non-admins).
     """
+    # Fast-path: Check if middleware already fetched the user
+    cached_user = getattr(request.state, "user", None)
+    if cached_user:
+        return cached_user
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

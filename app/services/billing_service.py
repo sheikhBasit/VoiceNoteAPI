@@ -7,7 +7,7 @@ import stripe
 from sqlalchemy.orm import Session
 
 from app.core.config import ai_config
-from app.db.models import Transaction, User, Wallet
+from app.db.models import Transaction, User, Wallet, UsageLog
 
 logger = logging.getLogger("VoiceNote.Billing")
 
@@ -48,15 +48,18 @@ class BillingService:
         description: str = "",
         ref_id: Optional[str] = None,
         audio_duration: float = 0.0,
+        override_wallet_id: Optional[str] = None,
     ) -> bool:
         """
         Deducts credits from wallet, updates user usage stats, and logs granular usage.
+        Supports charging a corporate wallet if override_wallet_id is provided.
         """
         user = self.db.query(User).filter(User.id == user_id).first()
         if not user:
             return False
 
-        wallet = self.get_or_create_wallet(user_id)
+        target_wallet_id = override_wallet_id or user_id
+        wallet = self.get_or_create_wallet(target_wallet_id)
 
         # Determine cost based on plan if not explicitly provided
         final_cost = cost
@@ -74,15 +77,14 @@ class BillingService:
 
         if wallet.balance < final_cost:
             logger.warning(
-                f"Insufficient funds for user {user_id}: Needs {final_cost}, has {wallet.balance}"
+                f"Insufficient funds for wallet {target_wallet_id} (charged for user {user_id}): Needs {final_cost}, has {wallet.balance}"
             )
-            # Optional: Send notification or update status?
             return False
 
         # Deduct balance
         wallet.balance -= final_cost
 
-        # Update User Usage Stats (Cache)
+        # Update User Usage Stats (Cache) - always attributed to the person who did it
         if not user.usage_stats:
             user.usage_stats = {
                 "total_audio_minutes": 0.0,
@@ -106,14 +108,12 @@ class BillingService:
             amount=-final_cost,
             balance_after=wallet.balance,
             type="USAGE",
-            description=description,
+            description=f"{description} (Charged to {'Corporate' if override_wallet_id else 'Personal'})",
             reference_id=ref_id,
         )
         self.db.add(tx)
 
         # Log to UsageLog
-        from app.db.models import UsageLog
-
         usage = UsageLog(
             user_id=user_id,
             endpoint=description.split(":")[0] if ":" in description else "unknown",

@@ -1,7 +1,13 @@
 import logging
 import os
 
-from pydub import AudioSegment, effects
+try:
+    from pydub import AudioSegment, effects
+except ImportError:
+    AudioSegment = None
+    effects = None
+    print("Warning: pydub not available in audio.py, audio processing will fail.")
+
 
 from app.utils.audio_quality_analyzer import AudioQualityAnalyzer
 from app.utils.json_logger import JLogger

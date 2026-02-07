@@ -12,7 +12,9 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Table,
     Text,
+    Float,
 )
 from sqlalchemy.dialects.postgresql import JSONB  # Specific for PostgreSQL performance
 from sqlalchemy.orm import relationship
@@ -33,6 +35,13 @@ class NoteStatus(enum.Enum):
     PROCESSING = "PROCESSING"
     DONE = "DONE"
     DELAYED = "DELAYED"
+
+
+class TaskStatus(enum.Enum):
+    TODO = "TODO"
+    IN_PROGRESS = "IN_PROGRESS"
+    DONE = "DONE"
+    BLOCKED = "BLOCKED"
 
 
 class CommunicationType(enum.Enum):
@@ -59,6 +68,23 @@ class SubscriptionTier(enum.Enum):
     STANDARD = "STANDARD"
     PREMIUM = "PREMIUM"
     GUEST = "GUEST"
+    ENTERPRISE = "ENTERPRISE"
+
+
+# --- ASSOCIATION TABLES ---
+
+folder_participants = Table(
+    "folder_participants",
+    Base.metadata,
+    Column(
+        "folder_id", String, ForeignKey("folders.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column(
+        "user_id", String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column("role", String, default="MEMBER"),  # OWNER, EDITOR, VIEWER
+    Column("joined_at", BigInteger, default=lambda: int(time.time() * 1000)),
+)
 
 
 class User(Base):
@@ -77,6 +103,9 @@ class User(Base):
     current_device_id = Column(String, nullable=True)
     tier = Column(Enum(SubscriptionTier), default=SubscriptionTier.GUEST)
     plan_id = Column(String, ForeignKey("service_plans.id"), nullable=True)
+    org_id = Column(
+        String, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Usage Stats (JSONB cache for quick admin view)
     usage_stats = Column(
@@ -133,6 +162,16 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    organization = relationship("Organization", back_populates="users", foreign_keys=[org_id])
+    shared_folders = relationship(
+        "Folder", secondary=folder_participants, back_populates="participants"
+    )
+    integrations = relationship(
+        "UserIntegration",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class Folder(Base):
@@ -149,6 +188,9 @@ class Folder(Base):
 
     user = relationship("User", back_populates="folders")
     notes = relationship("Note", back_populates="folder")
+    participants = relationship(
+        "User", secondary=folder_participants, back_populates="shared_folders"
+    )
 
 
 class Note(Base):
@@ -250,6 +292,7 @@ class Task(Base):
     )
     title = Column(String)  # Brief title
     description = Column(Text)  # Detailed instructions
+    status = Column(Enum(TaskStatus), default=TaskStatus.TODO, index=True)
     is_done = Column(Boolean, default=False, index=True)
     deadline = Column(BigInteger, nullable=True, index=True)
     priority = Column(Enum(Priority), default=Priority.MEDIUM, index=True)
@@ -497,3 +540,62 @@ class AdminActionLog(Base):
 
     # Relationship
     admin = relationship("User", foreign_keys=[admin_id])
+
+
+# --- B2B ORGANIZATIONAL MODELS ---
+
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id = Column(String, primary_key=True)
+    name = Column(String, index=True, nullable=False)
+    admin_user_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"))
+    corporate_wallet_id = Column(
+        String, nullable=True
+    )  # Link to a shared Wallet if needed
+    created_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+
+    users = relationship(
+        "User", back_populates="organization", foreign_keys="[User.org_id]"
+    )
+    work_locations = relationship("WorkLocation", back_populates="organization")
+
+
+class WorkLocation(Base):
+    __tablename__ = "work_locations"
+
+    id = Column(String, primary_key=True)
+    org_id = Column(String, ForeignKey("organizations.id", ondelete="CASCADE"))
+    name = Column(String, nullable=False)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    radius = Column(Integer, default=100)  # Radius in meters
+
+    organization = relationship("Organization", back_populates="work_locations")
+
+
+class UserIntegration(Base):
+    """
+    Stores OAuth tokens for third-party services (Google, Notion, Trello).
+    Encrypted storage recommended in production.
+    """
+
+    __tablename__ = "user_integrations"
+
+    id = Column(
+        String, primary_key=True, default=lambda: str(__import__("uuid").uuid4())
+    )
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    provider = Column(String, nullable=False, index=True)  # 'google', 'notion', 'trello'
+    access_token = Column(Text, nullable=False)
+    refresh_token = Column(Text, nullable=True)
+    expires_at = Column(BigInteger, nullable=True)  # Unix timestamp in ms
+    scope = Column(String, nullable=True)
+    meta_data = Column(JSONB, default=dict)  # Renamed from metadata to avoid SQL conflict
+
+    created_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+    updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+
+    user = relationship("User", back_populates="integrations")
+

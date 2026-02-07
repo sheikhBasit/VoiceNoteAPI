@@ -86,6 +86,13 @@ fi
 
 echo -e "Obtained token: ${YELLOW}${TOKEN:0:40}...${NC}\n"
 
+# PROMOTE USER TO PREMIUM (New: required for semantic analysis tests)
+USER_ID=$(echo "$TOKEN" | cut -d'.' -f2 | base64 -d 2>/dev/null | grep -o '"sub":"[^"]*' | cut -d'"' -f4)
+if [ ! -z "$USER_ID" ]; then
+    echo -e "Promoting User $USER_ID to PREMIUM..."
+    docker exec voicenote_db psql -U postgres -d voicenote -c "UPDATE users SET tier = 'PREMIUM' WHERE id = '$USER_ID';" > /dev/null
+fi
+
 ###############################################################################
 # NOTES ENDPOINTS
 ###############################################################################

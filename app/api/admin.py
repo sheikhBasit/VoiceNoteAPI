@@ -1117,3 +1117,90 @@ async def get_audit_logs(
     )
 
     return {"total": total, "offset": offset, "limit": limit, "logs": logs}
+
+
+# ==================== B2B MANAGEMENT ====================
+
+@router.post("/organizations", status_code=status.HTTP_201_CREATED)
+async def create_organization(
+    org_data: dict,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """
+    POST /organizations: Create a new B2B organization.
+    Expects: {id, name, admin_user_id}
+    """
+    if not AdminManager.is_admin(admin_user):
+         raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    # Create corporate wallet automatically
+    wallet_id = f"wallet_{org_data['id']}"
+    corporate_wallet = models.Wallet(
+        user_id=wallet_id,
+        balance=10000, # Initial credits for testing
+        currency="USD"
+    )
+    db.add(corporate_wallet)
+
+    new_org = models.Organization(
+        id=org_data["id"],
+        name=org_data["name"],
+        admin_user_id=org_data.get("admin_user_id", admin_user.id),
+        corporate_wallet_id=wallet_id
+    )
+    db.add(new_org)
+    
+    # Associate admin user with org
+    target_user_id = org_data.get("admin_user_id", admin_user.id)
+    target_user = db.query(models.User).filter(models.User.id == target_user_id).first()
+    if target_user:
+        target_user.org_id = new_org.id
+        
+    db.commit()
+    db.refresh(new_org)
+    return new_org
+
+@router.post("/locations", status_code=status.HTTP_201_CREATED)
+async def create_location(
+    loc_data: dict,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """
+    POST /locations: Add a work location for geofencing.
+    Expects: {org_id, name, latitude, longitude, radius}
+    """
+    if not AdminManager.is_admin(admin_user):
+         raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    new_loc = models.WorkLocation(
+        id=str(__import__("uuid").uuid4()),
+        org_id=loc_data["org_id"],
+        name=loc_data["name"],
+        latitude=loc_data["latitude"],
+        longitude=loc_data["longitude"],
+        radius=loc_data.get("radius", 100)
+    )
+    db.add(new_loc)
+    db.commit()
+    db.refresh(new_loc)
+    return new_loc
+@router.get("/organizations/{org_id}/balance")
+async def get_org_balance(
+    org_id: str,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """GET /organizations/{org_id}/balance: Check corporate wallet balance."""
+    org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    wallet = db.query(models.Wallet).filter(models.Wallet.user_id == org.corporate_wallet_id).first()
+    return {
+        "org_id": org.id,
+        "wallet_id": org.corporate_wallet_id,
+        "balance": wallet.balance if wallet else 0,
+        "currency": wallet.currency if wallet else "USD"
+    }

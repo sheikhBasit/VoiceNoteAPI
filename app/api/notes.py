@@ -29,13 +29,11 @@ from app.services.auth_service import get_current_user
 from app.services.deletion_service import DeletionService
 from app.services.search_service import SearchService
 from app.services.storage_service import StorageService
+from app.utils.billing_utils import check_credit_balance, requires_tier
 from app.utils.json_logger import JLogger
 from app.utils.security import verify_device_signature, verify_note_ownership
 from app.worker.task import analyze_note_semantics_task  # Celery tasks
-from app.worker.task import (
-    generate_note_embeddings_task,
-    note_process_pipeline,
-)
+from app.worker.task import generate_note_embeddings_task, note_process_pipeline
 
 # Services are instantiated inside endpoints to avoid module-level hangs
 limiter = Limiter(
@@ -89,7 +87,8 @@ async def process_note(
     image_uris: Optional[str] = Form(None),  # Client-side image URIs (comma-separated)
     debug_sync: bool = Form(False),  # For local developer testing
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(requires_tier(models.SubscriptionTier.FREE)),
+    _balance: bool = Depends(check_credit_balance(10)),  # Minimum cost to start process
     _sig: bool = Depends(verify_device_signature),  # Security requirement
 ):
     """POST /process: Main Upload for audio processing with validation and security."""
@@ -370,8 +369,34 @@ def get_note(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """GET /{note_id}: Returns full note detail (ownership validated)."""
-    return verify_note_ownership(db, current_user, note_id)
+    """
+    GET /{note_id}: Returns full note detail (ownership validated).
+    Requirement: Add related_notes field using pgvector to find top 3 matches.
+    Docstring: Avoids N+1 by fetching related notes in a single query after ownership check.
+    """
+    note = verify_note_ownership(db, current_user, note_id)
+
+    # 🚀 Semantic Note Linking (Phase 3 Requirement)
+    if note.embedding is not None:
+        from app.db.models import Note
+
+        # Use pgvector <-> (cosine distance) for the top 3 semantically closest notes
+        related = (
+            db.query(Note)
+            .filter(
+                Note.user_id == current_user.id,
+                Note.id != note_id,
+                Note.is_deleted == False,
+            )
+            .order_by(Note.embedding.cosine_distance(note.embedding))
+            .limit(3)
+            .all()
+        )
+        note.related_notes = related
+    else:
+        note.related_notes = []
+
+    return note
 
 
 @router.patch("/{note_id}", response_model=note_schema.NoteResponse)
@@ -586,6 +611,8 @@ async def ask_ai(
 async def search_notes_hybrid(
     request: Request,
     query: note_schema.SearchQuery,
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -597,7 +624,7 @@ async def search_notes_hybrid(
         ai_service = AIService()
         search_service = SearchService(ai_service)
         result = await search_service.unified_rag_search(
-            db, current_user.id, query.query
+            db, current_user.id, query.query, limit=limit, offset=offset
         )
         return result
     except Exception as e:
@@ -649,7 +676,7 @@ def get_whatsapp_draft(
 async def analyze_note_semantics(
     note_id: str,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(requires_tier(models.SubscriptionTier.PREMIUM)),
 ):
     """
     POST /{note_id}/semantic-analysis: Deep dive into note meaning.

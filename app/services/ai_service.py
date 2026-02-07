@@ -90,28 +90,27 @@ class AIService:
             return self._settings_cache
 
         try:
-            db = SessionLocal()
-            settings = db.query(models.SystemSettings).first()
-            if not settings:
-                # Initialize default if missing
-                settings = models.SystemSettings(id=1)
-                db.add(settings)
-                db.commit()
-                db.refresh(settings)
+            with SessionLocal() as db:
+                settings = db.query(models.SystemSettings).first()
+                if not settings:
+                    # Initialize default if missing
+                    settings = models.SystemSettings(id=1)
+                    db.add(settings)
+                    db.commit()
+                    db.refresh(settings)
 
-            # Convert to dictionary for easier access
-            self._settings_cache = {
-                "llm_model": settings.llm_model,
-                "llm_fast_model": settings.llm_fast_model,
-                "temperature": settings.temperature / 10.0,
-                "max_tokens": settings.max_tokens,
-                "top_p": settings.top_p / 10.0,
-                "stt_engine": settings.stt_engine,
-                "groq_whisper_model": settings.groq_whisper_model,
-                "deepgram_model": settings.deepgram_model,
-            }
+                # Convert to dictionary for easier access
+                self._settings_cache = {
+                    "llm_model": settings.llm_model,
+                    "llm_fast_model": settings.llm_fast_model,
+                    "temperature": settings.temperature / 10.0,
+                    "max_tokens": settings.max_tokens,
+                    "top_p": settings.top_p / 10.0,
+                    "stt_engine": settings.stt_engine,
+                    "groq_whisper_model": settings.groq_whisper_model,
+                    "deepgram_model": settings.deepgram_model,
+                }
             self._settings_last_fetch = time.time()
-            db.close()
             return self._settings_cache
         except Exception as e:
             logger.error(f"Failed to fetch dynamic settings: {e}")
@@ -160,6 +159,7 @@ class AIService:
         audio_path: str,
         languages: Optional[List[str]] = None,
         stt_model: str = "nova",
+        diarize: bool = True,
     ) -> Tuple[str, str, List[str], Dict[str, str]]:
         """
         STT with failover and explicit model selection.
@@ -169,7 +169,6 @@ class AIService:
         if not os.path.exists(audio_path):
             raise AIServiceError(f"Audio file not found: {audio_path}")
 
-        request_id = str(uuid.uuid4())
         settings = self._get_dynamic_settings()
 
         results = {}
@@ -201,12 +200,41 @@ class AIService:
             try:
                 with open(audio_path, "rb") as file:
                     buffer_data = file.read()
-                    # For SDK v5.x (Generated version)
-                    resp = self.dg_client.listen.v1.media.transcribe_file(
-                        buffer_data,
-                        model=settings["deepgram_model"],
-                        smart_format=True,
-                    )
+                    payload = {"buffer": buffer_data}
+                    options = {
+                        "model": settings["deepgram_model"],
+                        "smart_format": True,
+                        "diarize": diarize,
+                    }
+                    if languages and len(languages) == 1:
+                        options["language"] = languages[0]
+                    else:
+                        options["detect_language"] = True
+
+                    resp = self.dg_client.listen.v1.media.transcribe_file(payload, options)
+
+                    # Formatted transcript with speaker labels
+                    if diarize and hasattr(resp.results, 'channels'):
+                        words = resp.results.channels[0].alternatives[0].words
+                        if words and hasattr(words[0], 'speaker'):
+                            transcript_parts = []
+                            current_speaker = None
+                            current_sentence = []
+
+                            for word in words:
+                                if word.speaker != current_speaker:
+                                    if current_sentence:
+                                        transcript_parts.append(f"Speaker {current_speaker}: {' '.join(current_sentence)}")
+                                    current_speaker = word.speaker
+                                    current_sentence = [word.punctuated_word or word.word]
+                                else:
+                                    current_sentence.append(word.punctuated_word or word.word)
+
+                            if current_sentence:
+                                transcript_parts.append(f"Speaker {current_speaker}: {' '.join(current_sentence)}")
+                            
+                            return "\n".join(transcript_parts)
+
                     return resp.results.channels[0].alternatives[0].transcript
             except Exception as e:
                 logger.error(f"Deepgram failed: {e}")
@@ -282,7 +310,8 @@ class AIService:
                 )
 
             raise AIServiceError(
-                f"All STT engines failed. Details: {', '.join(error_details) if error_details else 'Unknown error (check logs)'}"
+                f"All STT engines failed. Details: "
+                f"{', '.join(error_details) if error_details else 'Unknown error (check logs)'}"
             )
 
         return primary_transcript, engine_used, used_langs, results
@@ -352,7 +381,10 @@ class AIService:
         # Inject Domain Terminology (Jargons)
         jargons = kwargs.get("jargons", [])
         if jargons:
-            system_prompt += f"\n\nCRITICAL CONTEXT: The following industry-specific terms or 'jargons' are relevant to this user. Use them correctly if they appear phonetically or contextually:\n{', '.join(jargons)}"
+            system_prompt += (
+                f"\n\nCRITICAL CONTEXT: The following industry-specific terms or 'jargons' are relevant to this user. "
+                f"Use them correctly if they appear phonetically or contextually:\n{', '.join(jargons)}"
+            )
 
         # NEW: Add temporal context for intelligent priority assignment
         if note_created_at:
@@ -490,13 +522,13 @@ Use this temporal context to intelligently assign task priorities based on urgen
         prompt = f"""
         Role: CONFLICT_DETECTOR
         Task: Identify any contradictions or major inconsistencies between the NEW_STORY and the EXISTING_{context_type.upper()}.
-        
+
         NEW_STORY (Current Note Summary):
         {new_summary}
-        
+
         EXISTING_{context_type.upper()}:
         {formatted_context}
-        
+
         Return a JSON object with a 'conflicts' key containing a list:
         {{
             "conflicts": [
@@ -559,13 +591,28 @@ Use this temporal context to intelligently assign task priorities based on urgen
         jargons = kwargs.get("jargons", [])
         personal_instruction = kwargs.get("personal_instruction", "")
 
+        # Role-Specific Prompt Engineering (Phase 3 Requirement)
+        role_specialization = ""
+        if user_role == "DEVELOPER":
+            role_specialization = (
+                "SPECIALIZATION (DEVELOPER): Extract technical specifications, architecture patterns, "
+                "code/tech specs, and complex technical requirements. Identify potential tech debt or scaling risks."
+            )
+        elif user_role == "STUDENT":
+            role_specialization = (
+                "SPECIALIZATION (STUDENT): Extract formulas, academic definitions, exam tips, "
+                "logical proofs, and study mnemonics. Focus on educational clarity and retrieval-practice questions."
+            )
+
         system_prompt = f"""
         Role: SEMANTIC_ANALYST (Expert in psychology, linguistics, and logical reasoning)
         Background: You are analyzing a voice note from a {user_role}.
-        
+
+        {role_specialization}
+
         Personal User Context: {personal_instruction}
         Relevant Jargons: {", ".join(jargons)}
-        
+
         Task: Provide a deep semantic analysis of the transcript.
         Output MUST be a JSON object with:
         - sentiment: string ("Positive", "Negative", "Neutral", "Mixed")

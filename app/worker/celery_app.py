@@ -62,9 +62,9 @@ if is_testing:
 from celery.schedules import crontab
 
 celery_app.conf.beat_schedule = {
-    "scan-for-upcoming-deadlines-every-hour": {
+    "scan-for-upcoming-deadlines-every-minute": {
         "task": "check_upcoming_tasks",
-        "schedule": crontab(minute=0),
+        "schedule": crontab(minute="*"),
     },
     "hard-delete-old-soft-deleted-records": {
         "task": "hard_delete_expired_records",

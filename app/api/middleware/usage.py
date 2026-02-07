@@ -1,16 +1,37 @@
 import logging
 import time
+import math
+from typing import Optional
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from app.db.models import UsageLog
+from app.db import models
 from app.db.session import SessionLocal
 from app.services.billing_service import BillingService
+from app.utils.json_logger import JLogger
+from starlette.background import BackgroundTask
 
 logger = logging.getLogger("VoiceNote.Usage")
+
+
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Haversine formula to calculate the distance between two points on Earth in meters.
+    """
+    R = 6371000  # radius of Earth in meters
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+
+    a = (
+        math.sin(delta_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
 
 class UsageTrackingMiddleware(BaseHTTPMiddleware):
@@ -18,71 +39,103 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next):
+        from app.db import models
         start_time = time.time()
 
         # Pass through check for health/metrics endpoints
         if request.url.path in ["/", "/health", "/metrics", "/docs", "/openapi.json"]:
             return await call_next(request)
 
-        # 1. Capture User ID
-        # For production, this MUST come from the Auth Middleware (request.state.user_id)
-        # For this MVP, we will extract it or default to "anonymous"
+        # 1. Capture User ID and Geolocation
         user_id = getattr(request.state, "user_id", None)
         if not user_id:
-            # Fallback for testing commercial flows without full Auth middleware
-            # In headers or query param?
             user_id = request.headers.get("X-User-ID", "anonymous")
 
-        # 2. COST ESTIMATION & LIMIT ENFORCEMENT
-        from app.db.models import SubscriptionTier, User
+        gps_header = request.headers.get("x-gps-coords") or request.headers.get("X-GPS-Coords")
+        
+        corporate_wallet_id = None
+        
+        # Token extraction for early auth
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            try:
+                from app.services.auth_service import SECRET_KEY, ALGORITHM
+                import jwt
+                payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                user_id = payload.get("sub")
+                request.state.user_id = user_id 
+            except Exception as e:
+                JLogger.debug("Middleware: Token decode failed", error=str(e))
 
+        # COST ESTIMATION
         cost_map = {
             "/api/v1/notes": 1,
             "/api/v1/transcribe": 10,
             "/api/v1/ai/analyze": 5,
-            "/api/v1/meetings/join": 20,
         }
-
         estimated_cost = 0
         for path, cost in cost_map.items():
             if path in request.url.path:
                 estimated_cost = cost
                 break
 
-        if user_id != "anonymous" and estimated_cost > 0:
-            db = SessionLocal()
-            try:
-                user = db.query(User).filter(User.id == user_id).first()
-                if user and user.tier == SubscriptionTier.PREMIUM:
-                    # Premium users get unlimited basic notes access
-                    if "/api/v1/notes" in request.url.path:
-                        estimated_cost = 0
+        db = None
+        try:
+            if user_id != "anonymous" and (gps_header or estimated_cost > 0):
+                db = SessionLocal()
+                user = db.query(models.User).filter(models.User.id == user_id).first()
+                request.state.user = user
+
+                if user and user.org_id and gps_header:
+                    try:
+                        lat_str, lon_str = gps_header.split(",")
+                        user_lat, user_lon = float(lat_str), float(lon_str)
+                        locations = (
+                            db.query(models.WorkLocation)
+                            .filter(models.WorkLocation.org_id == user.org_id)
+                            .all()
+                        )
+                        for loc in locations:
+                            dist = calculate_distance(user_lat, user_lon, loc.latitude, loc.longitude)
+                            if dist <= loc.radius:
+                                org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
+                                if org: 
+                                    corporate_wallet_id = org.corporate_wallet_id
+                                    JLogger.info("Middleware: Within geofence, corporate wallet selected", wallet=corporate_wallet_id)
+                                break
+                    except Exception as e: 
+                        JLogger.error("Middleware: Geofence error", error=str(e))
 
                 if estimated_cost > 0:
-                    billing = BillingService(db)
-                    has_funds = billing.check_balance(user_id, estimated_cost)
-                    if not has_funds:
-                        return JSONResponse(
-                            status_code=402,
-                            content={
-                                "detail": "Payment Required: Your credit balance is depleted. Please upgrade to Premium for unlimited access."
-                            },
-                        )
-            except Exception as e:
-                logger.error(f"Usage enforcement failed: {e}")
-            finally:
+                    # Premium users get free notes processing
+                    if user and user.tier == models.SubscriptionTier.PREMIUM and "/api/v1/notes" in request.url.path:
+                        estimated_cost = 0
+
+                    if estimated_cost > 0:
+                        billing = BillingService(db)
+                        target_wallet = corporate_wallet_id or user_id
+                        if not billing.check_balance(target_wallet, estimated_cost):
+                            return JSONResponse(
+                                status_code=402,
+                                content={"detail": f"Payment Required: balance depleted."},
+                            )
+
+            response = await call_next(request)
+        finally:
+            if db:
                 db.close()
 
-        # 3. Proceed with request
-        response = await call_next(request)
-
-        # 4. Calculate Metrics & Charge (Post-Processing)
         process_time = time.time() - start_time
-
-        try:
-            self.log_usage(request, response, process_time, user_id, estimated_cost)
-        except Exception as e:
-            logger.error(f"Failed to log usage: {e}")
+        response.background = BackgroundTask(
+            self.log_usage,
+            request,
+            response,
+            process_time,
+            user_id,
+            estimated_cost,
+            corporate_wallet_id,
+        )
 
         return response
 
@@ -93,43 +146,39 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
         duration: float,
         user_id: str,
         estimated_cost: int,
+        corporate_wallet_id: Optional[str] = None,
     ):
-        """
-        Writes to UsageLog table and Charges Logic if successful.
-        """
-        # Filter only relevant API calls
-        if not request.url.path.startswith("/api/v1"):
-            return
-
-        db = SessionLocal()
         try:
-            # 1. Charge the user if response was successful (2xx)
-            if (
-                response.status_code < 400
-                and estimated_cost > 0
-                and user_id != "anonymous"
-            ):
-                billing = BillingService(db)
-                billing.charge_usage(
-                    user_id, estimated_cost, f"API Call: {request.url.path}"
-                )
-
-            if user_id == "anonymous":
-                # Optional: Skip logging for anonymous users to avoid FK issues
-                # Or log with user_id = None if the schema allows it
+            from app.db import models
+            from app.db.session import SessionLocal
+            from app.services.billing_service import BillingService
+            
+            if not request.url.path.startswith("/api/v1"):
                 return
 
-            # 2. Log metadata
-            log_entry = UsageLog(  # Changed from models.UsageLog to UsageLog as it's directly imported
-                user_id=user_id,
-                endpoint=request.url.path,
-                duration_seconds=int(duration),
-                status=response.status_code,
-            )
-            db.add(log_entry)  # Changed from log to log_entry
-            db.commit()
-        except Exception as e:
-            # Don't break the request if logging fails
-            logger.warning(f"Usage logging error: {e}")
-        finally:
-            db.close()
+            db = SessionLocal()
+            try:
+                if response.status_code < 400 and estimated_cost > 0 and user_id != "anonymous":
+                    billing = BillingService(db)
+                    billing.charge_usage(
+                        user_id,
+                        estimated_cost,
+                        f"API Call: {request.url.path}",
+                        override_wallet_id=corporate_wallet_id,
+                    )
+
+                log_entry = models.UsageLog(
+                    user_id=user_id if user_id != "anonymous" else None,
+                    endpoint=request.url.path,
+                    duration_seconds=int(duration),
+                    status=response.status_code,
+                )
+                db.add(log_entry)
+                db.commit()
+            except Exception as e:
+                JLogger.warning(f"Usage logging internal error: {e}")
+            finally:
+                db.close()
+        except Exception as outer_e:
+            import logging
+            logging.error(f"Usage logging critical failure: {outer_e}")
