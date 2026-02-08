@@ -122,7 +122,7 @@ jobs:
           DEVICE_SECRET_KEY: "VN_SECURE_TEST_KEY"
           PYTHONPATH: .
         run: |
-          pytest tests/test_core.py tests/test_main.py -v --tb=short --timeout=10
+          pytest tests/unit/ -v --tb=short
         timeout-minutes: 10
 
   integration-tests:
@@ -176,7 +176,7 @@ jobs:
           DEVICE_SECRET_KEY: "VN_SECURE_TEST_KEY"
           PYTHONPATH: .
         run: |
-          pytest tests/test_new_endpoints.py tests/test_admin_system.py -v --tb=short --timeout=30 -m "not load and not stress and not performance"
+          pytest tests/integration/test_new_endpoints.py tests/integration/test_admin_system.py -v --tb=short -m "not load and not stress and not performance"
         timeout-minutes: 15
 
   test-summary:
