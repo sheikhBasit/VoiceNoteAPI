@@ -49,47 +49,116 @@ def sync_user(
     - If Email Exists + Device New: Returns 403 + Email Sent.
     - If Email Exists + Device Authorized: Login Success.
     """
+    import traceback
     try:
-        validated_email = ValidationService.validate_email(user_data.email)
-        validated_device_id = ValidationService.validate_device_id(user_data.device_id)
-        # validated_token = validate_token(user_data.token) # Biometric token checks
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        try:
+            validated_email = ValidationService.validate_email(user_data.email)
+            validated_device_id = ValidationService.validate_device_id(user_data.device_id)
+            # validated_token = validate_token(user_data.token) # Biometric token checks
+        except ValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
-    # 1. Find User by Email
-    db_user = db.query(models.User).filter(models.User.email == validated_email).first()
+        # 1. Find User by Email
+        db_user = db.query(models.User).filter(models.User.email == validated_email).first()
 
-    # 2. Case: New User (Auto-Register)
-    if not db_user:
-        import uuid
+        # 2. Case: New User (Auto-Register)
+        if not db_user:
+            import uuid
 
-        new_user_id = str(uuid.uuid4())
+            new_user_id = str(uuid.uuid4())
 
-        # Initialize authorized devices list
-        initial_device = {
-            "device_id": validated_device_id,
-            "device_model": user_data.device_model,
-            "biometric_token": user_data.token,
-            "authorized_at": int(time.time() * 1000),
-        }
+            # Initialize authorized devices list
+            initial_device = {
+                "device_id": validated_device_id,
+                "device_model": user_data.device_model,
+                "biometric_token": user_data.token,
+                "authorized_at": int(time.time() * 1000),
+            }
 
-        db_user = models.User(
-            id=new_user_id,
-            name=user_data.name,
-            email=validated_email,
-            authorized_devices=[initial_device],  # PRIMARY CHANGE
-            current_device_id=validated_device_id,
-            tier=models.SubscriptionTier.GUEST,  # Free Trial Default
-            # Defaults
-            primary_role=models.UserRole.GENERIC,  # Job Role (e.g. DEVELOPER)
-            work_days=[2, 3, 4, 5, 6],
-            timezone=user_data.timezone or "UTC",
-            last_login=int(time.time() * 1000),
-            is_deleted=False,
-        )
-        db.add(db_user)
+            db_user = models.User(
+                id=new_user_id,
+                name=user_data.name,
+                email=validated_email,
+                authorized_devices=[initial_device],  # PRIMARY CHANGE
+                current_device_id=validated_device_id,
+                tier=models.SubscriptionTier.GUEST,  # Free Trial Default
+                # Defaults
+                primary_role=models.UserRole.GENERIC,  # Job Role (e.g. DEVELOPER)
+                work_days=[2, 3, 4, 5, 6],
+                timezone=user_data.timezone or "UTC",
+                last_login=int(time.time() * 1000),
+                is_deleted=False,
+            )
+            db.add(db_user)
+            db.commit()
+            db.refresh(db_user)
+
+            # Issue Tokens
+            access_token = create_access_token(data={"sub": db_user.id})
+            refresh_token = create_refresh_token(db_user.id, db)
+
+            return {
+                "user": db_user,
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+                "is_new_user": True,
+            }
+
+        # 3. Case: Existing User - Security Check
+        if db_user.is_deleted:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account deactivated: This user account has been soft-deleted and must be restored by an admin.",
+            )
+
+        authorized_devices = db_user.authorized_devices or []
+
+        # Check if this device + token matches any authorized entry
+        is_authorized = False
+        for dev in authorized_devices:
+            if dev.get("device_id") == validated_device_id:
+                # Optional: Check biometric token match strictly?
+                # For now, if device_id matches, we assume it's valid,
+                # OR we can update the token if it rotated.
+                is_authorized = True
+
+                # Update metadata
+                dev["last_seen"] = int(time.time() * 1000)
+                dev["biometric_token"] = user_data.token  # Update latest token
+                break
+
+        if not is_authorized:
+            # Seamless Sync: Auto-authorize new devices for existing users
+            JLogger.info(
+                "Seamless Sync: Auto-authorizing new device",
+                user_id=db_user.id,
+                device_id=validated_device_id,
+            )
+            new_device = {
+                "device_id": validated_device_id,
+                "device_model": user_data.device_model,
+                "biometric_token": user_data.token,
+                "authorized_at": int(time.time() * 1000),
+                "last_seen": int(time.time() * 1000),
+            }
+            authorized_devices.append(new_device)
+            db_user.authorized_devices = authorized_devices
+
+        # Update current device and login time
+        db_user.current_device_id = validated_device_id
+        db_user.last_login = int(time.time() * 1000)
+
+        # Must flag modified for JSON updates in SQLAlchemy
+        from sqlalchemy.orm.attributes import flag_modified
+
+        flag_modified(db_user, "authorized_devices")
+
+        # Update timezone if provided during sync
+        if user_data.timezone:
+            db_user.timezone = user_data.timezone
+
         db.commit()
-        db.refresh(db_user)
 
         # Issue Tokens
         access_token = create_access_token(data={"sub": db_user.id})
@@ -100,75 +169,12 @@ def sync_user(
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
-            "is_new_user": True,
+            "is_new_user": False,
         }
-
-    # 3. Case: Existing User - Security Check
-    if db_user.is_deleted:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account deactivated: This user account has been soft-deleted and must be restored by an admin.",
-        )
-
-    authorized_devices = db_user.authorized_devices or []
-
-    # Check if this device + token matches any authorized entry
-    is_authorized = False
-    for dev in authorized_devices:
-        if dev.get("device_id") == validated_device_id:
-            # Optional: Check biometric token match strictly?
-            # For now, if device_id matches, we assume it's valid,
-            # OR we can update the token if it rotated.
-            is_authorized = True
-
-            # Update metadata
-            dev["last_seen"] = int(time.time() * 1000)
-            dev["biometric_token"] = user_data.token  # Update latest token
-            break
-
-    if not is_authorized:
-        # Seamless Sync: Auto-authorize new devices for existing users
-        JLogger.info(
-            "Seamless Sync: Auto-authorizing new device",
-            user_id=db_user.id,
-            device_id=validated_device_id,
-        )
-        new_device = {
-            "device_id": validated_device_id,
-            "device_model": user_data.device_model,
-            "biometric_token": user_data.token,
-            "authorized_at": int(time.time() * 1000),
-            "last_seen": int(time.time() * 1000),
-        }
-        authorized_devices.append(new_device)
-        db_user.authorized_devices = authorized_devices
-
-    # Update current device and login time
-    db_user.current_device_id = validated_device_id
-    db_user.last_login = int(time.time() * 1000)
-
-    # Must flag modified for JSON updates in SQLAlchemy
-    from sqlalchemy.orm.attributes import flag_modified
-
-    flag_modified(db_user, "authorized_devices")
-
-    # Update timezone if provided during sync
-    if user_data.timezone:
-        db_user.timezone = user_data.timezone
-
-    db.commit()
-
-    # Issue Tokens
-    access_token = create_access_token(data={"sub": db_user.id})
-    refresh_token = create_refresh_token(db_user.id, db)
-
-    return {
-        "user": db_user,
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "is_new_user": False,
-    }
+    except Exception as e:
+        # Catch-all to log the actual error in production
+        JLogger.error("CRITICAL SYNC ERROR", error=str(e), traceback=traceback.format_exc())
+        raise e
 
 
 @router.post("/logout")
