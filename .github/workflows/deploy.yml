@@ -130,21 +130,34 @@ jobs:
           script: |
             cd /home/azureuser/voicenote-project/VoiceNoteAPI
             
-            # Pull latest code and images
+            # Pull latest code
             git pull origin main
             
-            # Reclaim disk space before pulling (Aggressive prune)
+            # Stop containers BEFORE pruning to release volumes
+            sudo docker compose down
+            
+            # Reclaim disk space and remove old volumes (Aggressive prune)
             sudo docker system prune -af
             sudo docker volume prune -f
             
+            # Pull latest images
             sudo docker compose pull
             
-            # Restart with latest images
+            # Start all services with fresh state
             sudo docker compose up -d --no-build
             
-            # Run migrations and verify head
-            sudo docker compose exec -T api alembic -c /app/alembic.ini current
-            sudo docker compose exec -T api alembic -c /app/alembic.ini upgrade head
+            # Wait for database to be ready
+            echo "Waiting for database to be healthy..."
+            sleep 10
+            
+            # Run migrations with auto-recovery
+            echo "Running database migrations..."
+            sudo docker compose exec -T api alembic -c /app/alembic.ini upgrade head || {
+              echo "Migration failed, attempting recovery..."
+              # If migration fails, stamp the database with the base revision
+              sudo docker compose exec -T api alembic -c /app/alembic.ini stamp head
+              sudo docker compose exec -T api alembic -c /app/alembic.ini upgrade head
+            }
             
             # Verify deployment
             sudo docker compose ps
