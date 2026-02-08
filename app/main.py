@@ -250,11 +250,15 @@ async def redoc_html():
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
     # Log the full traceback for engineers
-    JLogger.exception(
+    error_trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    JLogger.error(
         "Unhandled exception caught by global handler",
         path=request.url.path,
         method=request.method,
+        error=str(exc),
+        traceback=error_trace,
     )
     return JSONResponse(
         status_code=500,
