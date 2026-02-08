@@ -450,13 +450,7 @@ async def update_user_details_admin(
         )
 
     # Import validation explicitly to avoid circular dependencies at module level if any
-    from app.utils.users_validation import (
-        ValidationError,
-        validate_email,
-        validate_name,
-        validate_system_prompt,
-        validate_work_hours,
-    )
+    from app.services.validation_service import ValidationService, ValidationError
 
     update_dict = {}
     for key, value in update_data.model_dump(exclude_unset=True).items():
@@ -464,7 +458,7 @@ async def update_user_details_admin(
             continue
         try:
             if key == "name" and value:
-                update_dict[key] = validate_name(value)
+                update_dict[key] = ValidationService.validate_name(value)
             elif key == "email" and value:
                 # Check if email is taken by another user
                 existing = (
@@ -474,16 +468,16 @@ async def update_user_details_admin(
                 )
                 if existing:
                     raise HTTPException(status_code=400, detail="Email already in use")
-                update_dict[key] = validate_email(value)
+                update_dict[key] = ValidationService.validate_email(value)
             elif key == "system_prompt" and value:
-                update_dict[key] = validate_system_prompt(value)
+                update_dict[key] = ValidationService.validate_system_prompt(value)
             elif key == "work_start_hour" and value is not None:
                 end_hour = update_data.work_end_hour or user.work_end_hour
-                validated = validate_work_hours(value, end_hour)
+                validated = ValidationService.validate_work_hours(value, end_hour)
                 update_dict["work_start_hour"] = validated[0]
             elif key == "work_end_hour" and value is not None:
                 start_hour = update_data.work_start_hour or user.work_start_hour
-                validated = validate_work_hours(start_hour, value)
+                validated = ValidationService.validate_work_hours(start_hour, value)
                 update_dict["work_end_hour"] = validated[1]
             elif key == "timezone" and value:
                 # Basic timezone validation could go here, for now trust schema or add validation

@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Optional
 
@@ -36,41 +37,66 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
+def create_refresh_token(user_id: str, db: Session, expires_delta: Optional[timedelta] = None):
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
     else:
         expire = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh"})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY_REFRESH, algorithm=ALGORITHM)
-    return encoded_jwt
+        
+    expires_timestamp = int(expire.timestamp() * 1000)
+    
+    # Generate random token string
+    import secrets
+    token_str = secrets.token_urlsafe(32)
+    
+    new_refresh = models.RefreshToken(
+        user_id=user_id,
+        token=token_str,
+        expires_at=expires_timestamp,
+        is_revoked=False
+    )
+    db.add(new_refresh)
+    db.commit()
+    
+    return token_str
 
 
 def refresh_access_token(refresh_token: str, db: Session):
-    try:
-        payload = jwt.decode(refresh_token, SECRET_KEY_REFRESH, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None or payload.get("type") != "refresh":
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
-
-        user = db.query(models.User).filter(models.User.id == user_id).first()
-        if not user or user.is_deleted:
-            raise HTTPException(status_code=401, detail="User validation failed")
-
-        # Implement Token Rotation: Issue BOTH a new Access AND a new Refresh token
-        new_access = create_access_token({"sub": user_id})
-        new_refresh = create_refresh_token({"sub": user_id})
-
-        return {
-            "access_token": new_access,
-            "refresh_token": new_refresh,
-            "token_type": "bearer",
-        }
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Refresh token expired")
-    except Exception:
+    # 1. Find the token in DB
+    db_token = db.query(models.RefreshToken).filter(
+        models.RefreshToken.token == refresh_token,
+        models.RefreshToken.is_revoked == False
+    ).first()
+    
+    if not db_token:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+        
+    # 2. Check Expiration
+    if db_token.expires_at < int(time.time() * 1000):
+        db_token.is_revoked = True
+        db.commit()
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+        
+    user_id = db_token.user_id
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user or user.is_deleted:
+        raise HTTPException(status_code=401, detail="User validation failed")
+
+    # 3. Implement Token Rotation
+    # Revoke current token
+    db_token.is_revoked = True
+    
+    # Issue new Pair
+    new_access = create_access_token({"sub": user_id})
+    new_refresh_str = create_refresh_token(user_id, db)
+    
+    db.commit()
+
+    return {
+        "access_token": new_access,
+        "refresh_token": new_refresh_str,
+        "token_type": "bearer",
+    }
 
 
 def verify_password(plain_password, hashed_password):

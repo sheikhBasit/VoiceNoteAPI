@@ -14,7 +14,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.services.rag_evaluator import RAGEvaluator
-from app.utils.audio_chunker import AudioChunker
+from app.services.audio_service import AudioService as AudioChunker
 from app.utils.metrics_collector import MetricsCollector
 
 ASSETS_DIR = "tests/assets/audio"

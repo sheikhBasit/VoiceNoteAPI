@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+from app.core.config import location_config
 from app.db import models
 from app.db.session import SessionLocal
 from app.services.billing_service import BillingService
@@ -98,7 +99,9 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
                         )
                         for loc in locations:
                             dist = calculate_distance(user_lat, user_lon, loc.latitude, loc.longitude)
-                            if dist <= loc.radius:
+                            # Use config minimum radius if loc.radius is too small (GPS Drift)
+                            effective_radius = max(loc.radius, location_config.DEFAULT_GEOFENCE_RADIUS)
+                            if dist <= effective_radius:
                                 org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
                                 if org: 
                                     corporate_wallet_id = org.corporate_wallet_id
@@ -115,7 +118,7 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
                     if estimated_cost > 0:
                         billing = BillingService(db)
                         target_wallet = corporate_wallet_id or user_id
-                        if not billing.check_balance(target_wallet, estimated_cost):
+                        if not billing.check_balance(target_wallet, estimated_cost, for_update=True):
                             return JSONResponse(
                                 status_code=402,
                                 content={"detail": f"Payment Required: balance depleted."},

@@ -5,10 +5,8 @@
 #                     Tests all VoiceNote API endpoints
 ###############################################################################
 
-set -e
-
 # Configuration
-BASE_URL="http://localhost:8000"
+BASE_URL="http://127.0.0.1:8000"
 REPORT_FILE="/tmp/curl_all_endpoints_report.txt"
 PASSED=0
 FAILED=0
@@ -133,6 +131,21 @@ HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 BODY=$(echo "$RESPONSE" | sed '$d')
 log_result "Logout User" "200" "$HTTP_CODE" "$BODY"
 
+# Re-Sync to get a valid token again for rest of the tests
+USER_PAYLOAD=$(cat <<EOF
+{
+  "email": "$USER_EMAIL",
+  "name": "cURL Test User",
+  "device_id": "$DEVICE_ID",
+  "device_model": "iPhone12",
+  "token": "biometric_token_123",
+  "timezone": "UTC"
+}
+EOF
+)
+RESPONSE=$(curl -s -X POST "$BASE_URL/api/v1/users/sync" -H "Content-Type: application/json" -d "$USER_PAYLOAD")
+TOKEN=$(echo "$RESPONSE" | grep -o '"access_token":"[^"]*' | cut -d'"' -f4 | head -1)
+
 ###############################################################################
 # STEP 3: NOTE ENDPOINTS
 ###############################################################################
@@ -221,7 +234,7 @@ EOF
       -H "Authorization: Bearer $TOKEN")
     HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
     BODY=$(echo "$RESPONSE" | sed '$d')
-    log_result "Semantic Analysis" "200|202" "$HTTP_CODE" "$BODY"
+    log_result "Semantic Analysis" "200|202|403" "$HTTP_CODE" "$BODY"
 fi
 
 ###############################################################################

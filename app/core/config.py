@@ -181,4 +181,22 @@ def get_ai_settings():
     return AISettings()
 
 
+class LocationConfig(BaseSettings):
+    """
+    Configuration for Location Services and Geofencing.
+    Attributes:
+        DEFAULT_GEOFENCE_RADIUS (int): Default radius in meters to account for GPS drift (e.g., 100m).
+    """
+    DEFAULT_GEOFENCE_RADIUS: int = Field(default=100, validation_alias="DEFAULT_GEOFENCE_RADIUS")
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+@lru_cache()
+def get_location_settings():
+    return LocationConfig()
+
+
 ai_config = get_ai_settings()
+location_config = get_location_settings()

@@ -348,8 +348,32 @@ def note_process_pipeline(
             # 8. Map & Save Tasks with Smart Actions
             from app.services.action_generator import ActionGenerator
             extracted_tasks = []
+            extracted_tasks = []
             for t_data in analysis.tasks:
-                actions_metadata = t_data.get("actions", {}) if isinstance(t_data, dict) else {}
+                # Helper to normalize access
+                is_dict = isinstance(t_data, dict)
+                raw_title = t_data.get("title") if is_dict else getattr(t_data, "title", None)
+                raw_desc = t_data.get("description") if is_dict else getattr(t_data, "description", None)
+                raw_prio = t_data.get("priority") if is_dict else getattr(t_data, "priority", "MEDIUM")
+                raw_deadline = t_data.get("deadline") if is_dict else getattr(t_data, "deadline", None)
+                if not raw_deadline and is_dict: 
+                    raw_deadline = t_data.get("due_date")
+
+                final_title = raw_title or (raw_desc if raw_desc else "Task")[:100]
+                final_desc = raw_desc or raw_title or "No description provided."
+
+                # GHOST TASK PREVENTION: Check for duplicates
+                existing_task = db.query(Task).filter(
+                    Task.note_id == note_id,
+                    Task.title == final_title,
+                    Task.deadline == raw_deadline
+                ).first()
+
+                if existing_task:
+                    JLogger.info(f"Worker: Skipping duplicate task '{final_title}'", note_id=note_id)
+                    continue
+
+                actions_metadata = t_data.get("actions", {}) if is_dict else getattr(t_data, "actions", {})
                 suggested_actions = {}
 
                 if "google_search" in actions_metadata:
@@ -381,26 +405,30 @@ def note_process_pipeline(
                     ai_data = actions_metadata["ai_prompt"]
                     suggested_actions["ai_prompt"] = ActionGenerator.generate_ai_prompt(
                         model=ai_data.get("model", "chatgpt"),
-                        task_description=t_data.get("description") if isinstance(t_data, dict) else t_data.description,
+                        task_description=final_desc,
                         context=note.summary or "",
                         custom_prompt=ai_data.get("prompt"),
                     )
 
-                new_task = Task(
-                    id=str(uuid.uuid4()),
+                from app.services.task_service import TaskService
+                task_service = TaskService(db)
+                new_task = task_service.create_task_with_deduplication(
                     user_id=note.user_id,
+                    title=final_title,
+                    description=final_desc,
                     note_id=note_id,
-                    title=t_data.get("title") or t_data.get("description", "Task")[:100],
-                    description=t_data["description"] if isinstance(t_data, dict) else t_data.description,
+                    deadline=raw_deadline,
                     priority=getattr(
                         Priority,
-                        t_data["priority"] if isinstance(t_data, dict) else t_data.priority,
+                        raw_prio,
                         Priority.MEDIUM,
-                    ),
-                    deadline=t_data["deadline"] if isinstance(t_data, dict) else t_data.deadline,
-                    suggested_actions=suggested_actions,
+                    )
                 )
-                db.add(new_task)
+
+                if "map" in actions_metadata or "ai_prompt" in actions_metadata:
+                    # Update suggested actions if it's a new task or we want to refresh them
+                    new_task.suggested_actions = suggested_actions
+
                 extracted_tasks.append(
                     {
                         "title": new_task.title,
@@ -571,6 +599,7 @@ def check_upcoming_tasks():
                 .filter(
                     Task.is_done.is_(False),
                     Task.is_deleted.is_(False),
+                    Task.notification_enabled.is_(True),
                     Task.notified_at.is_(None),
                     Task.deadline >= now_ms,
                     Task.deadline <= soon_ms,
@@ -864,6 +893,8 @@ def generate_note_embeddings_task(self, note_id: str):
                 "Worker: Embedding generation failed", note_id=note_id, error=str(e)
             )
             self.retry(exc=e, countdown=30)
+
+
 
 
 @celery_app.task(name="generate_productivity_report_task")

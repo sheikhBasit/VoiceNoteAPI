@@ -2,7 +2,7 @@ import os
 import time
 from typing import List
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Body
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
@@ -30,7 +30,7 @@ ai_service = AIService()
 @limiter.limit("60/minute")
 async def semantic_search(
     request: Request,
-    query: str,
+    query: str = Body(..., embed=True),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):

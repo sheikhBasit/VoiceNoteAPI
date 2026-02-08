@@ -5,7 +5,7 @@ Maps test expectations to actual implementation.
 """
 
 from app.utils.ai_service_utils import AIServiceError
-from app.utils.users_validation import ValidationError
+from app.services.validation_service import ValidationError
 
 # Make AIServiceError available from users_validation for test compatibility
 __all__ = [
@@ -20,23 +20,21 @@ __all__ = [
 
 
 def validate_email(email: str):
-    """Validate email - wraps users_validation."""
-    from app.utils.users_validation import validate_email as _validate_email
+    """Validate email - wraps ValidationService."""
+    from app.services.validation_service import ValidationService
 
     try:
-        return _validate_email(email)
+        return ValidationService.validate_email(email)
     except ValidationError as e:
         raise AIServiceError(str(e))
 
 
 def validate_device_model(model: str):
-    """Validate device model - wraps users_validation."""
-    from app.utils.users_validation import (
-        validate_device_model as _validate_device_model,
-    )
+    """Validate device model - wraps ValidationService."""
+    from app.services.validation_service import ValidationService
 
     try:
-        return _validate_device_model(model)
+        return ValidationService.validate_device_model(model)
     except ValidationError as e:
         raise AIServiceError(str(e))
 

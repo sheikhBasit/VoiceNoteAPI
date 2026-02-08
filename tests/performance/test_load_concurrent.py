@@ -34,7 +34,7 @@ class TestConcurrentAudioProcessing:
     @pytest.mark.load
     def test_concurrent_audio_validation(self):
         """Test validating multiple audio files concurrently."""
-        from app.utils.audio_chunker import AudioChunker
+        from app.services.audio_service import AudioService as AudioChunker
 
         # Simulate 10 concurrent validations
         audio_files = [

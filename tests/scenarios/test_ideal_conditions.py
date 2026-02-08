@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from app.utils.audio_chunker import AudioChunker
+from app.services.audio_service import AudioService as AudioChunker
 from app.utils.metrics_collector import MetricsCollector
 
 ASSETS_DIR = "tests/assets/audio/ideal"

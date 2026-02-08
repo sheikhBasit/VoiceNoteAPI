@@ -19,8 +19,11 @@ class BillingService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_or_create_wallet(self, user_id: str) -> Wallet:
-        wallet = self.db.query(Wallet).filter(Wallet.user_id == user_id).first()
+    def get_or_create_wallet(self, user_id: str, for_update: bool = False) -> Wallet:
+        query = self.db.query(Wallet).filter(Wallet.user_id == user_id)
+        if for_update:
+            query = query.with_for_update()
+        wallet = query.first()
         if not wallet:
             logger.info(f"Creating new wallet for user {user_id}")
             wallet = Wallet(
@@ -31,11 +34,12 @@ class BillingService:
             self.db.refresh(wallet)
         return wallet
 
-    def check_balance(self, user_id: str, estimated_cost: int) -> bool:
+    def check_balance(self, user_id: str, estimated_cost: int, for_update: bool = False) -> bool:
         """
         Returns True if user has enough credits.
+        If for_update=True, locks the row.
         """
-        wallet = self.get_or_create_wallet(user_id)
+        wallet = self.get_or_create_wallet(user_id, for_update=for_update)
         if wallet.is_frozen:
             return False
 
@@ -59,7 +63,7 @@ class BillingService:
             return False
 
         target_wallet_id = override_wallet_id or user_id
-        wallet = self.get_or_create_wallet(target_wallet_id)
+        wallet = self.get_or_create_wallet(target_wallet_id, for_update=True)
 
         # Determine cost based on plan if not explicitly provided
         final_cost = cost
@@ -135,7 +139,7 @@ class BillingService:
         """
         Adds credits to wallet from Stripe/Admin.
         """
-        wallet = self.get_or_create_wallet(user_id)
+        wallet = self.get_or_create_wallet(user_id, for_update=True)
         wallet.balance += amount
 
         tx = Transaction(

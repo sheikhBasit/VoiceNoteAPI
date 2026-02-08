@@ -7,8 +7,21 @@ import librosa
 import soundfile as sf
 from app.utils.json_logger import JLogger
 
-class AudioChunker:
-    """Utility for validating and chunking audio files."""
+class AudioService:
+    """Service for handling audio processing: validation, chunking, and merging."""
+
+    @staticmethod
+    def convert_to_supported_format(audio_path: str, output_path: str) -> str:
+        """
+        Converts audio file to supported WAV format.
+        """
+        try:
+            y, sr = librosa.load(audio_path, sr=None)
+            sf.write(output_path, y, sr)
+            return output_path
+        except Exception as e:
+            JLogger.error(f"Failed to convert audio: {e}")
+            return audio_path
 
     @staticmethod
     def validate_audio_file(audio_path: str) -> Tuple[bool, str]:

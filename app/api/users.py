@@ -29,17 +29,7 @@ from app.services.auth_service import (
 from app.services.deletion_service import DeletionService
 from app.utils.json_logger import JLogger
 from app.utils.security import verify_device_signature
-from app.utils.users_validation import (
-    ValidationError,
-    validate_device_id,
-    validate_email,
-    validate_jargons,
-    validate_name,
-    validate_system_prompt,
-    validate_user_id,
-    validate_work_days,
-    validate_work_hours,
-)
+from app.services.validation_service import ValidationService, ValidationError
 
 limiter = Limiter(
     key_func=get_remote_address,
@@ -60,8 +50,8 @@ def sync_user(
     - If Email Exists + Device Authorized: Login Success.
     """
     try:
-        validated_email = validate_email(user_data.email)
-        validated_device_id = validate_device_id(user_data.device_id)
+        validated_email = ValidationService.validate_email(user_data.email)
+        validated_device_id = ValidationService.validate_device_id(user_data.device_id)
         # validated_token = validate_token(user_data.token) # Biometric token checks
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -103,7 +93,7 @@ def sync_user(
 
         # Issue Tokens
         access_token = create_access_token(data={"sub": db_user.id})
-        refresh_token = create_refresh_token(data={"sub": db_user.id})
+        refresh_token = create_refresh_token(db_user.id, db)
 
         return {
             "user": db_user,
@@ -170,7 +160,7 @@ def sync_user(
 
     # Issue Tokens
     access_token = create_access_token(data={"sub": db_user.id})
-    refresh_token = create_refresh_token(data={"sub": db_user.id})
+    refresh_token = create_refresh_token(db_user.id, db)
 
     return {
         "user": db_user,
@@ -365,23 +355,23 @@ def update_user_settings(
             continue
         try:
             if key == "name" and value:
-                update_dict[key] = validate_name(value)
+                update_dict[key] = ValidationService.validate_name(value)
             elif key == "email" and value:
-                update_dict[key] = validate_email(value)
+                update_dict[key] = ValidationService.validate_email(value)
             elif key == "system_prompt" and value:
-                update_dict[key] = validate_system_prompt(value)
+                update_dict[key] = ValidationService.validate_system_prompt(value)
             elif key == "work_start_hour" and value is not None:
                 end_hour = update_data.work_end_hour or db_user.work_end_hour
-                validated = validate_work_hours(value, end_hour)
+                validated = ValidationService.validate_work_hours(value, end_hour)
                 update_dict["work_start_hour"] = validated[0]
             elif key == "work_end_hour" and value is not None:
                 start_hour = update_data.work_start_hour or db_user.work_start_hour
-                validated = validate_work_hours(start_hour, value)
+                validated = ValidationService.validate_work_hours(start_hour, value)
                 update_dict["work_end_hour"] = validated[1]
             elif key == "work_days" and value:
-                update_dict[key] = validate_work_days(value)
+                update_dict[key] = ValidationService.validate_work_days(value)
             elif key == "jargons" and value:
-                update_dict[key] = validate_jargons(value)
+                update_dict[key] = ValidationService.validate_jargons(value)
             else:
                 update_dict[key] = value
         except ValidationError as e:
@@ -465,7 +455,7 @@ def update_user_role(
         )
 
     try:
-        validated_user_id = validate_user_id(user_id)
+        validated_user_id = ValidationService.validate_user_id(user_id)
         from app.db.models import UserRole
 
         if role not in [role_enum.name for role_enum in UserRole]:

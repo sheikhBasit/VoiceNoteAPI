@@ -172,6 +172,29 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    refresh_tokens = relationship(
+        "RefreshToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class RefreshToken(Base):
+    """
+    Stores refresh tokens for secure session management.
+    Allows for revocation and rotation.
+    """
+    __tablename__ = "refresh_tokens"
+
+    id = Column(String, primary_key=True, default=lambda: str(__import__("uuid").uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token = Column(String(255), unique=True, index=True)
+    expires_at = Column(BigInteger, nullable=False)
+    is_revoked = Column(Boolean, default=False)
+    created_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+
+    user = relationship("User", back_populates="refresh_tokens")
 
 
 class Folder(Base):
