@@ -165,4 +165,10 @@ jobs:
             
             # Verify deployment
             sudo docker compose ps
-            sudo bash scripts/test/test_all_endpoints_curl.sh
+            
+            # Run tests and dump logs on failure
+            if ! sudo bash scripts/test/test_all_endpoints_curl.sh; then
+              echo "❌ Tests failed. Dumping API logs for debugging:"
+              sudo docker compose logs api --tail=500
+              exit 1
+            fi
