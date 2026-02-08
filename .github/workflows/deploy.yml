@@ -154,14 +154,13 @@ jobs:
             echo "Waiting for database to be healthy..."
             sleep 10
             
-            # Run migrations with auto-recovery
+            # Run migrations (Fail loudly if this errors)
             echo "Running database migrations..."
-            sudo docker compose exec -T api alembic -c /app/alembic.ini upgrade head || {
-              echo "Migration failed, attempting recovery..."
-              # If migration fails, stamp the database with the base revision
-              sudo docker compose exec -T api alembic -c /app/alembic.ini stamp head
-              sudo docker compose exec -T api alembic -c /app/alembic.ini upgrade head
-            }
+            sudo docker compose exec -T api alembic -c /app/alembic.ini upgrade head
+            
+            # Verify migration status
+            echo "Verifying migration state..."
+            sudo docker compose exec -T api alembic current
             
             # Verify deployment
             sudo docker compose ps
