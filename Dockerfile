@@ -32,6 +32,10 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip uninstall -y triton || true && \
     find /usr/local/lib/python3.11/site-packages -name "__pycache__" -type d -exec rm -rf {} +
 
+# Pre-download AI embedding model to avoid startup delays
+RUN python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" && \
+    echo "AI model pre-downloaded successfully"
+
 # Runtime stage
 FROM python:3.11-slim
 
@@ -56,6 +60,9 @@ WORKDIR /app
 # Copy Python environment from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy pre-downloaded AI model cache from builder
+COPY --from=builder /root/.cache/huggingface /root/.cache/huggingface
 
 # Copy application code
 COPY . .

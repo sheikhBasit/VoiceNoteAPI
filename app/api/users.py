@@ -331,6 +331,9 @@ def get_user_profile_by_id(
             )
 
         return user
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404) so they're not caught below
+        raise
     except Exception as e:
         JLogger.error("Failed to fetch user profile", user_id=user_id, error=str(e))
         raise HTTPException(

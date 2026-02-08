@@ -5,9 +5,15 @@
 # Python
 __pycache__
 *.pyc
+*.pyo
+*.pyd
 .venv
 venv
 .pytest_cache
+
+# Alembic cache (prevent migration revision conflicts)
+alembic/**/__pycache__
+alembic/**/*.pyc
 
 # Media & Data
 uploads/
