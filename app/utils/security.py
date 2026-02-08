@@ -23,7 +23,7 @@ async def verify_device_signature(request: Request, db: Session = Depends(get_db
     Exemption: Testing environment.
     """
     # 0. Check for Testing Environment
-    if os.getenv("ENVIRONMENT") == "testing":
+    if os.getenv("ENVIRONMENT") == "testing" and not request.headers.get("X-Force-Signature-Check"):
         return True
 
     # 1. Check for Admin Exemption

@@ -39,6 +39,7 @@ from app.worker.task import generate_note_embeddings_task, note_process_pipeline
 limiter = Limiter(
     key_func=get_remote_address,
     storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"),
+    enabled=os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true",
 )
 
 router = APIRouter(prefix="/api/v1/notes", tags=["Notes"])

@@ -120,7 +120,7 @@ seed-sql:
 
 seed-python:
 	@echo "🌱 Seeding database via Python..."
-	@$(COMPOSE) run --rm $(API_SERVICE) python scripts/seed_db.py
+	@$(COMPOSE) run --rm $(API_SERVICE) python scripts/db/seed_db.py
 	@echo "✅ Python seeding complete!"
 
 db-shell:
@@ -258,9 +258,9 @@ run:
 # Git Hooks & Pre-push checks
 install-hooks:
 	@echo "📝 Installing git hooks..."
-	@if [ -f scripts/pre-push-check.sh ]; then \
-		chmod +x scripts/pre-push-check.sh; \
-		cp scripts/pre-push-check.sh .git/hooks/pre-push; \
+	@if [ -f scripts/ops/pre-push-check.sh ]; then \
+		chmod +x scripts/ops/pre-push-check.sh; \
+		cp scripts/ops/pre-push-check.sh .git/hooks/pre-push; \
 		chmod +x .git/hooks/pre-push; \
 		echo "✅ Pre-push hook installed!"; \
 	else \

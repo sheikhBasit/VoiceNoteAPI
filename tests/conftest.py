@@ -33,6 +33,9 @@ class MockVector(String):
     class comparator_factory(String.Comparator):
         def cosine_distance(self, other):
             return literal_column("'0'")
+            
+        def l2_distance(self, other):
+            return literal_column("'0'")
 
 
 mock_pg_sql.Vector = MockVector
@@ -166,16 +169,92 @@ def setup_test_env():
 @pytest.fixture
 def db_session():
     """Provides a fresh database session for each test"""
-    from app.db.session import SessionLocal
+    from app.db.session import SessionLocal, Base
     session = SessionLocal()
+    
+    # Clean up any existing data before starting the test
+    # SQLite doesn't support TRUNCATE, so we use DELETE from all tables
+    # following the dependency graph order (reversed sorted_tables)
+    try:
+        for table in reversed(Base.metadata.sorted_tables):
+            session.execute(table.delete())
+        session.commit()
+    except Exception:
+        session.rollback()
+        
     try:
         yield session
     finally:
         session.close()
 
 
+@pytest.fixture
+def db(db_session):
+    """Alias for db_session to support tests that use 'db'"""
+    return db_session
+
+
+@pytest.fixture
+async def async_client():
+    """Provides an asynchronous HTTP client for testing"""
+    from httpx import ASGITransport, AsyncClient
+    from app.main import app
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+
+
+@pytest.fixture
+def client():
+    """Provides a synchronous TestClient for testing"""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    return TestClient(app)
+
+
 @pytest.fixture(autouse=True)
 def mock_ai_services():
     """Mock external AI services centrally (Legacy patch cleanup)"""
-    # Using global mocks now, but keeping this for any localized patching if needed
+    
+    # Retrieve the current mock objects dynamically to avoid stale references
+    groq_mod = sys.modules.get("groq")
+    if groq_mod:
+        client_mock = groq_mod.Groq.return_value
+        
+        # Reset Groq mock to default state
+        client_mock.chat.completions.create.reset_mock(return_value=True, side_effect=True)
+        client_mock.audio.transcriptions.create.reset_mock(return_value=True, side_effect=True)
+        
+        default_response = MagicMock()
+        default_response.choices = [MagicMock()]
+        default_response.choices[0].message.content = json.dumps(
+            {
+                "summary": "Mock Summary",
+                "title": "Mock Title",
+                "priority": "MEDIUM",
+                "tasks": [],
+                "topics": [],
+                "sentiment": "neutral",
+                "key_points": [],
+                "project_association": "None",
+                "entities": [],
+                "action_items": [],
+                "emotional_tone": "Neutral",
+                "logical_patterns": [],
+                "suggested_questions": [],
+                # Add fields expected by search
+                "answer": "Mock Answer", 
+                "query": "Mock Query",
+                "source": "Mock Source"
+            }
+        )
+        client_mock.chat.completions.create.return_value = default_response
+        client_mock.chat.completions.create.side_effect = None
+        
+        client_mock.audio.transcriptions.create.return_value = MagicMock(text="Groq Transcript")
+
+    # Reset Singleton state in AIService to ensure it picks up the correct mock
+    from app.services.ai_service import AIService
+    AIService._groq_client = None
+    AIService._dg_client = None
+    
     yield

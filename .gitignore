@@ -8,11 +8,14 @@ htmlcov/
 
 # Environment & Secrets
 .env
+.env.*
 .venv
 env/
 venv/
 ENV/
 *.key
+api_env.txt
+*_env.txt
 
 # Local Media & Processing
 uploads/
@@ -23,6 +26,16 @@ uploads/
 *.jpeg
 *.png
 
+# Logs and Results
+logs/
+tests/results/
+*.log
+test_results.md
+
+# Databases
+*.db
+*.sqlite
+
 # OS & IDE
 .DS_Store
 .vscode/
@@ -32,12 +45,6 @@ uploads/
 # Docker
 .docker/
 
-
 ssh_private
 ssh_private.pub
-
-api_env.txt
-# Env files
-*.env
-*_env.txt
 

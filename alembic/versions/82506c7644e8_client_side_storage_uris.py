@@ -20,13 +20,29 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Renames for Note table
-    op.execute("ALTER TABLE notes RENAME COLUMN document_urls TO document_uris")
+    # Renames for Note table (Safely)
+    op.execute("""
+        DO $$ 
+        BEGIN 
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='notes' AND column_name='document_urls') THEN
+                ALTER TABLE notes RENAME COLUMN document_urls TO document_uris;
+            END IF;
+        END $$;
+    """)
     op.execute("ALTER TABLE notes ADD COLUMN IF NOT EXISTS image_uris JSONB DEFAULT '[]'")
     
-    # Renames for Task table
-    op.execute("ALTER TABLE tasks RENAME COLUMN image_urls TO image_uris")
-    op.execute("ALTER TABLE tasks RENAME COLUMN document_urls TO document_uris")
+    # Renames for Task table (Safely)
+    op.execute("""
+        DO $$ 
+        BEGIN 
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='image_urls') THEN
+                ALTER TABLE tasks RENAME COLUMN image_urls TO image_uris;
+            END IF;
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='document_urls') THEN
+                ALTER TABLE tasks RENAME COLUMN document_urls TO document_uris;
+            END IF;
+        END $$;
+    """)
 
 
 def downgrade() -> None:
