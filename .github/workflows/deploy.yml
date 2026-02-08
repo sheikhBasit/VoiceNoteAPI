@@ -148,4 +148,4 @@ jobs:
             
             # Verify deployment
             sudo docker compose ps
-            sudo bash scripts/test/test_endpoints.sh
+            sudo bash scripts/test/test_all_endpoints_curl.sh
