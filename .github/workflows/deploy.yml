@@ -122,12 +122,19 @@ jobs:
     steps:
       - name: SSH and Deploy
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOCKER_USERNAME: ab745
+          DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
         with:
+          envs: DOCKER_USERNAME,DOCKER_PASSWORD
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_KEY }}
           command_timeout: 30m
           script: |
+            # Login to Docker Hub to fix rate limit
+            echo "$DOCKER_PASSWORD" | sudo docker login -u "$DOCKER_USERNAME" --password-stdin
+            
             cd /home/azureuser/voicenote-project/VoiceNoteAPI
             
             # Pull latest code
