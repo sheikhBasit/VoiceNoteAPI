@@ -1,19 +1,21 @@
 import logging
 import time
 import math
+import jwt
 from typing import Optional
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+from starlette.background import BackgroundTask
 
 from app.core.config import location_config
 from app.db import models
 from app.db.session import SessionLocal
 from app.services.billing_service import BillingService
+from app.services.auth_service import SECRET_KEY, ALGORITHM
 from app.utils.json_logger import JLogger
-from starlette.background import BackgroundTask
 
 logger = logging.getLogger("VoiceNote.Usage")
 
@@ -40,7 +42,6 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next):
-        from app.db import models
         start_time = time.time()
 
         # Pass through check for health/metrics endpoints
@@ -61,8 +62,6 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
             try:
-                from app.services.auth_service import SECRET_KEY, ALGORITHM
-                import jwt
                 payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
                 user_id = payload.get("sub")
                 request.state.user_id = user_id 
@@ -152,10 +151,6 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
         corporate_wallet_id: Optional[str] = None,
     ):
         try:
-            from app.db import models
-            from app.db.session import SessionLocal
-            from app.services.billing_service import BillingService
-            
             if not request.url.path.startswith("/api/v1"):
                 return
 

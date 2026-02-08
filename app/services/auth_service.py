@@ -1,5 +1,6 @@
 import os
 import time
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Optional
 
@@ -46,7 +47,6 @@ def create_refresh_token(user_id: str, db: Session, expires_delta: Optional[time
     expires_timestamp = int(expire.timestamp() * 1000)
     
     # Generate random token string
-    import secrets
     token_str = secrets.token_urlsafe(32)
     
     new_refresh = models.RefreshToken(

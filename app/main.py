@@ -301,38 +301,7 @@ Instrumentator().instrument(app).expose(app)
 app.add_middleware(UsageTrackingMiddleware)  # NEW: Usage Metering
 
 
-class RequestBodyCacheMiddleware:
-    def __init__(self, app):
-        self.app = app
 
-    async def __call__(self, scope, receive, send):
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        # Cache the body only for mutating methods
-        if scope["method"] in ("POST", "PUT", "PATCH"):
-            body = b""
-            more_body = True
-            while more_body:
-                message = await receive()
-                body += message.get("body", b"")
-                more_body = message.get("more_body", False)
-
-            # Re-emit the body as a single message for downstream consumers
-            async def receive_cached():
-                return {"type": "http.request", "body": body, "more_body": False}
-
-            # Set the cached body on scope for easy access in dependencies
-            scope["cached_body"] = body
-            await self.app(scope, receive_cached, send)
-        else:
-            await self.app(scope, receive, send)
-
-
-
-
-app.add_middleware(RequestBodyCacheMiddleware)
 
 
 @app.get("/")
