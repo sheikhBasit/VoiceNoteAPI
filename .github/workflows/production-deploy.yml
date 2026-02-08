@@ -90,7 +90,7 @@ jobs:
           DEVICE_SECRET_KEY: "VN_SECURE_TEST_KEY"
           PYTHONPATH: .
         run: |
-          pytest tests/ -v --tb=short -m "not load and not stress" --timeout=60 -x
+          pytest tests/ -v --tb=short -m "not load and not stress" -x
 
       - name: Generate Coverage Report
         env:

@@ -85,7 +85,7 @@ jobs:
           PYTEST_DB_NAME: "voicenote_test"
           PYTHONPATH: .
         run: |
-          python -m pytest tests/test_new_endpoints.py -v --tb=short
+          python -m pytest tests/integration/test_new_endpoints.py -v --tb=short
 
   build-and-push:
     name: Build and Push Docker Images
