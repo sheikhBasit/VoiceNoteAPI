@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Clean up any Python bytecode cache to prevent migration issues
+echo "Cleaning Python cache..."
+find /app/alembic -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find /app/alembic -type f -name "*.pyc" -delete 2>/dev/null || true
+echo "Cache cleaned."
+
 # Run migrations with auto-recovery for squashed migrations
 echo "Running database migrations..."
 

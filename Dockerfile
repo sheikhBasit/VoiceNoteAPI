@@ -67,6 +67,13 @@ COPY --from=builder /root/.cache/huggingface /root/.cache/huggingface
 # Copy application code
 COPY . .
 
+# Clean up any Python bytecode cache that might have been copied
+# This prevents old migration .pyc files from causing issues
+RUN find /app -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true && \
+    find /app -type f -name "*.pyc" -delete 2>/dev/null || true && \
+    find /app -type f -name "*.pyo" -delete 2>/dev/null || true && \
+    echo "Python cache cleaned"
+
 # Create necessary directories
 RUN mkdir -p uploads scripts logs && \
     chmod 777 uploads logs && \
