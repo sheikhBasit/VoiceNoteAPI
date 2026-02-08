@@ -10,6 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+from pgvector.sqlalchemy import Vector
 
 # revision identifiers, used by Alembic.
 revision: str = 'b891cb8863b5'
@@ -252,7 +253,7 @@ def upgrade() -> None:
     sa.Column('document_uris', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('image_uris', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('links', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('embedding', pgvector.sqlalchemy.vector.VECTOR(dim=384), nullable=True),
+    sa.Column('embedding', Vector(dim=384), nullable=True),
     sa.Column('embedding_version', sa.Integer(), nullable=True),
     sa.Column('languages', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('stt_model', sa.String(), nullable=True),
