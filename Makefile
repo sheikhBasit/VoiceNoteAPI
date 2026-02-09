@@ -79,9 +79,21 @@ up:
 	$(COMPOSE) up -d
 	@echo "⏳ Waiting for services to be healthy..."
 	@for i in $$(seq 1 45); do \
-		if [ "$$($(COMPOSE) ps --format json | grep -c '"Health":"healthy"')" -ge 3 ]; then \
-			echo "✅ All core services are healthy!"; \
+		DOCKER_STATUS=$$( $(COMPOSE) ps --format json ); \
+		DB_HEALTH=$$(echo "$$DOCKER_STATUS" | grep '"Service":"db"' | grep -c '"Health":"healthy"'); \
+		REDIS_HEALTH=$$(echo "$$DOCKER_STATUS" | grep '"Service":"redis"' | grep -c '"Health":"healthy"'); \
+		API_HEALTH=$$(echo "$$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"Health":"healthy"'); \
+		if [ "$$DB_HEALTH" -eq 1 ] && [ "$$REDIS_HEALTH" -eq 1 ] && [ "$$API_HEALTH" -eq 1 ]; then \
+			echo "✅ All core services (DB, Redis, API) are healthy!"; \
 			break; \
+		fi; \
+		echo "   Waiting... ($$i/45) [DB:$$DB_HEALTH Redis:$$REDIS_HEALTH API:$$API_HEALTH]"; \
+		if [ "$$DB_HEALTH" -eq 1 ] && [ "$$REDIS_HEALTH" -eq 1 ]; then \
+			API_RUNNING=$$(echo "$$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"State":"running"'); \
+			if [ "$$API_RUNNING" -eq 0 ]; then \
+				echo "⚠️ API not running. Force starting..."; \
+				$(COMPOSE) up -d api; \
+			fi; \
 		fi; \
 		echo "   Waiting... ($$i/45)"; \
 		sleep 2; \
@@ -102,9 +114,21 @@ restart:
 	$(COMPOSE) down && $(COMPOSE) up -d
 	@echo "⏳ Waiting for services to be healthy..."
 	@for i in $$(seq 1 45); do \
-		if [ "$$($(COMPOSE) ps --format json | grep -c '"Health":"healthy"')" -ge 3 ]; then \
-			echo "✅ All core services are healthy!"; \
+		DOCKER_STATUS=$$( $(COMPOSE) ps --format json ); \
+		DB_HEALTH=$$(echo "$$DOCKER_STATUS" | grep '"Service":"db"' | grep -c '"Health":"healthy"'); \
+		REDIS_HEALTH=$$(echo "$$DOCKER_STATUS" | grep '"Service":"redis"' | grep -c '"Health":"healthy"'); \
+		API_HEALTH=$$(echo "$$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"Health":"healthy"'); \
+		if [ "$$DB_HEALTH" -eq 1 ] && [ "$$REDIS_HEALTH" -eq 1 ] && [ "$$API_HEALTH" -eq 1 ]; then \
+			echo "✅ All core services (DB, Redis, API) are healthy!"; \
 			break; \
+		fi; \
+		echo "   Waiting... ($$i/45) [DB:$$DB_HEALTH Redis:$$REDIS_HEALTH API:$$API_HEALTH]"; \
+		if [ "$$DB_HEALTH" -eq 1 ] && [ "$$REDIS_HEALTH" -eq 1 ]; then \
+			API_RUNNING=$$(echo "$$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"State":"running"'); \
+			if [ "$$API_RUNNING" -eq 0 ]; then \
+				echo "⚠️ API not running. Force starting..."; \
+				$(COMPOSE) up -d api; \
+			fi; \
 		fi; \
 		echo "   Waiting... ($$i/45)"; \
 		sleep 2; \

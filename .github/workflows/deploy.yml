@@ -157,19 +157,36 @@ jobs:
             # Start all services with fresh state
             sudo docker compose up -d --no-build
             
-            # Wait for services to be ready (Robust wait)
-            echo "Waiting for services to be healthy..."
-            for i in {1..30}; do
-              if [ "$(sudo docker compose ps --format json | grep -c '"Health":"healthy"')" -ge 3 ]; then
-                echo "✅ Core services (DB, Redis, API) are healthy!"
+            # Targeted health check for core services
+            echo "Waiting for core services (db, redis, api) to be healthy..."
+            for i in {1..60}; do
+              DOCKER_STATUS=$(sudo docker compose ps --format json)
+              DB_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"db"' | grep -c '"Health":"healthy"')
+              REDIS_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"redis"' | grep -c '"Health":"healthy"')
+              API_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"Health":"healthy"')
+              
+              echo "   Status ($i/60): DB=$DB_HEALTH, Redis=$REDIS_HEALTH, API=$API_HEALTH"
+              
+              if [ "$DB_HEALTH" -eq 1 ] && [ "$REDIS_HEALTH" -eq 1 ] && [ "$API_HEALTH" -eq 1 ]; then
+                echo "✅ Core services are healthy!"
                 break
               fi
-              echo "   Waiting... ($i/30)"
+              
+              # If DB and Redis are healthy but API is not even running, try to force start it
+              if [ "$DB_HEALTH" -eq 1 ] && [ "$REDIS_HEALTH" -eq 1 ]; then
+                API_RUNNING=$(echo "$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"State":"running"')
+                if [ "$API_RUNNING" -eq 0 ]; then
+                  echo "⚠️ API service not running but dependencies are healthy. Force starting API..."
+                  sudo docker compose up -d api
+                fi
+              fi
+              
               sleep 2
-              if [ $i -eq 30 ]; then
+              if [ $i -eq 60 ]; then
                 echo "❌ Timing out waiting for services to be healthy."
                 sudo docker compose ps
                 sudo docker compose logs db
+                sudo docker compose logs api
                 exit 1
               fi
             done
