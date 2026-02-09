@@ -157,9 +157,22 @@ jobs:
             # Start all services with fresh state
             sudo docker compose up -d --no-build
             
-            # Wait for database to be ready
-            echo "Waiting for database to be healthy..."
-            sleep 10
+            # Wait for services to be ready (Robust wait)
+            echo "Waiting for services to be healthy..."
+            for i in {1..30}; do
+              if [ "$(sudo docker compose ps --format json | grep -c '"Health":"healthy"')" -ge 3 ]; then
+                echo "✅ Core services (DB, Redis, API) are healthy!"
+                break
+              fi
+              echo "   Waiting... ($i/30)"
+              sleep 2
+              if [ $i -eq 30 ]; then
+                echo "❌ Timing out waiting for services to be healthy."
+                sudo docker compose ps
+                sudo docker compose logs db
+                exit 1
+              fi
+            done
             
             # Run migrations (Fail loudly if this errors)
             echo "Running database migrations..."

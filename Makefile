@@ -77,8 +77,19 @@ build-no-cache:
 up:
 	@echo "🚀 Starting all services..."
 	$(COMPOSE) up -d
-	@sleep 5
-	@echo "✅ Services started!"
+	@echo "⏳ Waiting for services to be healthy..."
+	@for i in $$(seq 1 45); do \
+		if [ "$$($(COMPOSE) ps --format json | grep -c '"Health":"healthy"')" -ge 3 ]; then \
+			echo "✅ All core services are healthy!"; \
+			break; \
+		fi; \
+		echo "   Waiting... ($$i/45)"; \
+		sleep 2; \
+		if [ $$i -eq 45 ]; then \
+			echo "❌ Timeout waiting for services to be healthy"; \
+			exit 1; \
+		fi; \
+	done
 	@make health
 
 down:
@@ -89,8 +100,19 @@ down:
 restart:
 	@echo "🔄 Restarting all services..."
 	$(COMPOSE) down && $(COMPOSE) up -d
-	@sleep 5
-	@echo "✅ Services restarted!"
+	@echo "⏳ Waiting for services to be healthy..."
+	@for i in $$(seq 1 45); do \
+		if [ "$$($(COMPOSE) ps --format json | grep -c '"Health":"healthy"')" -ge 3 ]; then \
+			echo "✅ All core services are healthy!"; \
+			break; \
+		fi; \
+		echo "   Waiting... ($$i/45)"; \
+		sleep 2; \
+		if [ $$i -eq 45 ]; then \
+			echo "❌ Timeout waiting for services to be healthy"; \
+			exit 1; \
+		fi; \
+	done
 	@make health
 
 # Logs
