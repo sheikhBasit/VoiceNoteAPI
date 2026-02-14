@@ -62,7 +62,8 @@ asyncio.run(reset_alembic())
         fi
     fi
 elif grep -q "ERROR" /tmp/alembic_output.log; then
-    echo "Migration encountered errors but will continue startup..."
+    echo "❌ Migration encountered errors. Exiting to prevent broken state..."
+    exit 1
 fi
 
 # Cleanup

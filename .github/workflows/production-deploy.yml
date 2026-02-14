@@ -154,8 +154,6 @@ jobs:
     name: 🚀 Deploy to Production
     needs: [validate, build]
     runs-on: ubuntu-latest
-    environment:
-      name: production
     steps:
       - uses: actions/checkout@v4
 
