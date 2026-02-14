@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field, HttpUrl
 
 
 class Priority(str, Enum):
@@ -37,8 +37,14 @@ class TaskBase(BaseModel):
 
     # Use default_factory to avoid mutable default issues
     assigned_entities: List[ContactEntity] = Field(default_factory=list)
-    image_uris: List[str] = Field(default_factory=list)  # Client-side URIs
-    document_uris: List[str] = Field(default_factory=list)  # Client-side URIs
+    image_uris: List[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("image_uris", "image_urls"),
+    )  # Client-side URIs
+    document_uris: List[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("document_uris", "document_urls"),
+    )  # Client-side URIs
     external_links: List[LinkEntity] = Field(default_factory=list)
 
     communication_type: Optional[CommunicationType] = None

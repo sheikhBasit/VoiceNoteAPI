@@ -279,6 +279,7 @@ def search_tasks(
 
 
 @router.get("/stats", tags=["Analytics"])
+@router.get("/statistics", tags=["Analytics"])
 def get_task_statistics(
     db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):

@@ -10,6 +10,17 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.utils.json_logger import JLogger
 
+
+def is_dev_bypass(token: str) -> bool:
+    """Centralized check for development bypass tokens."""
+    if token and token.startswith("dev_"):
+        if os.getenv("ENVIRONMENT") == "production":
+            JLogger.warning(
+                "DEVELOPMENT BYPASS USED IN PRODUCTION ENVIRONMENT", token=token
+            )
+        return True
+    return False
+
 # Secret key for device signature verification
 DEVICE_SECRET_KEY = os.getenv("DEVICE_SECRET_KEY", "default_secret_for_dev_only")
 
@@ -26,25 +37,26 @@ async def verify_device_signature(request: Request, db: Session = Depends(get_db
     if os.getenv("ENVIRONMENT") == "testing" and not request.headers.get("X-Force-Signature-Check"):
         return True
 
-    # 1. Check for Admin Exemption
+    # 1. Check for Admin or Dev Bypass (Token-based)
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
+
+        if is_dev_bypass(token):
+            return True
+
         try:
             import jwt
-
             from app.services.auth_service import ALGORITHM, SECRET_KEY
-
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             user_id = payload.get("sub")
             if user_id:
                 from app.db import models
-
                 user = db.query(models.User).filter(models.User.id == user_id).first()
                 if user and user.is_admin:
                     return True
         except Exception:
-            pass  # Invalid token for admin check, proceed to signature check
+            pass  # Invalid token for bypass check, proceed to signature check
 
     signature = request.headers.get("X-Device-Signature")
     timestamp = request.headers.get("X-Device-Timestamp")  # Unix timestamp in seconds
