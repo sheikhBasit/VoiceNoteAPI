@@ -28,6 +28,8 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     id: Optional[str] = None
+    email: str
+    password: Optional[str] = None
     token: str
     device_id: str
     device_model: str

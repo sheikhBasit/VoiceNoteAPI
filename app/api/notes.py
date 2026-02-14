@@ -367,6 +367,7 @@ def bulk_move_notes(
 @router.get("/{note_id}", response_model=note_schema.NoteResponse)
 def get_note(
     note_id: str,
+    verbose: bool = Query(False, description="Include engine-specific transcripts for comparison"),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -396,6 +397,12 @@ def get_note(
         note.related_notes = related
     else:
         note.related_notes = []
+
+    # 🛠 Transcription Comparison (Phase 4 Requirement)
+    if not verbose:
+        note.transcript_groq = None
+        note.transcript_deepgram = None
+        note.transcript_android = None
 
     return note
 

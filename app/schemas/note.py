@@ -92,6 +92,10 @@ class NoteResponse(NoteBase):
     semantic_analysis: Optional[dict] = None
     processing_time_ms: Optional[int] = None  # New: Time taken for AI analysis
     related_notes: List[NoteResponseSummary] = []  # NEW: Top 3 semantic links
+    # Comparison Fields (NEW: populated only if verbose=true)
+    transcript_groq: Optional[str] = None
+    transcript_deepgram: Optional[str] = None
+    transcript_android: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 

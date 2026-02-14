@@ -278,8 +278,8 @@ def search_tasks(
     return tasks
 
 
-@router.get("/stats", tags=["Analytics"])
-@router.get("/statistics", tags=["Analytics"])
+@router.get("/stats", tags=["Analytics"], response_model=task_schema.TaskStatistics)
+@router.get("/statistics", tags=["Analytics"], response_model=task_schema.TaskStatistics)
 def get_task_statistics(
     db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
@@ -427,6 +427,27 @@ async def add_task_multimedia(
     process_task_image_pipeline.delay(task_id, local_path, file.filename)
 
     return {"message": "Upload received. Processing in background.", "task_id": task_id}
+
+
+@router.patch("/{task_id}/complete", response_model=task_schema.TaskResponse)
+def complete_task(
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    PATCH /{task_id}/complete: Professional alias for marking a task as done.
+    Sets is_done=True and status=DONE.
+    """
+    task = verify_task_ownership(db, current_user, task_id)
+    task.is_done = True
+    task.status = models.TaskStatus.DONE
+    task.updated_at = int(time.time() * 1000)
+    db.commit()
+    db.refresh(task)
+
+    JLogger.info("Task marked as complete", task_id=task_id, user_id=current_user.id)
+    return task
 
 
 @router.delete("/{task_id}")

@@ -18,6 +18,13 @@ class CommunicationType(str, Enum):
     SLACK = "SLACK"
 
 
+class TaskStatus(str, Enum):
+    TODO = "TODO"
+    IN_PROGRESS = "IN_PROGRESS"
+    DONE = "DONE"
+    BLOCKED = "BLOCKED"
+
+
 class ContactEntity(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
@@ -90,9 +97,19 @@ class TaskResponse(TaskBase):
     id: str
     note_id: Optional[str] = None
     is_done: bool
+    status: TaskStatus
     is_deleted: bool
     created_at: int
     updated_at: Optional[int] = None
     deleted_at: Optional[int] = None
     suggested_actions: Optional[SuggestedActions] = None  # NEW: Smart actions
     model_config = ConfigDict(from_attributes=True)
+
+
+class TaskStatistics(BaseModel):
+    total_tasks: int
+    completed_tasks: int
+    pending_tasks: int
+    by_priority: dict
+    by_status: dict
+    completion_rate: float

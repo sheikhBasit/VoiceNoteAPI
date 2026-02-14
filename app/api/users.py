@@ -25,6 +25,8 @@ from app.services.auth_service import (
     create_refresh_token,
     get_current_user,
     refresh_access_token,
+    get_password_hash,
+    verify_password
 )
 from app.services.deletion_service import DeletionService
 from app.utils.json_logger import JLogger
@@ -39,6 +41,7 @@ router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 
 
 @router.post("/sync", response_model=user_schema.SyncResponse)
+@router.post("/login", response_model=user_schema.SyncResponse)
 @limiter.limit("20/minute")  # Stricter limit for auth
 def sync_user(
     request: Request, user_data: user_schema.UserCreate, db: Session = Depends(get_db)
@@ -60,6 +63,15 @@ def sync_user(
 
         # 1. Find User by Email
         db_user = db.query(models.User).filter(models.User.email == validated_email).first()
+
+        # 2. Check Password if user exists and password is provided in request
+        if db_user and user_data.password and db_user.password_hash:
+            if not verify_password(user_data.password, db_user.password_hash):
+                JLogger.warning("Incorrect password attempt", user_id=db_user.id, email=validated_email)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect password for this email address"
+                )
 
         # 2. Case: New User (Auto-Register)
         if not db_user:
@@ -88,6 +100,7 @@ def sync_user(
                 timezone=user_data.timezone or "UTC",
                 last_login=int(time.time() * 1000),
                 is_deleted=False,
+                password_hash=get_password_hash(user_data.password) if user_data.password else None
             )
             db.add(db_user)
             db.commit()
