@@ -139,6 +139,15 @@ def verify_note_ownership(db: Session, user: Any, note_id: str):
     if is_user_admin:
         return note
 
+    # Check if user is a participant in the folder containing this note
+    participant = False
+    if note.folder_id:
+        from app.db.models import folder_participants
+        participant = db.query(folder_participants).filter(
+            folder_participants.c.folder_id == note.folder_id,
+            folder_participants.c.user_id == user_id
+        ).first() is not None
+
     if note.user_id == user_id or participant:
         return note
 
@@ -185,6 +194,14 @@ def verify_task_ownership(db: Session, user: Any, task_id: str):
     # Check parent note's folder for shared participation
     note = db.query(models.Note).filter(models.Note.id == task.note_id).first()
     if note:
+        participant = False
+        if note.folder_id:
+            from app.db.models import folder_participants
+            participant = db.query(folder_participants).filter(
+                folder_participants.c.folder_id == note.folder_id,
+                folder_participants.c.user_id == user_id
+            ).first() is not None
+
         if note.user_id == user_id or participant:
             return task
 

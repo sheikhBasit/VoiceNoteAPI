@@ -37,7 +37,7 @@ async def check_task_lock(task_id: str, current_user_id: str):
         )
 from app.utils.security import verify_note_ownership, verify_task_ownership
 from app.services.broadcaster import broadcaster
-from app.worker.task import broadcast_team_update # Sync helper
+from app.worker.task import broadcast_team_update, process_task_image_pipeline # Sync helper
 
 # Router initialization
 router = APIRouter(prefix="/api/v1/tasks", tags=["Tasks"])

@@ -9,6 +9,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    HTTPException,
     Query,
     Request,
     UploadFile,
@@ -24,6 +25,7 @@ from app.services.auth_service import get_current_user
 from app.services.note_service import NoteService
 from app.utils.billing_utils import check_credit_balance, requires_tier
 from app.utils.security import verify_device_signature
+from app.services.deletion_service import DeletionService
 from app.services.ai_service import AIService
 from app.services.search_service import SearchService
 from app.services.storage_service import StorageService

@@ -413,7 +413,7 @@ Use this temporal context to intelligently assign task priorities based on urgen
 """
                 system_prompt += temporal_context
             except Exception as e:
-                logger.warning(f"Failed to add temporal context: {e}")
+                JLogger.warning(f"Failed to add temporal context: {e}")
 
         user_content = f"Instruction: {user_instruction or 'Analyze the transcript.'}\n\nTranscript:\n{transcript}"
         settings = self._get_dynamic_settings()
