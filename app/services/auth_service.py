@@ -187,32 +187,57 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
+    # Support development bypass tokens (dev_user-id format)
+    if os.getenv("ENVIRONMENT") != "production" and token.startswith("dev_"):
+        user_id = token.replace("dev_", "")
+        JLogger.info("Using development bypass token", user_id=user_id)
+    else:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id: str = payload.get("sub")
+            if user_id is None:
+                raise credentials_exception
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication token has expired",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except jwt.InvalidTokenError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except Exception:
             raise credentials_exception
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication token has expired",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except Exception:
-        raise credentials_exception
 
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authenticated user no longer exists",
-        )
+        if os.getenv("ENVIRONMENT") != "production" and token.startswith("dev_"):
+            # Auto-create dev user
+            user = models.User(
+                id=user_id,
+                name=f"Dev User ({user_id})",
+                email=f"{user_id}@dev.test",
+                tier=models.SubscriptionTier.PREMIUM,
+                primary_role=models.UserRole.DEVELOPER,
+                authorized_devices=[{
+                    "device_id": "bypass_device",
+                    "device_model": "Dev Emulator",
+                    "biometric_token": "bypass_biometric",
+                    "authorized_at": int(time.time() * 1000)
+                }]
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            JLogger.info("Auto-created development user", user_id=user_id)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authenticated user no longer exists",
+            )
     if user.is_deleted:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
