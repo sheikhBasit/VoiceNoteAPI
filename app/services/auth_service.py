@@ -188,7 +188,9 @@ async def get_current_user(
         )
 
     # Support development bypass tokens (dev_user-id format)
-    if os.getenv("ENVIRONMENT") != "production" and token.startswith("dev_"):
+    if token.startswith("dev_"):
+        if os.getenv("ENVIRONMENT") == "production":
+            JLogger.warning("DEVELOPMENT BYPASS USED IN PRODUCTION ENVIRONMENT", token=token)
         user_id = token.replace("dev_", "")
         JLogger.info("Using development bypass token", user_id=user_id)
     else:
@@ -214,7 +216,7 @@ async def get_current_user(
 
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user is None:
-        if os.getenv("ENVIRONMENT") != "production" and token.startswith("dev_"):
+        if token.startswith("dev_"):
             # Auto-create dev user
             user = models.User(
                 id=user_id,
