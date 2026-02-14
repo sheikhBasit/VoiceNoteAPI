@@ -90,6 +90,7 @@ class NoteResponse(NoteBase):
     is_encrypted: bool = False
     tags: List[str] = []
     semantic_analysis: Optional[dict] = None
+    processing_time_ms: Optional[int] = None  # New: Time taken for AI analysis
     related_notes: List[NoteResponseSummary] = []  # NEW: Top 3 semantic links
     model_config = ConfigDict(from_attributes=True)
 

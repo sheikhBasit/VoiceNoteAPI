@@ -79,6 +79,7 @@ def note_process_pipeline(
 
     with SessionLocal() as db:
         ai_service = AIService()
+        start_time = time.time()  # New: Track total duration
         try:
             # 1. Update status to PROCESSING
             JLogger.info(
@@ -302,6 +303,11 @@ def note_process_pipeline(
             current_analysis["related_notes"] = related_links
             note.semantic_analysis = current_analysis
             
+            # Save processing duration
+            duration_ms = int((time.time() - start_time) * 1000)
+            note.processing_time_ms = duration_ms
+            JLogger.info(f"Worker: Processing duration: {duration_ms}ms", note_id=note_id)
+
             note.embedding_version = 1
             note.status = NoteStatus.DONE
             broadcast_ws_update(
