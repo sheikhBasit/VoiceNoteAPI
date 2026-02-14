@@ -37,7 +37,18 @@ class JsonFormatter(logging.Formatter):
         if record.exc_info:
             log_record["exception"] = self.formatException(record.exc_info)
 
-        return json.dumps(log_record)
+        # Robust serialization: handle bytes, sets, and other non-JSON types
+        def default_serializer(obj):
+            if isinstance(obj, bytes):
+                return obj.decode("utf-8", "replace")
+            if isinstance(obj, (set, tuple)):
+                return list(obj)
+            try:
+                return str(obj)
+            except Exception:
+                return f"<Unserializable: {type(obj).__name__}>"
+
+        return json.dumps(log_record, default=default_serializer)
 
 
 class JsonLogger:
