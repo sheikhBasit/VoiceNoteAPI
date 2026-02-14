@@ -50,12 +50,48 @@ ssh -i "$KEY_PATH" -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP << EOF
     docker system prune -af
     docker volume prune -f
     
+    # Force remove potential conflict containers
+    docker rm -f voicenote_node_exporter voicenote_api voicenote_db voicenote_redis || true
+
     echo "🐳 Rebuilding containers..."
     make build
     
     echo "🛑 Restarting services..."
     make down
     make up
+
+    # Targeted health check for core services
+    echo "⏳ Waiting for core services (db, redis, api) to be healthy..."
+    for i in {1..60}; do
+      # Note: No 'sudo' inside here since typically azureuser has permissions or it's handled by shell
+      DOCKER_STATUS=$(docker compose ps --format json)
+      
+      # Handle cases where json format might not be supported or empty
+      if [ -z "$DOCKER_STATUS" ]; then
+          DOCKER_STATUS=$(docker compose ps)
+          DB_HEALTH=$(echo "$DOCKER_STATUS" | grep -c "db.*healthy")
+          REDIS_HEALTH=$(echo "$DOCKER_STATUS" | grep -c "redis.*healthy")
+          API_HEALTH=$(echo "$DOCKER_STATUS" | grep -c "api.*healthy")
+      else
+          DB_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"db"' | grep -c '"Health":"healthy"')
+          REDIS_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"redis"' | grep -c '"Health":"healthy"')
+          API_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"Health":"healthy"')
+      fi
+      
+      echo "   Status ($i/60): DB=$DB_HEALTH, Redis=$REDIS_HEALTH, API=$API_HEALTH"
+      
+      if [ "$DB_HEALTH" -eq 1 ] && [ "$REDIS_HEALTH" -eq 1 ] && [ "$API_HEALTH" -eq 1 ]; then
+        echo "✅ Core services are healthy!"
+        break
+      fi
+      
+      sleep 2
+      if [ $i -eq 60 ]; then
+        echo "❌ Timing out waiting for services to be healthy."
+        docker compose ps
+        exit 1
+      fi
+    done
 EOF
 
 echo "✅ Deployment Complete!"
