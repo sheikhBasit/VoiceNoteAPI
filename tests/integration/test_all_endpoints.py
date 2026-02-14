@@ -48,6 +48,9 @@ def test_user(db: Session):
         primary_role=models.UserRole.GENERIC,
         is_deleted=False,
         last_login=int(time.time() * 1000),
+        # Manually set a known password hash for easier login testing if needed
+        # (This hash corresponds to 'testpassword', generated via bcrypt)
+        password_hash="$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW", 
         authorized_devices=[
             {
                 "device_id": "test_device",
@@ -115,17 +118,15 @@ def test_task(db: Session, test_user, test_note):
 class TestUserEndpoints:
     """Tests for /api/v1/users endpoints"""
 
-    def test_user_sync_new_user(self):
-        """POST /api/v1/users/sync - Create new user"""
+    def test_user_register_new_user(self):
+        """POST /api/v1/users/register - Create new user"""
         payload = {
             "email": f"newuser_{uuid.uuid4()}@test.com",
             "name": "New User",
-            "device_id": f"device_{uuid.uuid4()}",
-            "device_model": "iPhone12",
-            "token": "biometric_token_123",
+            "password": "securepassword123",
             "timezone": "UTC",
         }
-        response = client.post("/api/v1/users/sync", json=payload)
+        response = client.post("/api/v1/users/register", json=payload)
         assert response.status_code == 200
         data = response.json()
         assert "user" in data
@@ -133,17 +134,27 @@ class TestUserEndpoints:
         assert data["is_new_user"] is True
         assert data["token_type"] == "bearer"
 
-    def test_user_sync_existing_user(self, test_user, auth_header):
-        """POST /api/v1/users/sync - Sync existing user"""
+    def test_user_login_existing_user(self, test_user, auth_header):
+        """POST /api/v1/users/login - Login existing user"""
+        # Note: test_user fixture creates a user without a password hash in the test DB setup usually,
+        # checking the fixture first.
+        # Ideally, we should register a user first to test login properly.
+        
+        # 1. Register
+        email = f"login_test_{uuid.uuid4()}@test.com"
+        password = "loginpassword123"
+        client.post("/api/v1/users/register", json={
+            "email": email, 
+            "name": "Login Test", 
+            "password": password
+        })
+
+        # 2. Login
         payload = {
-            "email": test_user.email,
-            "name": test_user.name,
-            "device_id": "new_device_id",
-            "device_model": "iPhone13",
-            "token": "new_biometric_token",
-            "timezone": "UTC",
+            "email": email,
+            "password": password
         }
-        response = client.post("/api/v1/users/sync", json=payload)
+        response = client.post("/api/v1/users/login", json=payload)
         assert response.status_code == 200
         data = response.json()
         assert data["is_new_user"] is False
@@ -421,7 +432,9 @@ class TestAIEndpoints:
     def test_ai_search(self, auth_header):
         """POST /api/v1/ai/search - Search using AI"""
         response = client.post(
-            "/api/v1/ai/search?query=test+search", headers=auth_header
+            "/api/v1/ai/search", 
+            json={"query": "test search"},
+            headers=auth_header
         )
         assert response.status_code == 200
         data = response.json()

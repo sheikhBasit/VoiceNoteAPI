@@ -6,7 +6,6 @@ import redis
 from celery.result import AsyncResult
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import FileResponse
-from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.core.audio import preprocess_audio_pipeline
@@ -16,10 +15,7 @@ from app.worker.task import ping_task
 test_router = APIRouter(prefix="/api/v1/test", tags=["Testing Lab"])
 # ai_service is instantiated inside endpoints to avoid module-level hangs
 # ai_service = AIService()
-limiter = Limiter(
-    key_func=get_remote_address,
-    storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"),
-)
+from app.core.limiter import limiter
 
 from fastapi import APIRouter, File, Request, UploadFile
 

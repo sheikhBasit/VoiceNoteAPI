@@ -5,9 +5,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Optional
 
 import jwt
+import bcrypt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.db import models
@@ -22,7 +22,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60  # Short-lived access token for security
 REFRESH_TOKEN_EXPIRE_DAYS = 30  # Long lived for mobile
 SECRET_KEY_REFRESH = os.getenv("REFRESH_SECRET_KEY", "refresh-secret-key-change-me")
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # Removed passlib
 # Use HTTPBearer instead of OAuth2PasswordBearer for proper Swagger UI integration
 security = HTTPBearer(auto_error=False)
 
@@ -35,6 +35,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    if isinstance(encoded_jwt, bytes):
+        return encoded_jwt.decode('utf-8')
     return encoded_jwt
 
 
@@ -102,11 +104,16 @@ def refresh_access_token(refresh_token: str, db: Session):
 def verify_password(plain_password, hashed_password):
     if not hashed_password:
         return False
-    return pwd_context.verify(plain_password, hashed_password)
+    # Use bcrypt directly
+    try:
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception:
+        return False
 
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    # Use bcrypt directly
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 def create_device_verification_token(
@@ -122,7 +129,10 @@ def create_device_verification_token(
         "biometric_token": biometric_token,
         "exp": expire,
     }
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    if isinstance(token, bytes):
+        return token.decode('utf-8')
+    return token
 
 
 def verify_device_token(token: str) -> dict:
@@ -248,22 +258,8 @@ async def get_current_user(
 
     # Security check: Biometric token consistency for App Users
     if not user.is_admin:
-        request_biometric = request.headers.get("X-Biometric-Token")
-        if request_biometric:
-            # Check if any authorized device has this token
-            authorized_devices = user.authorized_devices or []
-            device_authorized = any(
-                d.get("biometric_token") == request_biometric
-                for d in authorized_devices
-            )
-
-            # For strict security, we'd also check if it matches the CURRENT device.
-            # But for now, ensuring it belongs to the user is the baseline.
-            if not device_authorized:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Biometric session invalid or changed",
-                )
+        # Biometric validation removed as per refactor to Email/Password auth
+        pass
 
     return user
 

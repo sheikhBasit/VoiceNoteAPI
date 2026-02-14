@@ -218,4 +218,5 @@ class TestEndpointCascadeIntegration:
 
         # 3. Should Fail
         assert response.status_code == 400
-        assert "HIGH priority tasks" in response.json()["detail"]
+        # VoiceNoteError maps message to "error" field, detail is None by default
+        assert "high-priority tasks" in response.json()["error"]

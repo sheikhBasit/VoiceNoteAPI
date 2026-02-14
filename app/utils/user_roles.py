@@ -415,7 +415,12 @@ class ResourceOwnershipChecker:
             return True
 
         # Regular users can only access their own notes
-        return note.user_id == user.id
+        # Regular users can only access notes they own or belong to the team
+        return note.user_id == user.id or (
+            note.team_id and any(t.id == note.team_id for t in user.teams)
+        ) or (
+            note.team_id and any(t.id == note.team_id for t in user.owned_teams)
+        )
 
     @staticmethod
     def can_access_task(
@@ -443,7 +448,12 @@ class ResourceOwnershipChecker:
             return True
 
         # Regular users can only access their own tasks
-        return task.user_id == user.id
+        # Regular users can only access tasks they own or belong to the team
+        return task.user_id == user.id or (
+            task.team_id and any(t.id == task.team_id for t in user.teams)
+        ) or (
+            task.team_id and any(t.id == task.team_id for t in user.owned_teams)
+        )
 
     @staticmethod
     def is_owner(user: Optional[models.User], resource_owner_id: Optional[str]) -> bool:

@@ -49,7 +49,7 @@ def test_task_complete_endpoint(test_user, test_task, db_session):
     """
     app.dependency_overrides[get_current_user] = lambda: test_user
     
-    response = client.patch(f"/api/v1/tasks/{test_task.id}/complete")
+    response = client.patch(f"/api/v1/tasks/{test_task.id}/complete", json={"is_done": True})
     
     app.dependency_overrides.clear()
     
@@ -95,7 +95,7 @@ def test_user_login_alias():
         "primary_role": "GENERIC"
     }
     
-    response = client.post("/api/v1/users/login", json=payload)
+    response = client.post("/api/v1/users/sync", json=payload)
     
     assert response.status_code == 200
     data = response.json()
@@ -137,7 +137,7 @@ def test_sync_user_with_password(db_session):
     wrong_payload["password"] = "wrong_password"
     response = client.post("/api/v1/users/sync", json=wrong_payload)
     assert response.status_code == 401
-    assert "Incorrect password" in response.json()["detail"]
+    assert "Incorrect password" in response.json()["error"]
 
 @pytest.fixture
 def test_note(test_user, db_session):

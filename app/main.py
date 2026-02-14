@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import List, Optional
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
@@ -11,7 +12,9 @@ from fastapi.openapi.utils import get_openapi
 from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.utils.exceptions import VoiceNoteError
 from app.api import (
     admin,
     ai,
@@ -24,6 +27,8 @@ from app.api import (
     sync,
     webhooks,
     websocket,
+    sse,
+    teams,
 )
 from app.api.middleware.usage import UsageTrackingMiddleware  # NEW
 from app.db.session import get_db
@@ -56,7 +61,7 @@ async def lifespan(app: FastAPI):
         from app.services.ai_service import AIService
         service = AIService()
         # Pre-load local embedding model (SentenceTransformer)
-        service._get_local_embedding_model()
+        # service._get_local_embedding_model()
         JLogger.info("Model warmup complete.")
     except Exception as e:
         JLogger.error(f"Startup warmup failed: {e}")
@@ -78,6 +83,55 @@ app = FastAPI(
 
 # Apply Compression (Speeds up large JSON responses like notes lists)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+@app.exception_handler(VoiceNoteError)
+async def voicenote_exception_handler(request: Request, exc: VoiceNoteError):
+    """Handler for custom application-level exceptions."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.message,
+            "code": exc.code,
+            "detail": exc.detail
+        },
+    )
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Standardize FastAPI/Starlette HTTP exceptions."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": str(exc.detail),
+            "code": "HTTP_ERROR",
+            "detail": None
+        },
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Standardize Pydantic validation errors."""
+    return JSONResponse(
+        status_code=400,
+        content={
+            "error": "Validation failed",
+            "code": "VALIDATION_ERROR",
+            "detail": exc.errors()
+        },
+    )
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    """Catch-all for unhandled exceptions."""
+    JLogger.critical(f"Unhandled exception: {str(exc)}", traceback=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "An unexpected error occurred",
+            "code": "INTERNAL_SERVER_ERROR",
+            "detail": str(exc) if os.getenv("ENVIRONMENT") != "production" else None
+        },
+    )
 
 # Add security scheme for Swagger UI
 
@@ -248,50 +302,10 @@ async def redoc_html():
     """)
 
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    import traceback
-    # Log the full traceback for engineers
-    error_trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    JLogger.error(
-        "Unhandled exception caught by global handler",
-        path=request.url.path,
-        method=request.method,
-        error=str(exc),
-        traceback=error_trace,
-    )
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": "Internal server error: A critical failure occurred. Our engineers have been notified."
-        },
-    )
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # Safely get body as string if it exists
-    body_str = "Not read"
-    if hasattr(request, "_body"):
-        try:
-            body_str = request._body.decode("utf-8")
-        except Exception:
-            body_str = str(request._body)
-
-    JLogger.error(
-        "Validation error",
-        path=request.url.path,
-        method=request.method,
-        errors=exc.errors(),
-        body_preview=body_str[:1000],  # Limit size
-    )
-    return JSONResponse(
-        status_code=400,
-        content={"detail": str(exc)},
-    )
-
-
 # Register routers
+from app.core.limiter import limiter
+app.state.limiter = limiter
+
 app.include_router(users.router)
 app.include_router(notes.router)
 app.include_router(tasks.router)
@@ -302,6 +316,8 @@ app.include_router(folders.router)  # NEW: Folders management
 app.include_router(integrations.router)
 app.include_router(webhooks.router)
 app.include_router(websocket.router)
+app.include_router(sse.router)
+app.include_router(teams.router)
 
 # Testing endpoints - only in non-production environments
 if os.getenv("ENVIRONMENT", "development") != "production":

@@ -10,7 +10,7 @@ class TaskService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_task_with_deduplication(self, user_id: str, title: str, description: str, note_id: str = None, deadline: int = None, priority: models.Priority = models.Priority.MEDIUM) -> models.Task:
+    def create_task_with_deduplication(self, user_id: str, title: str, description: str, note_id: str = None, deadline: int = None, priority: models.Priority = models.Priority.MEDIUM, assigned_entities: list = None, suggested_actions: dict = None) -> models.Task:
         """
         GHOST TASK PREVENTION: Ensures we don't create duplicate tasks for the same note and title.
         """
@@ -34,7 +34,9 @@ class TaskService:
             title=title,
             description=description,
             deadline=deadline,
-            priority=priority
+            priority=priority,
+            assigned_entities=assigned_entities or [],
+            suggested_actions=suggested_actions or {}
         )
         self.db.add(new_task)
         self.db.commit()

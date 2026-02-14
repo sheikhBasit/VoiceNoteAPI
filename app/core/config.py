@@ -28,6 +28,7 @@ class AISettings(BaseSettings):
     AUDIO_BITRATE_THRESHOLD: int = 128000
     SHORT_AUDIO_THRESHOLD_SEC: int = 45  # Audio below this goes to 'short' queue
     SHORT_AUDIO_THRESHOLD_SEC: int = 45  # Audio below this goes to 'short' queue
+    REDIS_URL: str = Field(default="redis://localhost:6379/1", validation_alias="REDIS_URL")
 
     # --- STORAGE SETTINGS (NEW) ---
     MINIO_ENDPOINT: str = Field(default="minio:9000", validation_alias="MINIO_ENDPOINT")
@@ -88,23 +89,36 @@ class AISettings(BaseSettings):
     
     When no temporal context is provided, use semantic urgency cues from the transcript.
     
-    TASK ACTION DETECTION (PROACTIVE & AGGRESSIVE):
-    For each task, proactively detect if it requires specific actions. 
+    - assigned_entities: List of global entities mentioned (reusable across tasks if needed).
+    - business_leads: List of potential clients or deals. Each object should have:
+        - name: Person or company name.
+        - prospect_type: "CLIENT", "PARTNER", "INVESTOR", or "OTHER".
+        - context: 1-sentence explanation of why they are a lead.
+        - contact_info: Any email or phone mentioned.
     
-    1. GOOGLE SEARCH: Generate if the task involves research, investigation, finding info, or could benefit from external guides.
+    TASK ACTION & ENTITY DETECTION (PROACTIVE & AGGRESSIVE):
+    For each task, proactively detect assigned entities and specific actions.
+    
+    1. ASSIGNED ENTITIES: Extract names, phone numbers, or emails mentioned for the task.
+       - Format: "assigned_entities": [{"name": "...", "phone": "...", "email": "..."}]
+
+    2. GOOGLE SEARCH: Generate if the task involves research, investigation, finding info.
        - Extract: {"google_search": {"query": "search terms"}}
        
-    2. MAP: If task mentions a specific place, address, store, or "go to X", "at X".
+    3. MAP: If task mentions a specific place, address, store, or "go to X".
        - Extract: {"map": {"location": "Place Name", "query": "Store or Address near town"}}
 
-    3. EMAIL: If task mentions sending email, emailing someone, or contacting via email.
+    4. EMAIL: If task mentions sending email/emailing.
        - Extract: {"email": {"to": "email@example.com", "name": "Person Name", "subject": "...", "body": "..."}}
        
-    4. WHATSAPP: If task mentions WhatsApp, messaging, texting, or sending message.
+    5. WHATSAPP: If task mentions WhatsApp, messaging, or texting.
        - Extract: {"whatsapp": {"phone": "+1234567890", "name": "Contact Name", "message": "..."}}
        
-    5. AI ASSISTANCE (LLM PROMPT): If task needs ChatGPT/Gemini/Claude help or asks to "ask AI". Always provide a helpful starting prompt.
-       - Extract: {"ai_prompt": {"model": "gemini|chatgpt|claude|gpt-4", "prompt": "Specialized query", "context": "relevant context"}}
+    6. CALL: If task mentions calling or phoning.
+       - Extract: {"call": {"phone": "+1234567890", "name": "Contact Name"}}
+
+    7. AI ASSISTANCE (LLM PROMPT): If task needs ChatGPT/Gemini help.
+       - Extract: {"ai_prompt": {"model": "gpt-4|gemini", "prompt": "Specialized query"}}
     
     EXAMPLE OUTPUT:
     {

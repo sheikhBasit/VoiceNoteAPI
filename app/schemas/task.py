@@ -60,6 +60,7 @@ class TaskBase(BaseModel):
 
 class TaskCreate(TaskBase):
     note_id: Optional[str] = None
+    team_id: Optional[str] = None
 
 
 class TaskUpdate(BaseModel):
@@ -75,6 +76,7 @@ class TaskUpdate(BaseModel):
     communication_type: Optional[CommunicationType] = None
     is_action_approved: bool = False
     is_deleted: Optional[bool] = None
+    team_id: Optional[str] = None
 
 
 class SuggestedActions(BaseModel):
@@ -96,6 +98,7 @@ class SuggestedActions(BaseModel):
 class TaskResponse(TaskBase):
     id: str
     note_id: Optional[str] = None
+    team_id: Optional[str] = None
     is_done: bool
     status: TaskStatus
     is_deleted: bool

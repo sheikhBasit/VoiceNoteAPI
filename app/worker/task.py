@@ -40,19 +40,42 @@ except Exception:
     redis_client = None
 
 
-def broadcast_ws_update(user_id: str, event_type: str, data: any):
-    """Publish a real-time update to the WebSocket manager via Redis."""
+def broadcast_team_update(team_id: str, event_type: str, data: any, trigger_id: str = None):
+    """Publish a real-time update for a team via Redis (SSE compatible)."""
     payload = {
-        "user_id": user_id,
         "type": event_type,
         "data": data,
+        "trigger_id": trigger_id or str(uuid.uuid4()),
         "timestamp": int(time.time() * 1000),
     }
     if redis_client:
         try:
+            redis_client.publish(f"team:{team_id}", json.dumps(payload))
+        except Exception as e:
+            JLogger.warning("Failed to publish team update to Redis", error=str(e))
+
+
+def broadcast_user_update(user_id: str, event_type: str, data: any, trigger_id: str = None):
+    """Publish a real-time update for a specific user via Redis (SSE compatible)."""
+    payload = {
+        "type": event_type,
+        "data": data,
+        "trigger_id": trigger_id or str(uuid.uuid4()),
+        "timestamp": int(time.time() * 1000),
+    }
+    if redis_client:
+        try:
+            # SSE Broadcaster listens on user:{user_id}
+            redis_client.publish(f"user:{user_id}", json.dumps(payload))
+            # Legacy WS manager listens on user_updates_{user_id}
             redis_client.publish(f"user_updates_{user_id}", json.dumps(payload))
         except Exception as e:
-            JLogger.warning("Failed to publish WS update to Redis", error=str(e))
+            JLogger.warning("Failed to publish user update to Redis", error=str(e))
+
+
+def broadcast_ws_update(user_id: str, event_type: str, data: any):
+    """Legacy helper, redirects to broadcast_user_update."""
+    broadcast_user_update(user_id, event_type, data)
 
 
 @celery_app.task(name="ping_task")
@@ -93,13 +116,19 @@ def note_process_pipeline(
             db.commit()
 
             # Notify UI immediately
-            note_owner_id = db.query(Note.user_id).filter(Note.id == note_id).scalar()
-            if note_owner_id:
-                broadcast_ws_update(
-                    note_owner_id,
+            note = db.query(Note).filter(Note.id == note_id).first()
+            if note and note.user_id:
+                broadcast_user_update(
+                    note.user_id,
                     "NOTE_STATUS",
                     {"note_id": note_id, "status": "PROCESSING"},
                 )
+                if note.team_id:
+                    broadcast_team_update(
+                        note.team_id,
+                        "NOTE_STATUS",
+                        {"note_id": note_id, "status": "PROCESSING", "user_id": note.user_id},
+                    )
 
             # 2. Preprocess (Offloading from Android for battery/speed)
             broadcast_ws_update(
@@ -196,35 +225,42 @@ def note_process_pipeline(
             # 3. Update audio_url with processed path (as a local URL)
             audio_url = f"/{processed_path}"
 
-            # 4. AI Analysis (Whisper STT -> Llama 3.1 LLM)
-            JLogger.info("Worker: Running AI analysis", note_id=note_id)
-            broadcast_ws_update(
-                note_owner_id,
-                "PIPELINE_STEP",
-                {
-                    "note_id": note_id,
-                    "step": "SUMMARIZING",
-                    "message": "AI is transcribing and summarizing your audio...",
-                },
+            # 4. Transcribe Audio
+            JLogger.info("Worker: Transcribing audio", note_id=note_id)
+            transcript, engine, detected_langs, all_transcripts = ai_service.transcribe_with_failover_sync(
+                processed_path, languages=languages, stt_model=stt_model
             )
 
+            # 5. RAG: Fetch Historical Context
+            JLogger.info("Worker: Fetching historical context...", note_id=note_id)
+            from app.services.rag_service import RAGService
+            context_notes = RAGService.get_context_for_transcript(
+                db, note.user_id, transcript, exclude_note_id=note_id
+            )
+
+            # 6. AI Analysis with Context
+            JLogger.info("Worker: Running LLM analysis with context", note_id=note_id)
             # Fetch user profile for personalization and timezone context
-            note = db.query(Note).filter(Note.id == note_id).first()
+            note = db.query(Note).filter(Note.id == note_id).first() # Re-fetch in case it was updated
             user = note.user if note else None
             user_instr = user.system_prompt if user else ""
             user_jargons = user.jargons if user else []
             user_timezone = user.timezone if user else "UTC"
 
-            analysis = ai_service.run_full_analysis_sync(
-                processed_path,
+            analysis = ai_service.llm_brain_sync(
+                transcript,
                 user_role,
-                languages=languages,
-                stt_model=stt_model,
                 user_instruction=user_instr,
                 jargons=user_jargons,
                 note_created_at=note.timestamp,
                 user_timezone=user_timezone,
+                context_notes=context_notes,
             )
+            analysis.metadata = {
+                "engine": engine,
+                "languages": detected_langs,
+                "all_transcripts": all_transcripts,
+            }
             JLogger.info(
                 "Worker: AI analysis complete",
                 note_id=note_id,
@@ -301,6 +337,7 @@ def note_process_pipeline(
             # Save related links in semantic_analysis (or merge with existing)
             current_analysis = note.semantic_analysis or {}
             current_analysis["related_notes"] = related_links
+            current_analysis["business_leads"] = getattr(analysis, "business_leads", [])
             note.semantic_analysis = current_analysis
             
             # Save processing duration
@@ -352,7 +389,7 @@ def note_process_pipeline(
                 JLogger.error("Failed to process charging logic", error=str(e))
 
             # 8. Map & Save Tasks with Smart Actions
-            from app.services.action_generator import ActionGenerator
+            from app.services.action_suggestion_service import ActionSuggestionService
             extracted_tasks = []
             extracted_tasks = []
             for t_data in analysis.tasks:
@@ -383,12 +420,12 @@ def note_process_pipeline(
                 suggested_actions = {}
 
                 if "google_search" in actions_metadata:
-                    suggested_actions["google_search"] = ActionGenerator.generate_google_search(
+                    suggested_actions["google_search"] = ActionSuggestionService.generate_google_search(
                         actions_metadata["google_search"]["query"]
                     )
                 if "email" in actions_metadata:
                     email_data = actions_metadata["email"]
-                    suggested_actions["email"] = ActionGenerator.generate_email_draft(
+                    suggested_actions["email"] = ActionSuggestionService.generate_email_draft(
                         to=email_data.get("to", ""),
                         name=email_data.get("name", ""),
                         subject=email_data.get("subject", ""),
@@ -396,20 +433,26 @@ def note_process_pipeline(
                     )
                 if "whatsapp" in actions_metadata:
                     wa_data = actions_metadata["whatsapp"]
-                    suggested_actions["whatsapp"] = ActionGenerator.generate_whatsapp_message(
+                    suggested_actions["whatsapp"] = ActionSuggestionService.generate_whatsapp_message(
                         phone=wa_data.get("phone", ""),
                         name=wa_data.get("name", ""),
                         message=wa_data.get("message", ""),
                     )
+                if "call" in actions_metadata:
+                    call_data = actions_metadata["call"]
+                    suggested_actions["call"] = ActionSuggestionService.generate_call_link(
+                        phone=call_data.get("phone", ""),
+                        name=call_data.get("name", ""),
+                    )
                 if "map" in actions_metadata:
                     map_data = actions_metadata["map"]
-                    suggested_actions["map"] = ActionGenerator.generate_map_link(
+                    suggested_actions["map"] = ActionSuggestionService.generate_map_link(
                         location=map_data.get("location", ""),
                         query=map_data.get("query", ""),
                     )
                 if "ai_prompt" in actions_metadata:
                     ai_data = actions_metadata["ai_prompt"]
-                    suggested_actions["ai_prompt"] = ActionGenerator.generate_ai_prompt(
+                    suggested_actions["ai_prompt"] = ActionSuggestionService.generate_ai_prompt(
                         model=ai_data.get("model", "chatgpt"),
                         task_description=final_desc,
                         context=note.summary or "",
@@ -428,12 +471,22 @@ def note_process_pipeline(
                         Priority,
                         raw_prio,
                         Priority.MEDIUM,
-                    )
+                    ),
+                    assigned_entities=t_data.get("assigned_entities", []) if is_dict else getattr(t_data, "assigned_entities", []),
+                    suggested_actions=suggested_actions
                 )
 
-                if "map" in actions_metadata or "ai_prompt" in actions_metadata:
-                    # Update suggested actions if it's a new task or we want to refresh them
-                    new_task.suggested_actions = suggested_actions
+                if note.team_id:
+                    broadcast_team_update(
+                        note.team_id,
+                        "TASK_CREATED",
+                        {
+                            "task_id": new_task.id,
+                            "note_id": note_id,
+                            "title": new_task.title,
+                            "priority": new_task.priority.value,
+                        },
+                    )
 
                 extracted_tasks.append(
                     {

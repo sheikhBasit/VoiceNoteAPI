@@ -1,12 +1,13 @@
-import logging
 import os
 import time
 import uuid
+from datetime import datetime
 from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 from app.core.config import ai_config
 from app.db import models
+from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.schemas.note import NoteAIOutput
 from app.utils.ai_service_utils import (
@@ -16,8 +17,7 @@ from app.utils.ai_service_utils import (
     validate_json_response,
     validate_transcript,
 )
-
-logger = logging.getLogger("VoiceNote")
+from app.utils.json_logger import JLogger
 
 
 class AIService:
@@ -50,35 +50,35 @@ class AIService:
         return AIService._dg_client
 
     def _get_diarization_pipeline(self):
-        """Lazy load diarization pipeline."""
+        """Lazy load diarization pipeline for speaker detection."""
         if (
             self._diarization_pipeline is None
             and self.hf_token
             and os.getenv("ENABLE_AI_PIPELINES", "false") == "true"
         ):
             try:
-                logger.info("Loading Speaker Diarization pipeline...")
+                JLogger.info("Loading Speaker Diarization pipeline...")
                 from pyannote.audio import Pipeline
 
                 self._diarization_pipeline = Pipeline.from_pretrained(
                     "pyannote/speaker-diarization@2.1", use_auth_token=self.hf_token
                 )
             except Exception as e:
-                logger.error(f"Failed to load speaker diarization: {e}")
+                JLogger.error("Failed to load speaker diarization", error=str(e))
         return self._diarization_pipeline
 
     def _get_local_embedding_model(self):
+        """Lazy load the sentence transformer model."""
         if AIService._local_embedding_model is None:
             try:
-                # Using all-MiniLM-L6-v2 which produces 384 dimensions
-                logger.info("Loading local embedding model: all-MiniLM-L6-v2")
+                JLogger.info("Loading local embedding model: all-MiniLM-L6-v2")
                 from sentence_transformers import SentenceTransformer
 
                 AIService._local_embedding_model = SentenceTransformer(
                     "all-MiniLM-L6-v2"
                 )
             except Exception as e:
-                logger.error(f"Failed to load local embedding model: {e}")
+                JLogger.error("Failed to load local embedding model", error=str(e))
         return AIService._local_embedding_model
 
     def _get_dynamic_settings(self):
@@ -113,7 +113,7 @@ class AIService:
             self._settings_last_fetch = time.time()
             return self._settings_cache
         except Exception as e:
-            logger.error(f"Failed to fetch dynamic settings: {e}")
+            JLogger.error("Failed to fetch dynamic settings", error=str(e))
             # Fallback to defaults from ai_config
             return {
                 "llm_model": ai_config.LLM_MODEL,
@@ -235,9 +235,11 @@ class AIService:
                             
                             return "\n".join(transcript_parts)
 
+                            return "\n".join(transcript_parts)
+
                     return resp.results.channels[0].alternatives[0].transcript
             except Exception as e:
-                logger.error(f"Deepgram failed: {e}")
+                JLogger.error("Deepgram transcription failed", error=str(e))
                 return None
 
         def run_groq():
@@ -249,7 +251,7 @@ class AIService:
                         file=(os.path.basename(audio_path), file.read()), **groq_params
                     )
             except Exception as e:
-                logger.error(f"Groq failed: {e}")
+                JLogger.error("Groq transcription failed", error=str(e))
                 return None
 
         # Execute based on preference
@@ -292,9 +294,7 @@ class AIService:
                 primary_transcript = groq_t or ""
                 engine_used = "groq" if groq_t else "failed"
 
-        logger.info(
-            f"STT Complete: engine={engine_used}, transcript_type={type(primary_transcript)}"
-        )
+        JLogger.info("STT pipeline execution complete", engine=engine_used)
         if not primary_transcript:
             error_details = []
             if not self.dg_client:
@@ -322,6 +322,7 @@ class AIService:
         user_role: str = "GENERIC",
         languages: Optional[List[str]] = None,
         stt_model: str = "nova",
+        context_notes: Optional[str] = None,
         **kwargs,
     ) -> NoteAIOutput:
         """Synchronous orchestration with model selection."""
@@ -330,7 +331,9 @@ class AIService:
                 audio_path, languages=languages, stt_model=stt_model
             )
         )
-        ai_output = self.llm_brain_sync(transcript, user_role, **kwargs)
+        ai_output = self.llm_brain_sync(
+            transcript, user_role, context_notes=context_notes, **kwargs
+        )
         # Store metadata for the worker to save
         ai_output.metadata = {
             "engine": engine,
@@ -450,7 +453,8 @@ Use this temporal context to intelligently assign task priorities based on urgen
                         "description": task_description,
                         "priority": t.get("priority", "MEDIUM").upper(),
                         "deadline": t.get("deadline") or t.get("due_date"),
-                        "actions": t.get("actions", {}),  # Pass through actions
+                        "actions": t.get("actions", {}),
+                        "assigned_entities": t.get("assigned_entities", []),
                     }
                 )
 
@@ -465,9 +469,11 @@ Use this temporal context to intelligently assign task priorities based on urgen
                 transcript=transcript,
                 tasks=tasks,
                 tags=tags,
+                assigned_entities=data.get("assigned_entities") or [],
+                business_leads=data.get("business_leads") or [],
             )
         except Exception as e:
-            logger.error(f"LLM brain failed for {user_role}: {e}")
+            JLogger.error("LLM brain process failed", user_role=user_role, error=str(e))
             raise
 
     @retry_with_backoff(max_attempts=3)
@@ -547,7 +553,7 @@ Use this temporal context to intelligently assign task priorities based on urgen
             data = validate_json_response(response.choices[0].message.content)
             return data.get("conflicts", [])
         except Exception as e:
-            logger.error(f"Sync conflict detection failed ({context_type}): {e}")
+            JLogger.error("Conflict detection failed", context_type=context_type, error=str(e))
             return []
 
     @retry_with_backoff(max_attempts=2)
@@ -579,7 +585,7 @@ Use this temporal context to intelligently assign task priorities based on urgen
             data = validate_json_response(response.choices[0].message.content)
             return data.get("conflicts", [])
         except Exception as e:
-            logger.error(f"Conflict detection failed: {e}")
+            JLogger.error("LLM conflict detection failed", error=str(e))
             return []
 
     def semantic_analysis_sync(
@@ -646,7 +652,7 @@ Use this temporal context to intelligently assign task priorities based on urgen
                 },
             )
         except Exception as e:
-            logger.error(f"Semantic analysis failed: {e}")
+            JLogger.error("Semantic analysis failed", user_role=user_role, error=str(e))
             raise
 
     async def semantic_analysis(
@@ -654,3 +660,79 @@ Use this temporal context to intelligently assign task priorities based on urgen
     ) -> dict:
         """Deep semantic analysis: emotional tone, patterns, logical consistency."""
         return self.semantic_analysis_sync(transcript, user_role, **kwargs)
+
+    def perform_semantic_search(
+        self, db: Session, user_id: str, query: str, limit: int = 5, is_admin: bool = False
+    ) -> List[dict]:
+        """
+        Consolidated semantic search logic.
+        """
+        query_vector = self.generate_embedding_sync(query)
+        
+        # Filtering logic
+        query_obj = db.query(models.Note).filter(
+            models.Note.is_deleted == False, 
+            models.Note.is_encrypted == False
+        )
+        
+        if not is_admin:
+            query_obj = query_obj.filter(models.Note.user_id == user_id)
+            
+        results = (
+            query_obj.order_by(models.Note.embedding.cosine_distance(query_vector))
+            .limit(limit)
+            .all()
+        )
+        
+        search_results = []
+        for note in results:
+            # Calculate score (1 - distance)
+            distance = db.query(models.Note.embedding.cosine_distance(query_vector)).filter(models.Note.id == note.id).scalar()
+            search_results.append({
+                "note": note,
+                "score": 1.0 - (distance or 0.0)
+            })
+            
+        return sorted(search_results, key=lambda x: x["score"], reverse=True)
+
+    def answer_question(
+        self, db: Session, user_id: str, question: str, note_id: Optional[str] = None
+    ) -> str:
+        """
+        Unified Q&A logic with RAG support.
+        If note_id is provided, it focuses on that note.
+        Otherwise, it uses RAG across all notes.
+        """
+        from app.services.rag_service import RAGService
+        
+        if note_id:
+            # Single note focus
+            note = db.query(models.Note).filter(
+                models.Note.id == note_id,
+                models.Note.user_id == user_id,
+                models.Note.is_deleted == False
+            ).first()
+            if not note:
+                raise AIServiceError("Note not found or access denied")
+            context = f"Note Title: {note.title}\nTranscript: {note.transcript}"
+        else:
+            # Global RAG focus
+            context = RAGService.get_context_for_transcript(db, user_id, question)
+            
+        try:
+            response = self.groq_client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"You are a helpful AI assistant. Use the following context to answer the user's question:\n\n{context}",
+                    },
+                    {"role": "user", "content": question},
+                ],
+                model="llama-3.1-70b-versatile",
+                temperature=0.3,
+                max_tokens=800,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            JLogger.error("Answer generation failed", user_id=user_id, error=str(e))
+            raise AIServiceError(f"AI service error: {str(e)}")

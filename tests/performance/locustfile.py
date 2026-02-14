@@ -12,11 +12,12 @@ class VoiceNoteLoadTester(HttpUser):
         self.headers = {"X-Device-Token": "test_secret_token"}
         # Register user
         self.client.post(
-            "/api/v1/users/sync",
+            "/api/v1/users/register",
             json={
                 "id": self.user_id,
-                "token": "test_secret_token",
+                "email": f"{self.user_id}@loadtest.com",
                 "name": "Load User",
+                "password": "loadtestpassword123"
             },
         )
 

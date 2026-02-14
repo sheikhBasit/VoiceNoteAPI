@@ -11,11 +11,11 @@ from fastapi import (
     File,
     HTTPException,
     Query,
+    Request,
     UploadFile,
     status,
 )
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+from app.core.limiter import limiter
 from sqlalchemy.orm import Session, joinedload
 
 from app.db import models
@@ -25,20 +25,30 @@ from app.services.auth_service import get_current_user
 from app.services.deletion_service import DeletionService
 from app.services.task_service import TaskService
 from app.utils.json_logger import JLogger
-from app.utils.security import verify_note_ownership, verify_task_ownership
-from app.worker.task import process_task_image_pipeline
 
-limiter = Limiter(
-    key_func=get_remote_address,
-    storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"),
-)
+async def check_task_lock(task_id: str, current_user_id: str):
+    """Utility to check if a task is locked by someone else."""
+    lock_key = f"lock:task:{task_id}"
+    locked_by = await broadcaster.redis.get(lock_key)
+    if locked_by and locked_by != current_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail="Task is currently being edited by another team member."
+        )
+from app.utils.security import verify_note_ownership, verify_task_ownership
+from app.services.broadcaster import broadcaster
+from app.worker.task import broadcast_team_update # Sync helper
+
+# Router initialization
 router = APIRouter(prefix="/api/v1/tasks", tags=["Tasks"])
 
 
 @router.post(
     "", response_model=task_schema.TaskResponse, status_code=status.HTTP_201_CREATED
 )
+@limiter.limit("10/minute")
 def create_task(
+    request: Request,
     task_data: task_schema.TaskCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
@@ -84,6 +94,7 @@ def create_task(
         external_links=[e.dict(exclude_unset=True) for e in task_data.external_links],
         communication_type=task_data.communication_type,
         is_action_approved=task_data.is_action_approved,
+        team_id=task_data.team_id,
         created_at=int(time.time() * 1000),
         updated_at=int(time.time() * 1000),
     )
@@ -106,6 +117,21 @@ def create_task(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error: Task creation failed",
         )
+    
+    # 🚀 SSE Event Pushing for manual task creation
+    if new_task.team_id:
+        from app.worker.task import broadcast_team_update
+        broadcast_team_update(
+            new_task.team_id,
+            "TASK_CREATED",
+            {
+                "task_id": new_task.id,
+                "user_id": current_user.id,
+                "description": new_task.description,
+                "manual": True
+            }
+        )
+
     return new_task
 
 
@@ -127,10 +153,16 @@ def list_tasks(
     - Regular Users: See only their own tasks.
     - Filtering: Support for note_id, contact email, and contact phone.
     """
+    # Query for tasks owned by user OR belonging to user's teams
+    team_ids = [t.id for t in current_user.teams] + [t.id for t in current_user.owned_teams]
+    
     query = (
         db.query(models.Task)
         .options(joinedload(models.Task.note))
-        .filter(models.Task.user_id == current_user.id, models.Task.is_deleted == False)
+        .filter(
+            models.Task.is_deleted == False,
+            (models.Task.user_id == current_user.id) | (models.Task.team_id.in_(team_ids))
+        )
     )
 
     if note_id:
@@ -318,7 +350,7 @@ def get_single_task(
 
 
 @router.patch("/{task_id}", response_model=task_schema.TaskResponse)
-def update_task(
+async def update_task(
     task_id: str,
     task_update: task_schema.TaskUpdate,
     db: Session = Depends(get_db),
@@ -329,6 +361,7 @@ def update_task(
     Handles description, priority, deadline, status, assignments, and soft deletion.
     """
     task = verify_task_ownership(db, current_user, task_id)
+    await check_task_lock(task_id, current_user.id)
 
     # Update only provided fields
     update_data = task_update.model_dump(exclude_unset=True)
@@ -388,7 +421,74 @@ def update_task(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error: Task update could not be persisted",
         )
+
+    # 🚀 SSE Event Pushing for updates
+    if task.team_id:
+        from app.worker.task import broadcast_team_update
+        broadcast_team_update(
+            task.team_id,
+            "TASK_UPDATED",
+            {"task_id": task_id, "user_id": current_user.id, "changes": update_data}
+        )
+
     return task
+
+
+@router.post("/{task_id}/lock")
+async def lock_task(
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    POST /{task_id}/lock: Acquire a soft-lock on a task for editing.
+    Prevents other team members from editing for 5 minutes.
+    """
+    task = verify_task_ownership(db, current_user, task_id)
+    lock_key = f"lock:task:{task_id}"
+
+    # Try to set lock with 5 minute TTL (standard edit window)
+    success = await broadcaster.redis.set(lock_key, current_user.id, ex=300, nx=True)
+    if not success:
+        locked_by = await broadcaster.redis.get(lock_key)
+        if locked_by != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail=f"Task is currently being edited by another team member."
+            )
+
+    # Broadcast lock event via SSE
+    if task.team_id:
+        await broadcaster.push_team_event(
+            task.team_id,
+            "TASK_LOCKED",
+            {"task_id": task_id, "user_id": current_user.id, "user_name": current_user.name}
+        )
+
+    return {"message": "Task locked for editing", "expires_in": 300}
+
+
+@router.delete("/{task_id}/lock")
+async def unlock_task(
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """DELETE /{task_id}/lock: Explicitly release a task lock."""
+    task = verify_task_ownership(db, current_user, task_id)
+    lock_key = f"lock:task:{task_id}"
+
+    locked_by = await broadcaster.redis.get(lock_key)
+    if locked_by == current_user.id:
+        await broadcaster.redis.delete(lock_key)
+        if task.team_id:
+            await broadcaster.push_team_event(
+                task.team_id,
+                "TASK_UNLOCKED",
+                {"task_id": task_id, "user_id": current_user.id}
+            )
+
+    return {"message": "Task lock released"}
 
 
 @router.post("/{task_id}/multimedia")
@@ -404,6 +504,7 @@ async def add_task_multimedia(
     Optimized: Immediate response to user while worker handles compression.
     """
     task = verify_task_ownership(db, current_user, task_id)
+    await check_task_lock(task_id, current_user.id)
 
     # 1. Save locally via chunked reading
     temp_id = str(uuid.uuid4())
@@ -429,25 +530,7 @@ async def add_task_multimedia(
     return {"message": "Upload received. Processing in background.", "task_id": task_id}
 
 
-@router.patch("/{task_id}/complete", response_model=task_schema.TaskResponse)
-def complete_task(
-    task_id: str,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
-):
-    """
-    PATCH /{task_id}/complete: Professional alias for marking a task as done.
-    Sets is_done=True and status=DONE.
-    """
-    task = verify_task_ownership(db, current_user, task_id)
-    task.is_done = True
-    task.status = models.TaskStatus.DONE
-    task.updated_at = int(time.time() * 1000)
-    db.commit()
-    db.refresh(task)
 
-    JLogger.info("Task marked as complete", task_id=task_id, user_id=current_user.id)
-    return task
 
 
 @router.delete("/{task_id}")
@@ -483,6 +566,7 @@ async def remove_multimedia(
         )
 
     task = verify_task_ownership(db, current_user, task_id)
+    await check_task_lock(task_id, current_user.id)
 
     # Filter out the URL from both image and document arrays
     if url_to_remove in task.image_uris:
@@ -647,7 +731,7 @@ def restore_task(
 
 
 @router.patch("/{task_id}/complete", response_model=task_schema.TaskResponse)
-def toggle_task_completion(
+async def toggle_task_completion(
     task_id: str,
     is_done: bool = Body(..., embed=True),
     db: Session = Depends(get_db),
@@ -658,14 +742,34 @@ def toggle_task_completion(
     Explicit endpoint for UI convenience.
     """
     task = verify_task_ownership(db, current_user, task_id)
+    await check_task_lock(task_id, current_user.id)
 
     if task.is_deleted:
         raise HTTPException(status_code=400, detail="Cannot complete a deleted task")
 
     task.is_done = is_done
+    if is_done:
+        task.status = models.TaskStatus.DONE
+    else:
+        # Revert to TODO if unchecked, or keep as is? 
+        # Safest is TODO or previous status, but we don't track previous.
+        # Let's set to TODO if it was DONE.
+        if task.status == models.TaskStatus.DONE:
+            task.status = models.TaskStatus.TODO
+            
     task.updated_at = int(time.time() * 1000)
     db.commit()
     db.refresh(task)
+
+    # 🚀 SSE Event Pushing for completion
+    if task.team_id:
+        from app.worker.task import broadcast_team_update
+        broadcast_team_update(
+            task.team_id,
+            "TASK_COMPLETED" if is_done else "TASK_REOPENED",
+            {"task_id": task_id, "user_id": current_user.id, "is_done": is_done}
+        )
+
     return task
 
 

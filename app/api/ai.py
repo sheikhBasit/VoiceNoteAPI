@@ -2,8 +2,7 @@ import os
 import time
 from typing import List
 
-from fastapi import APIRouter, Depends, Request, Body
-from slowapi import Limiter
+from fastapi import APIRouter, Depends, Request, Body, HTTPException
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
@@ -19,54 +18,51 @@ router = APIRouter(prefix="/api/v1/ai", tags=["AI & Insights"])
 # ai_service is instantiated inside endpoints to avoid module-level hangs
 # ai_service = AIService()
 
-limiter = Limiter(
-    key_func=get_remote_address,
-    storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"),
-)
+from app.core.limiter import limiter
 ai_service = AIService()
 
 
 @router.post("/search", response_model=List[note_schema.NoteResponse])
 @limiter.limit("60/minute")
-async def semantic_search(
+async def semantic_search_handler(
     request: Request,
     query: str = Body(..., embed=True),
+    limit: int = Body(5, embed=True),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    user_id = current_user.id
-    start_time = time.time()
-    query_vector = ai_service.generate_embedding_sync(query)
-    embedding_time = time.time() - start_time
-
-    # EXEMPTION: Admins can search across all notes
-    query_obj = db.query(models.Note).filter(
-        models.Note.is_deleted == False, models.Note.is_encrypted == False
+    """
+    Search endpoint using consolidated semantic search logic.
+    """
+    results_with_scores = ai_service.perform_semantic_search(
+        db, 
+        current_user.id, 
+        query, 
+        limit=limit, 
+        is_admin=is_admin(current_user)
     )
+    
+    # Return just the notes for this response model (NoteResponse)
+    return [r["note"] for r in results_with_scores]
 
-    if not is_admin(current_user):  # Using new utility function
-        query_obj = query_obj.filter(models.Note.user_id == user_id)
 
-    # Use cosine_distance to match the HNSW index (vector_cosine_ops)
-    results = (
-        query_obj.order_by(models.Note.embedding.cosine_distance(query_vector))
-        .limit(5)
-        .all()
-    )
-
-    search_time = time.time() - (start_time + embedding_time)
-
-    JLogger.info(
-        "Semantic search performed",
-        user_id=user_id,
-        is_admin=is_admin(current_user),
-        query=query,
-        results_count=len(results),
-        embedding_time_ms=int(embedding_time * 1000),
-        search_time_ms=int(search_time * 1000),
-    )
-
-    return results
+@router.post("/ask")
+@limiter.limit("30/minute")
+async def ask_ai_custom(
+    request: Request,
+    question: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """
+    POST /ask: Global AI assistant with RAG context.
+    Uses unified AIService logic.
+    """
+    try:
+        answer = ai_service.answer_question(db, current_user.id, question)
+        return {"answer": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stats")

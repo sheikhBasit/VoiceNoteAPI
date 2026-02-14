@@ -31,6 +31,7 @@ class NoteCreate(NoteBase):
     links: List[ExternalLink] = []
     is_encrypted: bool = False
     comparison_notes: str = ""
+    team_id: Optional[str] = None
 
 
 class NoteUpdate(BaseModel):
@@ -48,6 +49,7 @@ class NoteUpdate(BaseModel):
     image_uris: Optional[List[str]] = None  # Client-side image URIs
     links: Optional[List[ExternalLink]] = None
     is_deleted: Optional[bool] = None
+    team_id: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -96,6 +98,7 @@ class NoteResponse(NoteBase):
     transcript_groq: Optional[str] = None
     transcript_deepgram: Optional[str] = None
     transcript_android: Optional[str] = None
+    team_id: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -106,8 +109,10 @@ class NoteAIOutput(BaseModel):
     summary: str
     priority: Priority
     transcript: str  # Formatted with speaker labels
-    tasks: List[dict] = []  # Avoid circular import
-    tags: List[str] = []  # New
+    tasks: List[dict] = []  # List of Task objects with actions and assigned_entities
+    tags: List[str] = []
+    assigned_entities: List[dict] = []  # Global entities found in note
+    business_leads: List[dict] = []  # NEW: Potential deals, clients, or prospects found
     metadata: Optional[dict] = None
 
 

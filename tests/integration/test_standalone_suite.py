@@ -9,6 +9,7 @@ import sys
 
 import numpy as np
 import pytest
+from unittest.mock import patch
 
 # Add app to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -37,12 +38,22 @@ class TestAudioChunkerStandalone:
         assert not is_valid
         assert "exist" in error.lower()
 
-    def test_should_chunk_logic(self):
+    @patch("librosa.get_duration")
+    def test_should_chunk_logic(self, mock_duration):
         """Test chunking decision logic."""
-        long_audio = os.path.join(ASSETS_DIR, "worst_case/very_long_10min.wav")
-        if os.path.exists(long_audio):
-            should_chunk = AudioChunker.should_chunk(long_audio, max_duration_minutes=5)
-            assert should_chunk
+        mock_duration.return_value = 600.0  # 10 minutes
+        # We don't need a real file if we mock librosa, but validation checks existence first.
+        # AudioChunker.should_chunk calls librosa.get_duration(path=...).
+        # We can pass any path if we assume it exists or if we mock os.path.exists too?
+        # The test originally checked for existence of a real file.
+        # Let's use a dummy path and mock os.path.exists inside the test or just use __file__.
+        
+        with patch("app.services.audio_service.librosa.get_duration", return_value=600.0):
+             # We pass a dummy path, but should_chunk calls librosa.get_duration.
+             # Validation of existence is NOT done in should_chunk, it's done in validate_audio_file.
+             # should_chunk just tries via try-except.
+             should_chunk = AudioChunker.should_chunk("dummy_long.wav", max_duration_minutes=5)
+             assert should_chunk
 
     def test_merge_transcripts(self):
         """Test transcript merging."""

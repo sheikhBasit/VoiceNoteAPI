@@ -177,3 +177,4 @@ zope.interface==8.2
 flower==2.0.1
 minio==7.2.7
 pytz==2024.1
+bcrypt==4.1.2

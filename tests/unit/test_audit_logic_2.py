@@ -82,13 +82,13 @@ def test_dynamic_meeting_roi():
     from app.services.analytics_service import AnalyticsService
 
     db = MagicMock()
-    # Mock total_tasks and completed_tasks counts
-    db.query.return_value.filter.return_value.count.return_value = 1
-
-    # Mock user and usage_stats to avoid MagicMock comparison error
-    user = MagicMock()
-    user.usage_stats = {"last_analytics_refresh": int(time.time() * 1000)}
-    db.query.return_value.filter.return_value.first.return_value = user
+    # Mock query chain to allow multiple .filter() calls returning the same query object
+    query_mock = MagicMock()
+    db.query.return_value = query_mock
+    query_mock.filter.return_value = query_mock 
+    query_mock.limit.return_value = query_mock
+    # count() should return an int
+    query_mock.count.return_value = 1
 
     note1 = MagicMock()
     note1.transcript_groq = "Hello world " * 200  # 400 words
@@ -104,14 +104,14 @@ def test_dynamic_meeting_roi():
     note2.transcript_deepgram = None
     note2.transcript_android = None
 
-    # Mock the notes query: .order_by(...).limit(...).all()
-    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+    # Mock the notes query: .all() to return notes
+    query_mock.all.return_value = [
         note1,
         note2,
     ]
 
     # total_words = 600
-    # roi = 600 / (40 * 60) = 0.25 hours
+    # roi = 600 / 2400 = 0.25 hours
     # round(0.25, 1) in Python 3 is 0.2
 
     result = AnalyticsService.get_productivity_pulse(db, "user_1", force_refresh=True)
@@ -123,12 +123,17 @@ def test_stop_words_filtering():
     from app.services.analytics_service import AnalyticsService
 
     db = MagicMock()
-    db.query.return_value.filter.return_value.count.return_value = 1
-
-    # Mock user and usage_stats
+    # Mock query chain
+    query_mock = MagicMock()
+    db.query.return_value = query_mock
+    query_mock.filter.return_value = query_mock 
+    query_mock.limit.return_value = query_mock
+    query_mock.count.return_value = 1
+    
+    # user mock not needed for static method but kept consistent if utilized elsewhere
     user = MagicMock()
     user.usage_stats = {"last_analytics_refresh": int(time.time() * 1000)}
-    db.query.return_value.filter.return_value.first.return_value = user
+    query_mock.first.return_value = user # Just in case
 
     note = MagicMock()
     note.title = "Summary Update"
@@ -136,7 +141,7 @@ def test_stop_words_filtering():
     note.transcript_groq = ""
     note.transcript_deepgram = None
     note.transcript_android = None
-    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+    query_mock.all.return_value = [
         note
     ]
 

@@ -106,11 +106,18 @@ class SearchService:
         """Helper for a single vector search."""
         try:
             query_embedding = await self.ai_service.generate_embedding(query)
+            
+            # Fetch user with team relations
+            user = db.query(models.User).filter(models.User.id == user_id).first()
+            team_ids = []
+            if user:
+                team_ids = [t.id for t in user.teams] + [t.id for t in user.owned_teams]
+
             return (
                 db.query(models.Note)
                 .filter(
-                    models.Note.user_id == user_id,
                     models.Note.is_deleted == False,
+                    (models.Note.user_id == user_id) | (models.Note.team_id.in_(team_ids)),
                     models.Note.embedding.l2_distance(query_embedding) <= threshold,
                 )
                 .order_by(models.Note.embedding.l2_distance(query_embedding))

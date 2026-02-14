@@ -19,26 +19,21 @@ def generate_test_signature(
     return hmac.new(DEVICE_SECRET_KEY.encode(), message, hashlib.sha256).hexdigest()
 
 
-@pytest.fixture(scope="module", autouse=True)
-def override_auth():
+@pytest.fixture(scope="function", autouse=True)
+def override_auth(db_session):
     from app.db import models
-    from app.db.session import SessionLocal
     from app.services.auth_service import get_current_user
     
     # Create test user in DB if not exists
-    db = SessionLocal()
-    user = db.query(models.User).filter(models.User.id == "test_user").first()
-    if not user:
-        user = models.User(
-            id="test_user",
-            email="test_niche@example.com",
-            name="Niche Test User",
-            is_admin=True,
-            usage_stats={"last_analytics_refresh": 0},
-        )
-        db.add(user)
-        db.commit()
-    db.close()
+    user = models.User(
+        id="test_user",
+        email="test_niche@example.com",
+        name="Niche Test User",
+        is_admin=True,
+        usage_stats={"last_analytics_refresh": 0},
+    )
+    db_session.add(user)
+    db_session.commit()
 
     def mock_get_current_user():
         from unittest.mock import MagicMock
@@ -52,7 +47,8 @@ def override_auth():
 
     app.dependency_overrides[get_current_user] = mock_get_current_user
     yield
-    app.dependency_overrides.pop(get_current_user, None)
+    if get_current_user in app.dependency_overrides:
+        del app.dependency_overrides[get_current_user]
 
 
 def test_dashboard_endpoint(client):
@@ -133,7 +129,7 @@ def test_security_invalid_signature(client):
 
     response = client.post(path, data={"user_id": "test"}, headers=headers)
     assert response.status_code == 401
-    assert "Invalid device signature" in response.json()["detail"]
+    assert "Invalid device signature" in response.json()["error"]
 
 
 def test_whatsapp_draft_endpoint(client):

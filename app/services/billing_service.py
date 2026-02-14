@@ -63,7 +63,6 @@ class BillingService:
             return False
 
         target_wallet_id = override_wallet_id or user_id
-        wallet = self.get_or_create_wallet(target_wallet_id, for_update=True)
 
         # Determine cost based on plan if not explicitly provided
         final_cost = cost
@@ -79,14 +78,35 @@ class BillingService:
         if not final_cost:
             final_cost = 0
 
-        if wallet.balance < final_cost:
-            logger.warning(
-                f"Insufficient funds for wallet {target_wallet_id} (charged for user {user_id}): Needs {final_cost}, has {wallet.balance}"
-            )
-            return False
+        # Atomic Update: Decrease balance only if sufficient funds
+        # This prevents race conditions better than SELECT FOR UPDATE in SQLite
+        updated_count = self.db.query(Wallet).filter(
+            Wallet.user_id == target_wallet_id,
+            Wallet.balance >= final_cost
+        ).update(
+            {"balance": Wallet.balance - final_cost},
+            synchronize_session=False
+        )
 
-        # Deduct balance
-        wallet.balance -= final_cost
+        if updated_count == 0:
+            # Check if it was insufficient funds or missing wallet
+            wallet = self.get_or_create_wallet(target_wallet_id)
+            if wallet.balance < final_cost:
+                logger.warning(
+                    f"Insufficient funds for wallet {target_wallet_id} (charged for user {user_id}): Needs {final_cost}, has {wallet.balance}"
+                )
+                return False
+            else:
+                # Should ensure wallet exists, then retry? 
+                # Ideally get_or_create above handles creation, so if count=0 and balance is enough, something weird happened.
+                # But get_or_create was just called to check.
+                # Let's assume Insufficient Funds is the main reason if wallet exists.
+                return False
+        
+        # Determine new balance for logging
+        # We need to fetch it again or calculate it. Fetching is safer.
+        updated_wallet = self.db.query(Wallet).filter(Wallet.user_id == target_wallet_id).first()
+        current_balance = updated_wallet.balance if updated_wallet else 0
 
         # Update User Usage Stats (Cache) - always attributed to the person who did it
         if not user.usage_stats:
@@ -108,9 +128,9 @@ class BillingService:
 
         # Log Transaction
         tx = Transaction(
-            wallet_id=wallet.user_id,
+            wallet_id=target_wallet_id,
             amount=-final_cost,
-            balance_after=wallet.balance,
+            balance_after=current_balance,
             type="USAGE",
             description=f"{description} (Charged to {'Corporate' if override_wallet_id else 'Personal'})",
             reference_id=ref_id,

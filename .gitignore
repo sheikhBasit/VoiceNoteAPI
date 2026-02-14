@@ -5,10 +5,15 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+dist/
+build/
+*.egg-info/
+.ipynb_checkpoints/
 
 # Environment & Secrets
 .env
 .env.*
+!.env.*.example
 .venv
 env/
 venv/
@@ -16,6 +21,8 @@ ENV/
 *.key
 api_env.txt
 *_env.txt
+ssh_private*
+certs/
 
 # Local Media & Processing
 uploads/
@@ -25,6 +32,8 @@ uploads/
 *.jpg
 *.jpeg
 *.png
+*.tmp
+*.temp
 
 # Logs and Results
 logs/
@@ -38,13 +47,14 @@ test_results.md
 
 # OS & IDE
 .DS_Store
+Thumbs.db
 .vscode/
 .idea/
 *.swp
+*.sublime-project
+*.sublime-workspace
 
 # Docker
 .docker/
-
-ssh_private
-ssh_private.pub
+docker-compose.override.yml
 

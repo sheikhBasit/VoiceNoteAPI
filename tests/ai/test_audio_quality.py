@@ -6,6 +6,8 @@ import os
 import sys
 
 import pytest
+import numpy as np
+from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -20,6 +22,23 @@ class TestAudioQualityAnalyzer:
     def setup_method(self):
         """Setup analyzer."""
         self.analyzer = AudioQualityAnalyzer()
+
+    @pytest.fixture(autouse=True)
+    def mock_librosa(self):
+        with patch("app.utils.audio_quality_analyzer.librosa") as mock_librosa:
+            # Mock load to return valid numpy array and sr
+            mock_librosa.load.return_value = (np.zeros(22050*30), 22050) # 30s silence
+            
+            # Mock features to return appropriate shapes
+            # feature.rms returns (1, t)
+            mock_librosa.feature.rms.return_value = np.array([[0.1]]) 
+            mock_librosa.feature.spectral_flatness.return_value = np.array([[0.1]])
+            mock_librosa.feature.zero_crossing_rate.return_value = np.array([[0.1]])
+            
+            # Mock effects.split
+            mock_librosa.effects.split.return_value = np.array([[0, 22050*30]])
+            
+            yield mock_librosa
 
     def test_analyze_ideal_audio(self):
         """Test analysis of ideal quality audio."""

@@ -139,20 +139,13 @@ def verify_note_ownership(db: Session, user: Any, note_id: str):
     if is_user_admin:
         return note
 
-    if note.user_id == user_id:
+    if note.user_id == user_id or participant:
         return note
 
-    # Check for Shared Folder Participation (Phase 5 Requirement)
-    if note.folder_id:
-        participant = (
-            db.query(models.folder_participants)
-            .filter(
-                models.folder_participants.c.folder_id == note.folder_id,
-                models.folder_participants.c.user_id == user_id,
-            )
-            .first()
-        )
-        if participant:
+    # Check for Team Membership
+    if note.team_id:
+        if any(t.id == note.team_id for t in user.teams) or \
+           any(t.id == note.team_id for t in user.owned_teams):
             return note
 
     JLogger.warning("Ownership/Participation violation attempt", user_id=user_id, note_id=note_id)
@@ -192,19 +185,14 @@ def verify_task_ownership(db: Session, user: Any, task_id: str):
     # Check parent note's folder for shared participation
     note = db.query(models.Note).filter(models.Note.id == task.note_id).first()
     if note:
-        if note.user_id == user_id:
+        if note.user_id == user_id or participant:
             return task
-        if note.folder_id:
-            participant = (
-                db.query(models.folder_participants)
-                .filter(
-                    models.folder_participants.c.folder_id == note.folder_id,
-                    models.folder_participants.c.user_id == user_id,
-                )
-                .first()
-            )
-            if participant:
-                return task
+
+    # Check for Team Membership
+    if task.team_id:
+        if any(t.id == task.team_id for t in user.teams) or \
+           any(t.id == task.team_id for t in user.owned_teams):
+            return task
 
     JLogger.warning("Task access violation attempt", user_id=user_id, task_id=task_id)
     raise HTTPException(

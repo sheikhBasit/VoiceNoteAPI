@@ -26,6 +26,16 @@ class UserBase(BaseModel):
     # admin_permissions: Optional[Dict[str, Any]] = None
 
 
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserRegister(BaseModel):
+    email: str
+    password: str
+    name: str
+    timezone: Optional[str] = "UTC"
+
 class UserCreate(UserBase):
     id: Optional[str] = None
     email: str

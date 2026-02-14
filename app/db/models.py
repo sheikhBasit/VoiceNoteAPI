@@ -1,5 +1,6 @@
 import enum
 import time
+import uuid
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -83,6 +84,19 @@ folder_participants = Table(
         "user_id", String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     ),
     Column("role", String, default="MEMBER"),  # OWNER, EDITOR, VIEWER
+    Column("joined_at", BigInteger, default=lambda: int(time.time() * 1000)),
+)
+
+
+team_members = Table(
+    "team_members",
+    Base.metadata,
+    Column(
+        "team_id", String, ForeignKey("teams.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column(
+        "user_id", String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    ),
     Column("joined_at", BigInteger, default=lambda: int(time.time() * 1000)),
 )
 
@@ -178,6 +192,8 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    owned_teams = relationship("Team", back_populates="owner")
+    teams = relationship("Team", secondary=team_members, back_populates="members")
 
 
 class RefreshToken(Base):
@@ -216,6 +232,20 @@ class Folder(Base):
     )
 
 
+class Team(Base):
+    __tablename__ = "teams"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    owner_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
+
+    owner = relationship("User", back_populates="owned_teams")
+    members = relationship("User", secondary=team_members, back_populates="teams")
+    notes = relationship("Note", back_populates="team")
+    tasks = relationship("Task", back_populates="team")
+
+
 class Note(Base):
     __tablename__ = "notes"
 
@@ -223,6 +253,9 @@ class Note(Base):
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     folder_id = Column(
         String, ForeignKey("folders.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    team_id = Column(
+        String, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True
     )
     title = Column(String)
     summary = Column(Text)
@@ -282,6 +315,7 @@ class Note(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,  # Use database-level CASCADE
     )
+    team = relationship("Team", back_populates="notes")
 
     @property
     def transcript(self):
@@ -313,6 +347,9 @@ class Task(Base):
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     note_id = Column(
         String, ForeignKey("notes.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    team_id = Column(
+        String, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True
     )
     title = Column(String)  # Brief title
     description = Column(Text)  # Detailed instructions
@@ -362,6 +399,7 @@ class Task(Base):
     # }
 
     note = relationship("Note", back_populates="tasks")
+    team = relationship("Team", back_populates="tasks")
 
 
 class ApiKey(Base):

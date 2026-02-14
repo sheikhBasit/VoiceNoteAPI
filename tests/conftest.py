@@ -1,9 +1,23 @@
 import json
 import os
 import sys
-from unittest.mock import MagicMock
+
+# Set env vars BEFORE importing app modules
+os.environ["ENVIRONMENT"] = "testing"
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+os.environ["REDIS_URL"] = "memory://"
+os.environ["CELERY_BROKER_URL"] = "memory://"
+os.environ["CELERY_RESULT_BACKEND"] = "cache+memory://"
+os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
+os.environ["MINIO_ENDPOINT"] = "localhost:9000"
+os.environ["MINIO_ACCESS_KEY"] = "minioadmin"
+os.environ["MINIO_SECRET_KEY"] = "minioadmin"
+os.environ["SENTENCE_TRANSFORMERS_HOME"] = "/tmp/models"
+from unittest.mock import MagicMock, AsyncMock
 
 import pytest
+from app.db.session import get_db
 
 
 # --- MOCK LIBS BEFORE IMPORTS ---
@@ -21,7 +35,21 @@ redis_mock = mock_package("redis")
 redis_mock.__version__ = "5.0.0"
 mock_package("redis.client")
 mock_package("redis.connection")
-mock_package("redis.asyncio")
+redis_asyncio = mock_package("redis.asyncio")
+
+# Configure Async Redis Client
+redis_client_mock = MagicMock()
+redis_client_mock.get = AsyncMock(return_value=None)
+redis_client_mock.set = AsyncMock(return_value=True)
+redis_client_mock.delete = AsyncMock(return_value=1)
+redis_client_mock.exists = AsyncMock(return_value=0)
+redis_client_mock.expire = AsyncMock(return_value=True)
+redis_client_mock.publish = AsyncMock(return_value=1)
+redis_client_mock.ping = AsyncMock(return_value=True)
+redis_client_mock.close = AsyncMock(return_value=None)
+
+redis_asyncio.from_url.return_value = redis_client_mock
+redis_asyncio.Redis.return_value = redis_client_mock
 
 # pgvector Mock for SQLite
 mock_pgvector = mock_package("pgvector")
@@ -46,12 +74,8 @@ from sqlalchemy.types import JSON
 
 sqlalchemy.dialects.postgresql.JSONB = JSON
 
-# Heavy/External AI mocks
-mock_package("pydub")
-mock_package("pydub.silence")
-mock_package("pydub.audio_segment")
-mock_package("librosa")
-mock_package("soundfile")
+# Heavy/External AI mocks - Only mock if absolutely necessary
+# For now, let's keep sentence_transformers and transformers mocked as they are very heavy
 mock_package("sentence_transformers")
 mock_package("transformers")
 mock_torch = mock_package("torch")
@@ -128,24 +152,10 @@ Task.delay = MagicMock()
 Task.apply_async = MagicMock()
 
 # Handle pydub
-mock_pydub = mock_package("pydub")
-mock_package("pydub.silence")
-mock_package("pydub.audio_segment")
 
 # ---------------------------------
 
-# Set env vars BEFORE importing app modules
-os.environ["ENVIRONMENT"] = "testing"
-os.environ["DATABASE_URL"] = "sqlite:///./test.db"
-os.environ["REDIS_URL"] = "memory://"
-os.environ["CELERY_BROKER_URL"] = "memory://"
-os.environ["CELERY_RESULT_BACKEND"] = "cache+memory://"
-os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
-os.environ["MINIO_ENDPOINT"] = "localhost:9000"
-os.environ["MINIO_ACCESS_KEY"] = "minioadmin"
-os.environ["MINIO_SECRET_KEY"] = "minioadmin"
 # Mock AI Models path
-os.environ["SENTENCE_TRANSFORMERS_HOME"] = "/tmp/models"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -204,11 +214,21 @@ async def async_client():
 
 
 @pytest.fixture
-def client():
+def client(db_session):
     """Provides a synchronous TestClient for testing"""
     from fastapi.testclient import TestClient
     from app.main import app
-    return TestClient(app)
+    # Override get_db dependency
+    def override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
+    yield TestClient(app)
+    # Clear overrides
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -257,4 +277,22 @@ def mock_ai_services():
     AIService._groq_client = None
     AIService._dg_client = None
     
+    yield
+
+
+@pytest.fixture(autouse=True)
+def mock_broadcaster_redis():
+    """Ensure broadcaster redis is async compatible"""
+    try:
+        from app.services.broadcaster import broadcaster
+        # Directly patch the instance method if it's not already an AsyncMock
+        if not isinstance(broadcaster.redis.get, AsyncMock):
+            broadcaster.redis.get = AsyncMock(return_value=None)
+            broadcaster.redis.set = AsyncMock(return_value=True)
+            broadcaster.redis.delete = AsyncMock(return_value=1)
+            broadcaster.redis.publish = AsyncMock(return_value=1)
+            broadcaster.redis.expire = AsyncMock(return_value=True)
+            broadcaster.redis.exists = AsyncMock(return_value=0)
+    except ImportError:
+        pass
     yield

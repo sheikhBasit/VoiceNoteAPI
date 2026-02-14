@@ -33,44 +33,40 @@ def test_user(db_session):
     )
     db_session.add(user)
     db_session.commit()
+    db_session.refresh(user)
     return user
 
 
-def get_auth_headers(user_id):
-    # Simulated auth - depends on your auth implementation
-    # Assuming the app has a way to bypass for tests or uses JWT
-    # For now, let's assume get_current_user can be mocked or we use a real token
-    # Since I cannot easily generate a JWT here without the secret, I will assume
-    # the environment allows some form of test auth or I can mock it in the test.
-    pass
-
-
-def test_create_task_no_note(test_user):
+def test_create_task_no_note(client, test_user): # Use client fixture
     # Mocking get_current_user to return our test_user
     from app.services.auth_service import get_current_user
 
     app.dependency_overrides[get_current_user] = lambda: test_user
 
-    payload = {
-        "description": "Standalone manual task",
-        "priority": "HIGH",
-        "note_id": None,
-    }
+    try:
+        payload = {
+            "description": "Standalone manual task",
+            "priority": "HIGH",
+            "note_id": None,
+        }
 
-    response = client.post("/api/v1/tasks/", json=payload)
-    if response.status_code != 201:
-        print(f"DEBUG: POST /api/v1/tasks/ failed with {response.status_code}")
-        print(f"DEBUG: Response body: {os.linesep}{response.text}")
-    app.dependency_overrides.clear()
+        response = client.post("/api/v1/tasks/", json=payload)
+        if response.status_code != 201:
+            print(f"DEBUG: POST /api/v1/tasks/ failed with {response.status_code}")
+            print(f"DEBUG: Response body: {os.linesep}{response.text}")
+        
+        assert response.status_code == 201
+        data = response.json()
+        assert data["description"] == "Standalone manual task"
+        assert data["note_id"] is None
+        assert "id" in data
+    finally:
+        # Clean up only this override
+        if get_current_user in app.dependency_overrides:
+            del app.dependency_overrides[get_current_user]
 
-    assert response.status_code == 201
-    data = response.json()
-    assert data["description"] == "Standalone manual task"
-    assert data["note_id"] is None
-    assert "id" in data
 
-
-def test_list_standalone_tasks(test_user, db_session):
+def test_list_standalone_tasks(client, test_user, db_session): # Use client fixture
     # Create a task
     task_id = str(uuid.uuid4())
     task = models.Task(
@@ -83,9 +79,13 @@ def test_list_standalone_tasks(test_user, db_session):
 
     app.dependency_overrides[get_current_user] = lambda: test_user
 
-    response = client.get("/api/v1/tasks")
-    app.dependency_overrides.clear()
-
-    assert response.status_code == 200
-    data = response.json()
-    assert any(t["id"] == task_id for t in data)
+    try:
+        response = client.get("/api/v1/tasks")
+        assert response.status_code == 200
+        data = response.json()
+        # Filter for our task in case there are others
+        found = any(t["id"] == task_id for t in data)
+        assert found, f"Task {task_id} not found in response"
+    finally:
+        if get_current_user in app.dependency_overrides:
+             del app.dependency_overrides[get_current_user]

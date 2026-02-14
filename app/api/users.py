@@ -13,7 +13,6 @@ from fastapi import (
     UploadFile,
     status,
 )
-from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
@@ -33,11 +32,121 @@ from app.utils.json_logger import JLogger
 from app.utils.security import verify_device_signature
 from app.services.validation_service import ValidationService, ValidationError
 
-limiter = Limiter(
-    key_func=get_remote_address,
-    storage_uri=os.getenv("REDIS_URL", "redis://redis:6379/0"),
-)
+from app.core.limiter import limiter
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
+
+
+@router.post("/register", response_model=user_schema.SyncResponse)
+@limiter.limit("5/minute")
+def register_user(
+    request: Request, user_data: user_schema.UserRegister, db: Session = Depends(get_db)
+):
+    """
+    POST /register: Create a new user account with Email/Password.
+    """
+    # 1. Validation
+    try:
+        validated_email = ValidationService.validate_email(user_data.email)
+        validated_name = ValidationService.validate_name(user_data.name)
+        if len(user_data.password) < 8:
+            raise ValidationError("Password must be at least 8 characters long")
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # 2. Check overlap
+    if db.query(models.User).filter(models.User.email == validated_email).first():
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered. Please login instead."
+        )
+
+    # 3. Create User
+    import uuid
+    new_user_id = str(uuid.uuid4())
+    
+    # Initialize basic device info (for session tracking, though not strict auth anymore)
+    user_agent = request.headers.get("User-Agent", "Unknown")
+    initial_device = {
+        "device_model": user_agent,
+        "authorized_at": int(time.time() * 1000),
+        "login_method": "password"
+    }
+
+    db_user = models.User(
+        id=new_user_id,
+        name=validated_name,
+        email=validated_email,
+        password_hash=get_password_hash(user_data.password),
+        authorized_devices=[initial_device],
+        tier=models.SubscriptionTier.GUEST,
+        primary_role=models.UserRole.GENERIC,
+        work_days=[1, 2, 3, 4, 5],
+        timezone=user_data.timezone or "UTC",
+        last_login=int(time.time() * 1000),
+        is_deleted=False
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    # 4. Issue Tokens
+    access_token = create_access_token(data={"sub": db_user.id})
+    refresh_token = create_refresh_token(db_user.id, db)
+
+    return {
+        "user": db_user,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "is_new_user": True,
+    }
+
+
+@router.post("/login", response_model=user_schema.SyncResponse)
+@limiter.limit("10/minute")
+def login_user(
+    request: Request, user_data: user_schema.UserLogin, db: Session = Depends(get_db)
+):
+    """
+    POST /login: Authenticate with Email/Password.
+    """
+    # 1. Find User
+    db_user = db.query(models.User).filter(models.User.email == user_data.email).first()
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    # 2. Check Password
+    if not verify_password(user_data.password, db_user.password_hash):
+        JLogger.warning("Login failed: Incorrect password", email=user_data.email)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    if db_user.is_deleted:
+         raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account deactivated. Please contact support.",
+        )
+
+    # 3. Update Valid Login Stats
+    db_user.last_login = int(time.time() * 1000)
+    db.commit()
+
+    # 4. Issue Tokens
+    access_token = create_access_token(data={"sub": db_user.id})
+    refresh_token = create_refresh_token(db_user.id, db)
+
+    return {
+        "user": db_user,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "is_new_user": False,
+    }
 
 
 @router.post("/sync", response_model=user_schema.SyncResponse)

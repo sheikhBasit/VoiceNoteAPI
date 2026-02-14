@@ -5,6 +5,7 @@ Tests: Note Creation, WhatsApp Draft, Semantic Analysis, Task Creation
 
 import time
 
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 
@@ -20,21 +21,19 @@ TEST_USER = {"email": "test@example.com", "password": "testpass123"}
 def auth_context():
     """Get authentication context (token and user info) for tests"""
     # Create a unique test user for this session to avoid device/existing user conflicts
-    timestamp = int(time.time())
+    unique_id = str(uuid.uuid4())
     test_user_payload = {
-        "name": f"Test User {timestamp}",
-        "email": f"test_{timestamp}@example.com",
-        "token": "test-biometric-token",
-        "device_id": f"test-device-{timestamp}",
-        "device_model": "Pytest CI",
-        "primary_role": "GENERIC",
+        "name": f"Test User {unique_id[:8]}",
+        "email": f"test_{unique_id}@example.com",
+        "password": "testpass123",
         "timezone": "UTC",
     }
 
-    sync_response = client.post("/api/v1/users/sync", json=test_user_payload)
+    # Use register endpoint instead of sync
+    register_response = client.post("/api/v1/users/register", json=test_user_payload)
 
-    if sync_response.status_code == 200:
-        data = sync_response.json()
+    if register_response.status_code == 200:
+        data = register_response.json()
         return {
             "access_token": data["access_token"],
             "email": test_user_payload["email"],

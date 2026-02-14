@@ -1,5 +1,5 @@
 import time
-
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 
@@ -8,36 +8,31 @@ from app.db.session import get_db
 from app.main import app
 
 
-@pytest.fixture(autouse=True)
-def override_db(db):
-    """Override get_db dependency to use test session"""
-    db.expire_on_commit = False  # FIX: Prevent ObjectDeletedError
-
-    def _get_db_override():
-        yield db
-
-    app.dependency_overrides[get_db] = _get_db_override
-    yield
-    app.dependency_overrides.clear()
-
-
-client = TestClient(app)
-
-
 @pytest.fixture
-def auth_headers():
-    timestamp = int(time.time())
+def auth_headers(client):
+    unique_id = str(uuid.uuid4())
+    email = f"user_{unique_id}@example.com"
+    password = "testpassword123"
+    
     resp = client.post(
-        "/api/v1/users/sync",
+        "/api/v1/users/register",
         json={
             "name": "Regular User",
-            "email": f"user_{timestamp}@example.com",
-            "token": "user-token",
-            "device_id": f"user-device-{timestamp}",
-            "device_model": "Test",
-            "primary_role": "GENERIC",
+            "email": email,
+            "password": password,
+            "timezone": "UTC"
         },
     )
+    # If register fails (e.g. user exists from previous run), try login
+    if resp.status_code == 400 and "already registered" in resp.text:
+         resp = client.post(
+            "/api/v1/users/login",
+            json={
+                "email": email,
+                "password": password
+            }
+         )
+
     return {
         "Authorization": f"Bearer {resp.json()['access_token']}",
         "user_id": resp.json()["user"]["id"],
@@ -45,50 +40,57 @@ def auth_headers():
 
 
 @pytest.fixture
-def admin_auth(db):
+def admin_auth(client, db_session):
     """Create an admin user and return headers"""
-    timestamp = int(time.time())
-    email = f"admin_{timestamp}@example.com"
+    unique_id = str(uuid.uuid4())
+    email = f"admin_{unique_id}@example.com"
+    password = "adminpassword123"
 
-    # 1. Create user via public sync
+    # 1. Create user via register
     resp = client.post(
-        "/api/v1/users/sync",
+        "/api/v1/users/register",
         json={
             "name": "Test Admin",
             "email": email,
-            "token": "admin-token",
-            "device_id": f"admin-device-{timestamp}",
-            "device_model": "Test",
-            "primary_role": "DEVELOPER",
+            "password": password,
+            "timezone": "UTC"
         },
     )
+    if resp.status_code == 400 and "already registered" in resp.text:
+         resp = client.post(
+            "/api/v1/users/login",
+            json={
+                "email": email,
+                "password": password
+            }
+         )
+         
     data = resp.json()
     user_id = data["user"]["id"]
     token = data["access_token"]
 
     # 2. Elevate to Admin using shared DB session
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+    user = db_session.query(models.User).filter(models.User.id == user_id).first()
     user.is_admin = True
     # Ensure usage of dict for SQLite compatibility handled by SQLAlchemy
     user.admin_permissions = {"can_delete_users": True, "can_view_all_users": True}
-    db.commit()
+    db_session.commit()
 
     return {"Authorization": f"Bearer {token}", "user_id": user_id}
 
 
 class TestAdminUpdates:
-    def test_admin_update_user(self, db, admin_auth):
+    def test_admin_update_user(self, client, db_session, admin_auth):
         """Test admin updating another user"""
         # Create user to be updated
         timestamp = int(time.time())
         target_resp = client.post(
-            "/api/v1/users/sync",
+            "/api/v1/users/register",
             json={
                 "name": "Target User",
                 "email": f"target_{timestamp}@example.com",
-                "token": "target-tok",
-                "device_id": f"target-dev-{timestamp}",
-                "device_model": "Test",
+                "password": "targetpassword123",
+                "timezone": "UTC"
             },
         )
         target_id = target_resp.json()["user"]["id"]
@@ -103,12 +105,12 @@ class TestAdminUpdates:
         assert patch_resp.json()["name"] == "Updated By Admin"
 
         # Verify in DB
-        db.refresh(db.query(models.User).get(target_id))
-        assert db.query(models.User).get(target_id).name == "Updated By Admin"
+        db_session.refresh(db_session.query(models.User).get(target_id))
+        assert db_session.query(models.User).get(target_id).name == "Updated By Admin"
 
 
 class TestNotesRestoration:
-    def test_restore_note(self, db, auth_headers):
+    def test_restore_note(self, client, db_session, auth_headers):
         # 1. Create Note
         note = client.post(
             "/api/v1/notes/create", headers=auth_headers, json={"title": "To Delete"}
@@ -120,11 +122,11 @@ class TestNotesRestoration:
         assert del_resp.status_code == 200
 
         # FIX: Expire all to refresh session state and avoid ObjectDeletedError
-        db.expire_all()
+        db_session.expire_all()
 
         # DEBUG: Check DB state
         # We need to refresh/query to see if hard deleted
-        db_note = db.query(models.Note).filter(models.Note.id == note_id).first()
+        db_note = db_session.query(models.Note).filter(models.Note.id == note_id).first()
         assert db_note is not None, "Note was HARD deleted!"
         assert db_note.is_deleted is True, "Note was not soft deleted!"
 
@@ -135,7 +137,7 @@ class TestNotesRestoration:
         assert restore_resp.status_code == 200
         assert restore_resp.json()["is_deleted"] is False
 
-    def test_bulk_delete_notes(self, db, auth_headers):
+    def test_bulk_delete_notes(self, client, db_session, auth_headers):
         n1 = client.post(
             "/api/v1/notes/create", headers=auth_headers, json={"title": "Bulk 1"}
         ).json()["id"]
@@ -153,7 +155,7 @@ class TestNotesRestoration:
         data = bulk_resp.json()
         assert data["deleted_count"] == 2
 
-        db.expire_all()
+        db_session.expire_all()
 
         # Verify
         restore_resp = client.patch(f"/api/v1/notes/{n1}/restore", headers=auth_headers)
@@ -161,7 +163,7 @@ class TestNotesRestoration:
 
 
 class TestTasksRestoration:
-    def test_task_lifecycle_and_bulk(self, auth_headers):
+    def test_task_lifecycle_and_bulk(self, client, auth_headers):
         t1 = client.post(
             "/api/v1/tasks",
             headers=auth_headers,
