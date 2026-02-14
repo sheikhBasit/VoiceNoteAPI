@@ -3,7 +3,7 @@
 # VoiceNote Server-Side Update Script
 # Triggered by cicd_listener.py
 
-PROJECT_DIR="/home/azureuser/voicenote-api"
+PROJECT_DIR="/home/azureuser/voicenote-project/VoiceNoteAPI"
 
 echo "========================================"
 echo "🚀 Deployment started at $(date)"
@@ -44,19 +44,9 @@ sudo docker compose up -d --no-build
 echo "⏳ Waiting for core services (db, redis, api) to be healthy..."
 for i in {1..60}; do
   DOCKER_STATUS=$(sudo docker compose ps --format json)
-  
-  # Handle cases where json format might not be supported or empty
-  if [ -z "$DOCKER_STATUS" ]; then
-      # Fallback to non-json if json format fails or is empty
-      DOCKER_STATUS=$(sudo docker compose ps)
-      DB_HEALTH=$(echo "$DOCKER_STATUS" | grep -c "db.*healthy")
-      REDIS_HEALTH=$(echo "$DOCKER_STATUS" | grep -c "redis.*healthy")
-      API_HEALTH=$(echo "$DOCKER_STATUS" | grep -c "api.*healthy")
-  else
-      DB_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"db"' | grep -c '"Health":"healthy"')
-      REDIS_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"redis"' | grep -c '"Health":"healthy"')
-      API_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"Health":"healthy"')
-  fi
+  DB_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"db"' | grep -c '"Health":"healthy"')
+  REDIS_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"redis"' | grep -c '"Health":"healthy"')
+  API_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"Health":"healthy"')
   
   echo "   Status ($i/60): DB=$DB_HEALTH, Redis=$REDIS_HEALTH, API=$API_HEALTH"
   
@@ -67,16 +57,10 @@ for i in {1..60}; do
   
   # If DB and Redis are healthy but API is not even running, try to force start it
   if [ "$DB_HEALTH" -eq 1 ] && [ "$REDIS_HEALTH" -eq 1 ]; then
-    if [ ! -z "$DOCKER_STATUS" ]; then
-        API_RUNNING=$(echo "$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"State":"running"')
-        if [ "$API_RUNNING" -eq 0 ] && [[ "$DOCKER_STATUS" != *"api"* || "$DOCKER_STATUS" == *"api"* && "$DOCKER_STATUS" != *"running"* ]]; then
-             API_RUNNING=$(echo "$DOCKER_STATUS" | grep -c "api.*running")
-        fi
-
-        if [ "$API_RUNNING" -eq 0 ]; then
-          echo "⚠️ API service not running but dependencies are healthy. Force starting API..."
-          sudo docker compose up -d api
-        fi
+    API_RUNNING=$(echo "$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"State":"running"')
+    if [ "$API_RUNNING" -eq 0 ]; then
+      echo "⚠️ API service not running but dependencies are healthy. Force starting API..."
+      sudo docker compose up -d api
     fi
   fi
   

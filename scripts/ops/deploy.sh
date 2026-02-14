@@ -7,7 +7,7 @@
 KEY_PATH="/home/basitdev/Downloads/voice_note_ai.pem"
 SERVER_USER="azureuser"
 SERVER_IP="4.240.96.60"
-REMOTE_DIR="/home/azureuser/voicenote-api"
+REMOTE_DIR="/home/azureuser/voicenote-project/VoiceNoteAPI"
 
 # Ensure strict permissions on the key (required by SSH)
 if [ -f "$KEY_PATH" ]; then
