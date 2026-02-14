@@ -270,6 +270,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    JLogger.error(
+        "Validation error",
+        path=request.url.path,
+        method=request.method,
+        errors=exc.errors(),
+        body=getattr(request, "_body", "Not read"),
+    )
     return JSONResponse(
         status_code=400,
         content={"detail": str(exc)},
