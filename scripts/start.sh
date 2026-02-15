@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Clean up any Python bytecode cache to prevent migration issues
-echo "Cleaning Python cache..."
+echo "[$(date)] Cleaning Python cache..."
 find /app/alembic -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 find /app/alembic -type f -name "*.pyc" -delete 2>/dev/null || true
 echo "Cache cleaned."
 
 # Run migrations with auto-recovery for squashed migrations
-echo "Running database migrations..."
+echo "[$(date)] Running database migrations..."
 
 # Capture both stdout and stderr
 ALEMBIC_LOG="/tmp/alembic_output.log"
@@ -73,7 +73,7 @@ rm -f /tmp/alembic_output.log
 
 # Start application
 echo "========================================="
-echo "Starting FastAPI application..."
+echo "[$(date)] Starting FastAPI application..."
 echo "========================================="
 
 # Detect if we should use reload or workers

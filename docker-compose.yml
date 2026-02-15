@@ -73,6 +73,8 @@ services:
       MINIO_ENDPOINT: "minio:9000"
       MINIO_ROOT_PASSWORD: "minioadmin"
       RATE_LIMIT_ENABLED: "false"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
     ports:
       - "8000:8000"
     depends_on:
@@ -89,10 +91,10 @@ services:
       - ./alembic.ini:/app/alembic.ini
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
-      interval: 10s
+      interval: 15s
       timeout: 5s
       retries: 10
-      start_period: 60s
+      start_period: 180s
     networks:
       - voicenote_network
     restart: unless-stopped
@@ -122,6 +124,8 @@ services:
       DEVICE_SECRET_KEY: "VN_SECURE_8f7d9a2b_2026"
       MINIO_ENDPOINT: "minio:9000"
       MINIO_ROOT_PASSWORD: "minioadmin"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
     depends_on:
       db:
         condition: service_healthy
