@@ -156,8 +156,11 @@ jobs:
             # Pull latest images
             sudo docker compose pull
             
-            # Start all services with fresh state
-            sudo docker compose up -d --no-build
+            # Start all services with fresh state (allow to fail gracefully)
+            sudo docker compose up -d --no-build || true
+            
+            # Give containers a moment to initialize
+            sleep 5
             
             # Robust targeted health check
             echo "Waiting for core services (db, redis, api) to be healthy..."
