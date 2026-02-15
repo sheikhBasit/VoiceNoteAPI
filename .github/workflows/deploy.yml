@@ -169,14 +169,14 @@ jobs:
               
               echo "   Status ($i/40): DB=$DB_HEALTH, Redis=$REDIS_HEALTH, API=$API_HEALTH (State=$API_STATE)"
               
-              if [ "$DB_HEALTH" = "healthy" ] && [ "$REDIS_HEALTH" = "healthy" ] && [ "$API_HEALTH" = "healthy" ]; then
+              if echo "$DB_HEALTH" | grep -q "healthy" && echo "$REDIS_HEALTH" | grep -q "healthy" && echo "$API_HEALTH" | grep -q "healthy"; then
                 echo "✅ All core services are healthy!"
                 break
               fi
               
               # Force restart API if dependencies are healthy but API is not running/restarting
-              if [ "$DB_HEALTH" = "healthy" ] && [ "$REDIS_HEALTH" = "healthy" ]; then
-                if [ "$API_STATE" != "running" ] && [ "$API_STATE" != "starting" ]; then
+              if echo "$DB_HEALTH" | grep -q "healthy" && echo "$REDIS_HEALTH" | grep -q "healthy"; then
+                if ! echo "$API_STATE" | grep -q "running" && ! echo "$API_STATE" | grep -q "starting"; then
                   echo "⚠️ API service in state '$API_STATE'. Force starting API..."
                   sudo docker compose up -d api
                 fi

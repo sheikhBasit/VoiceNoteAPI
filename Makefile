@@ -83,12 +83,12 @@ up:
 			REDIS_HEALTH=$$(docker inspect --format='{{.State.Health.Status}}' voicenote_redis 2>/dev/null || echo "not-found"); \
 			API_HEALTH=$$(docker inspect --format='{{.State.Health.Status}}' voicenote_api 2>/dev/null || echo "not-found"); \
 			API_STATE=$$(docker inspect --format='{{.State.Status}}' voicenote_api 2>/dev/null || echo "not-found"); \
-			if [ "$$DB_HEALTH" = "healthy" ] && [ "$$REDIS_HEALTH" = "healthy" ] && [ "$$API_HEALTH" = "healthy" ]; then \
+			if echo "$$DB_HEALTH" | grep -q "healthy" && echo "$$REDIS_HEALTH" | grep -q "healthy" && echo "$$API_HEALTH" | grep -q "healthy"; then \
 				echo "✅ All core services (DB, Redis, API) are healthy!"; \
 				break; \
 			fi; \
 			echo "   Waiting... ($$i/40) [DB:$$DB_HEALTH Redis:$$REDIS_HEALTH API:$$API_HEALTH (State:$$API_STATE)]"; \
-			if [ "$$DB_HEALTH" = "healthy" ] && [ "$$REDIS_HEALTH" = "healthy" ]; then \
+			if echo "$$DB_HEALTH" | grep -q "healthy" && echo "$$REDIS_HEALTH" | grep -q "healthy"; then \
 				if [ "$$API_STATE" != "running" ] && [ "$$API_STATE" != "starting" ]; then \
 					echo "⚠️ API not running. Force starting..."; \
 					$(COMPOSE) up -d api; \
@@ -116,12 +116,12 @@ restart:
 			REDIS_HEALTH=$$(docker inspect --format='{{.State.Health.Status}}' voicenote_redis 2>/dev/null || echo "not-found"); \
 			API_HEALTH=$$(docker inspect --format='{{.State.Health.Status}}' voicenote_api 2>/dev/null || echo "not-found"); \
 			API_STATE=$$(docker inspect --format='{{.State.Status}}' voicenote_api 2>/dev/null || echo "not-found"); \
-			if [ "$$DB_HEALTH" = "healthy" ] && [ "$$REDIS_HEALTH" = "healthy" ] && [ "$$API_HEALTH" = "healthy" ]; then \
+			if echo "$$DB_HEALTH" | grep -q "healthy" && echo "$$REDIS_HEALTH" | grep -q "healthy" && echo "$$API_HEALTH" | grep -q "healthy"; then \
 				echo "✅ All core services (DB, Redis, API) are healthy!"; \
 				break; \
 			fi; \
 			echo "   Waiting... ($$i/40) [DB:$$DB_HEALTH Redis:$$REDIS_HEALTH API:$$API_HEALTH (State:$$API_STATE)]"; \
-			if [ "$$DB_HEALTH" = "healthy" ] && [ "$$REDIS_HEALTH" = "healthy" ]; then \
+			if echo "$$DB_HEALTH" | grep -q "healthy" && echo "$$REDIS_HEALTH" | grep -q "healthy"; then \
 				if [ "$$API_STATE" != "running" ] && [ "$$API_STATE" != "starting" ]; then \
 					echo "⚠️ API not running. Force starting..."; \
 					$(COMPOSE) up -d api; \
