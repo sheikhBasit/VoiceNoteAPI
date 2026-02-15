@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
         from app.services.ai_service import AIService
         service = AIService()
         # Pre-load local embedding model (SentenceTransformer)
-        # service._get_local_embedding_model()
+        service._get_local_embedding_model()
         JLogger.info("Model warmup complete.")
     except Exception as e:
         JLogger.error(f"Startup warmup failed: {e}")
@@ -152,13 +152,14 @@ def custom_openapi():
             "type": "http",
             "scheme": "bearer",
             "bearerFormat": "JWT",
-            "description": "Enter your JWT token from /api/v1/users/sync",
+            "description": "Enter your JWT token from /api/v1/users/register or /api/v1/users/login",
         }
     }
 
     # Endpoints that do NOT require authentication
     public_endpoints = {
-        "/api/v1/users/sync": ["post"],
+        "/api/v1/users/register": ["post"],
+        "/api/v1/users/login": ["post"],
         "/api/v1/users/verify-device": ["get"],
         "/api/v1/users/request-device-auth": ["post"],
     }

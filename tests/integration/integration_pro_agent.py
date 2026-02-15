@@ -6,11 +6,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.db.models import Note, NoteStatus
-from app.worker.task import process_voice_note_pipeline
+from app.worker.task import note_process_pipeline
 
 # Mock constants
 TEST_AUDIO_SOURCE = (
-    "/home/basitdev/Me/StudioProjects/VoiceNoteAPI/tests/assets/ideal_quality.wav"
+    "/app/tests/assets/audio/ideal/clean_30s.wav"
 )
 
 
@@ -71,8 +71,8 @@ def test_pro_agent_pipeline_e2e(mock_ws, mock_session_local, mock_ai_service, mo
     user_role = "GENERIC"
 
     try:
-        # Execute pipeline
-        result = process_voice_note_pipeline(note_id, temp_upload, user_role)
+        # Execute pipeline (pass MagicMock() as self since it's a bound task)
+        result = note_process_pipeline(MagicMock(), note_id, temp_upload, user_role)
 
         # Assertions
         assert result["status"] == "success"

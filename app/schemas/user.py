@@ -35,6 +35,9 @@ class UserRegister(BaseModel):
     password: str
     name: str
     timezone: Optional[str] = "UTC"
+    device_id: Optional[str] = None
+    device_model: Optional[str] = None
+    token: Optional[str] = None  # Biometric/Device token
 
 class UserCreate(UserBase):
     id: Optional[str] = None

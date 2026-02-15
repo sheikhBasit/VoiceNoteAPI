@@ -40,33 +40,89 @@ class CompleteAPITester:
         print("AUTHENTICATION")
         print("="*80)
         
-        # User sync
-        res = self.client.post(f"{BASE_URL}/users/sync", json={
-            "id": self.test_user_id,
+        # 1. User Auth (Register -> Login)
+        user_payload = {
             "name": "Complete Test User",
             "email": f"{self.test_user_id}@test.com",
-            "token": "test_token",
+            "password": "testpassword123",
+            "timezone": "UTC"
+        }
+        
+        # Register
+        self.client.post(f"{BASE_URL}/users/register", json=user_payload)
+        
+        # Login
+        login_payload = {
+            "email": f"{self.test_user_id}@test.com",
+            "password": "testpassword123",
             "device_id": "test_device",
-            "device_model": "TestBot",
-            "primary_role": "DEVELOPER"
-        })
+            "device_model": "TestBot"
+        }
+        res = self.client.post(f"{BASE_URL}/users/login", json=login_payload)
+        
         if res.status_code == 200:
             self.user_token = res.json().get("access_token")
-        self.log("Auth", "/users/sync", "POST", res.status_code, res.status_code == 200)
+            # If not 200, we'll fail later
+        self.log("Auth", "/users/login", "POST", res.status_code, res.status_code == 200)
         
-        # Admin sync
-        res = self.client.post(f"{BASE_URL}/users/sync", json={
-            "id": "admin_user_001",
+        # 2. Admin Auth (Register -> Elevate -> Login)
+        admin_email = "admin_test_suite@voicenote.app"
+        admin_payload = {
             "name": "System Admin",
-            "email": "admin@voicenote.app",
-            "token": "admin_token_001",
+            "email": admin_email,
+            "password": "adminpassword123",
+            "timezone": "UTC"
+        }
+        
+        # Register (ignore if exists)
+        self.client.post(f"{BASE_URL}/users/register", json=admin_payload)
+        
+        # Elevate to Admin (Direct DB)
+        try:
+            from app.db.session import SessionLocal
+            from app.db import models
+            db = SessionLocal()
+            user = db.query(models.User).filter(models.User.email == admin_email).first()
+            if user:
+                user.is_admin = True
+                user.primary_role = models.UserRole.DEVELOPER
+                # Grant all permissions
+                user.admin_permissions = {
+                    "can_view_all_users": True,
+                    "can_manage_users": True,
+                    "can_delete_users": True,
+                    "can_manage_admins": True,
+                    "can_view_all_notes": True,
+                    "can_delete_notes": True,
+                    "can_moderate_content": True,
+                    "can_view_analytics": True,
+                    "can_export_data": True,
+                    "can_modify_system_settings": True,
+                    "can_manage_roles": True
+                }
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(user, "admin_permissions")
+                
+                db.commit()
+                print(f"✅ Elevated {admin_email} to ADMIN with FULL PERMISSIONS")
+            else:
+                print(f"⚠️ User {admin_email} NOT FOUND in DB")
+            db.close()
+        except Exception as e:
+            print(f"⚠️ Failed to elevate admin: {e}")
+
+        # Login
+        admin_login_payload = {
+            "email": admin_email,
+            "password": "adminpassword123",
             "device_id": "admin_device_001",
-            "device_model": "Server",
-            "primary_role": "GENERIC"
-        })
+            "device_model": "Server"
+        }
+        res = self.client.post(f"{BASE_URL}/users/login", json=admin_login_payload)
+        
         if res.status_code == 200:
             self.admin_token = res.json().get("access_token")
-        self.log("Auth", "/users/sync (Admin)", "POST", res.status_code, res.status_code == 200)
+        self.log("Auth", "/users/login (Admin)", "POST", res.status_code, res.status_code == 200)
 
     # ==================== USERS ====================
     def test_users(self):
@@ -228,6 +284,8 @@ class CompleteAPITester:
         
         # GET /notes
         res = self.client.get(f"{BASE_URL}/admin/notes", headers=headers)
+        if res.status_code != 200:
+            print(f"❌ /admin/notes FAILED: {res.text}")
         self.log("Admin", "/admin/notes", "GET", res.status_code, res.status_code == 200)
         
         # GET /admins

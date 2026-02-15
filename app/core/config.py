@@ -33,10 +33,12 @@ class AISettings(BaseSettings):
     # --- STORAGE SETTINGS (NEW) ---
     MINIO_ENDPOINT: str = Field(default="minio:9000", validation_alias="MINIO_ENDPOINT")
     MINIO_ACCESS_KEY: str = Field(
-        default="minioadmin", validation_alias="MINIO_ACCESS_KEY"
+        default="minioadmin", 
+        validation_alias="MINIO_ROOT_USER"  # Align with MinIO root user common env
     )
     MINIO_SECRET_KEY: str = Field(
-        default="minioadminpassword", validation_alias="MINIO_SECRET_KEY"
+        default="minioadmin", 
+        validation_alias="MINIO_ROOT_PASSWORD" # Align with MinIO root pass common env
     )
     MINIO_BUCKET_NAME: str = Field(
         default="incoming", validation_alias="MINIO_BUCKET_NAME"

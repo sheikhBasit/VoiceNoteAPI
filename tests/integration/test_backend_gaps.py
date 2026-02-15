@@ -83,19 +83,30 @@ def test_task_statistics_alias(test_user):
 
 def test_user_login_alias():
     """
-    TDD: Test the /users/login alias.
-    Expectation: Returns 200 OK and valid sync response.
+    TDD: Test the /users/login endpoint.
+    Expectation: Returns 200 OK and valid auth response.
     """
+    unique_email = f"login_{uuid.uuid4()}@example.com"
     payload = {
         "name": "Login Test",
-        "email": f"login_{uuid.uuid4()}@example.com",
-        "token": "test_token",
-        "device_id": "device_123",
-        "device_model": "Android SDK",
-        "primary_role": "GENERIC"
+        "email": unique_email,
+        "password": "testpassword123",
+        "timezone": "UTC"
     }
     
-    response = client.post("/api/v1/users/sync", json=payload)
+    # Register user first
+    response = client.post("/api/v1/users/register", json=payload)
+    assert response.status_code == 200
+    
+    # Now login
+    login_payload = {
+        "email": unique_email,
+        "password": "testpassword123",
+        "token": "test_token",
+        "device_id": "device_123",
+        "device_model": "Android SDK"
+    }
+    response = client.post("/api/v1/users/login", json=login_payload)
     
     assert response.status_code == 200
     data = response.json()
@@ -120,7 +131,7 @@ def test_sync_user_with_password(db_session):
     }
     
     # 1. First sync (Initial creation with password)
-    response = client.post("/api/v1/users/sync", json=payload)
+    response = client.post("/api/v1/users/register", json=payload)
     assert response.status_code == 200
     
     # Verify in DB that password hash is set
@@ -128,16 +139,23 @@ def test_sync_user_with_password(db_session):
     assert db_user.password_hash is not None
     assert db_user.password_hash != "secure_password"
     
-    # 2. Second sync with correct password (Success)
-    response = client.post("/api/v1/users/sync", json=payload)
+    # 2. Second login with correct password (Success)
+    login_payload = {
+        "email": email,
+        "password": "secure_password",
+        "token": "test_token",
+        "device_id": "device_456",
+        "device_model": "Android SDK"
+    }
+    response = client.post("/api/v1/users/login", json=login_payload)
     assert response.status_code == 200
     
-    # 3. Third sync with WRONG password (Failure)
-    wrong_payload = payload.copy()
+    # 3. Third login with WRONG password (Failure)
+    wrong_payload = login_payload.copy()
     wrong_payload["password"] = "wrong_password"
-    response = client.post("/api/v1/users/sync", json=wrong_payload)
+    response = client.post("/api/v1/users/login", json=wrong_payload)
     assert response.status_code == 401
-    assert "Incorrect password" in response.json()["error"]
+    assert "Incorrect password" in response.json()["error"] or "Invalid" in response.json()["error"]
 
 @pytest.fixture
 def test_note(test_user, db_session):

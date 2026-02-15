@@ -67,25 +67,34 @@ def test_audio_file():
 def authenticated_user():
     """Use pre-seeded test admin user for authentication."""
     # Use the test admin user from seed.sql
-    test_admin_email = "pytest-admin@voicenote.test"
+    # User a unique admin user for each run to avoid device auth conflicts
+    test_admin_email = f"pytest-admin-{uuid.uuid4()}@voicenote.test"
 
-    # Sync with the test admin user to get a valid token
-    response = requests.post(
-        f"{BASE_URL.replace('/api/v1', '')}/api/v1/users/sync",
+    # 1. Register
+    reg_response = requests.post(
+        f"{BASE_URL.replace('/api/v1', '')}/api/v1/users/register",
         json={
             "name": "Pytest Test Admin",
             "email": test_admin_email,
-            "token": "pytest_test_token",
+            "password": "testpassword123",
+            "timezone": "UTC",
+        },
+    )
+    
+    # 2. Login to get token
+    response = requests.post(
+        f"{BASE_URL.replace('/api/v1', '')}/api/v1/users/login",
+        json={
+            "email": test_admin_email,
+            "password": "testpassword123",
             "device_id": "pytest_device_admin",
             "device_model": "pytest",
-            "primary_role": "DEVELOPER",
-            "timezone": "UTC",
         },
     )
 
     if response.status_code != 200:
         pytest.fail(
-            f"Failed to sync with test admin: {response.status_code} - {response.text}"
+            f"Failed to login with test admin: {response.status_code} - {response.text}"
         )
 
     data = response.json()
@@ -218,11 +227,47 @@ class TestMinIOArchitecture:
         process_data = process_response.json()
         assert "status" in process_data or "note_id" in process_data
 
-        return presigned_data["note_id"]
 
     def test_processing_completion(self, authenticated_user, test_audio_file):
         """Test that processing completes successfully."""
-        note_id = self.test_storage_key_processing(authenticated_user, test_audio_file)
+        # Step 1: Get pre-signed URL
+        presigned_response = requests.get(
+            f"{BASE_URL}/notes/presigned-url", headers=authenticated_user["headers"]
+        )
+        assert presigned_response.status_code == 200
+        presigned_data = presigned_response.json()
+
+        # Step 2: Upload to MinIO
+        upload_url = presigned_data["upload_url"]
+        if "minio:9000" in upload_url:
+            upload_url = upload_url.replace(
+                "minio:9000", MINIO_URL.replace("http://", "")
+            )
+
+        with open(test_audio_file, "rb") as f:
+            upload_response = requests.put(upload_url, data=f)
+        assert upload_response.status_code == 200
+
+        # Step 3: Trigger processing
+        process_response = requests.post(
+            f"{BASE_URL}/notes/process",
+            headers=authenticated_user["headers"],
+            data={
+                "storage_key": presigned_data["storage_key"],
+                "note_id_override": presigned_data["note_id"],
+                "stt_model": "nova",
+            },
+        )
+
+        # Accept both 202 (success) and 429 (rate limit)
+        assert process_response.status_code in [
+            202,
+            429,
+        ], f"Unexpected status: {process_response.status_code}"
+        if process_response.status_code == 429:
+            pytest.skip("Rate limit hit, skipping test")
+
+        note_id = presigned_data["note_id"]
 
         # Poll for completion
         max_retries = 30

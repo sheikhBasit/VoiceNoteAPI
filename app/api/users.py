@@ -64,10 +64,11 @@ def register_user(
     import uuid
     new_user_id = str(uuid.uuid4())
     
-    # Initialize basic device info (for session tracking, though not strict auth anymore)
-    user_agent = request.headers.get("User-Agent", "Unknown")
+    # Initialize authorized devices list
     initial_device = {
-        "device_model": user_agent,
+        "device_id": user_data.device_id,
+        "device_model": user_data.device_model or request.headers.get("User-Agent", "Unknown"),
+        "biometric_token": user_data.token,
         "authorized_at": int(time.time() * 1000),
         "login_method": "password"
     }
@@ -149,7 +150,6 @@ def login_user(
     }
 
 
-@router.post("/sync", response_model=user_schema.SyncResponse)
 @router.post("/login", response_model=user_schema.SyncResponse)
 @limiter.limit("20/minute")  # Stricter limit for auth
 def sync_user(

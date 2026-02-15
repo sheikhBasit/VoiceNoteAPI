@@ -36,8 +36,7 @@ class FolderResponse(BaseModel):
     updated_at: int
     note_count: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # --- Endpoints ---
@@ -181,7 +180,7 @@ def delete_folder(
 
     # Unlink notes (Set folder_id to NULL)
     db.query(models.Note).filter(models.Note.folder_id == folder_id).update(
-        {"folder_id": None}
+        {"folder_id": None}, synchronize_session="fetch"
     )
 
     db.delete(folder)

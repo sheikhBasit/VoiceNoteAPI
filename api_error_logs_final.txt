@@ -1,0 +1,201 @@
+Attaching to voicenote_api
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:05.963931+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:06.078064+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:06.125422+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_958312ad", "restored_by": "test_complete_958312ad"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:06.129176+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_958312ad", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "PATCH /api/v1/users/test_complete_958312ad/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:06.182301+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user fac44906-8c0b-4817-b174-aeaed38b0b8d", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/admin/status HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/admin/users HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/admin/users/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:06.898715+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Middleware critical failure", "filename": "usage.py", "funcName": "dispatch", "lineno": 145, "pathname": "/app/app/api/middleware/usage.py", "error": "[TypeError('cannot convert dictionary update sequence element #0 to a sequence'), TypeError('vars() argument must have __dict__ attribute')]"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/admin/notes HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/admin/admins HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m 🛡️ Admin Action Log: UPDATE_AI_SETTINGS by dc693fdf-f4a3-4019-9000-9fa86fd80548 on GLOBAL_SYSTEM_SETTINGS
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "POST /api/v1/admin/users/test_complete_958312ad/make-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:44674 - "POST /api/v1/admin/users/test_complete_958312ad/remove-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:44.356076+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:44.465006+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:44.511745+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_72fb7728", "restored_by": "test_complete_72fb7728"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:44.514233+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_72fb7728", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "PATCH /api/v1/users/test_complete_72fb7728/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:44.562908+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user e985d730-361e-46fd-b41e-05ee220fe7d5", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/admin/status HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/admin/users HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/admin/users/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:22:45.250240+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Middleware critical failure", "filename": "usage.py", "funcName": "dispatch", "lineno": 145, "pathname": "/app/app/api/middleware/usage.py", "error": "[TypeError('cannot convert dictionary update sequence element #0 to a sequence'), TypeError('vars() argument must have __dict__ attribute')]"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/admin/notes HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/admin/admins HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m 🛡️ Admin Action Log: UPDATE_AI_SETTINGS by dc693fdf-f4a3-4019-9000-9fa86fd80548 on GLOBAL_SYSTEM_SETTINGS
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "POST /api/v1/admin/users/test_complete_72fb7728/make-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:38402 - "POST /api/v1/admin/users/test_complete_72fb7728/remove-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:23:17.643251+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:23:17.748698+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:23:17.795298+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_e53fc946", "restored_by": "test_complete_e53fc946"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:23:17.798032+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_e53fc946", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "PATCH /api/v1/users/test_complete_e53fc946/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:23:17.848031+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user 96324c1f-a181-4568-bbda-788c3d855d15", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/admin/status HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/admin/users HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/admin/users/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:23:18.546413+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Middleware critical failure", "filename": "usage.py", "funcName": "dispatch", "lineno": 145, "pathname": "/app/app/api/middleware/usage.py", "error": "[TypeError('cannot convert dictionary update sequence element #0 to a sequence'), TypeError('vars() argument must have __dict__ attribute')]"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/admin/notes HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/admin/admins HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m 🛡️ Admin Action Log: UPDATE_AI_SETTINGS by dc693fdf-f4a3-4019-9000-9fa86fd80548 on GLOBAL_SYSTEM_SETTINGS
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "POST /api/v1/admin/users/test_complete_e53fc946/make-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33652 - "POST /api/v1/admin/users/test_complete_e53fc946/remove-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:09.647838+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:09.757928+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:09.804769+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_4d721f2a", "restored_by": "test_complete_4d721f2a"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:09.807236+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_4d721f2a", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "PATCH /api/v1/users/test_complete_4d721f2a/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:09.856512+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user fb57b236-8961-4dde-9925-fdc33f0d71ef", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/admin/status HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/admin/users HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/admin/users/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:10.519784+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Middleware critical failure", "filename": "usage.py", "funcName": "dispatch", "lineno": 145, "pathname": "/app/app/api/middleware/usage.py", "error": "[TypeError('cannot convert dictionary update sequence element #0 to a sequence'), TypeError('vars() argument must have __dict__ attribute')]"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/admin/notes HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/admin/admins HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m 🛡️ Admin Action Log: UPDATE_AI_SETTINGS by dc693fdf-f4a3-4019-9000-9fa86fd80548 on GLOBAL_SYSTEM_SETTINGS
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "POST /api/v1/admin/users/test_complete_4d721f2a/make-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:39350 - "POST /api/v1/admin/users/test_complete_4d721f2a/remove-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:45.495745+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:45.602667+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:45.647771+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_4fb1df7a", "restored_by": "test_complete_4fb1df7a"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:45.650173+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_4fb1df7a", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "PATCH /api/v1/users/test_complete_4fb1df7a/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:45.699313+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user 29fd59a4-3b5e-40db-8770-cad95239b4f9", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/admin/status HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/admin/users HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/admin/users/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:24:46.401493+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Middleware critical failure", "filename": "usage.py", "funcName": "dispatch", "lineno": 145, "pathname": "/app/app/api/middleware/usage.py", "error": "[TypeError('cannot convert dictionary update sequence element #0 to a sequence'), TypeError('vars() argument must have __dict__ attribute')]"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/admin/notes HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/admin/admins HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m 🛡️ Admin Action Log: UPDATE_AI_SETTINGS by dc693fdf-f4a3-4019-9000-9fa86fd80548 on GLOBAL_SYSTEM_SETTINGS
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "POST /api/v1/admin/users/test_complete_4fb1df7a/make-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:43972 - "POST /api/v1/admin/users/test_complete_4fb1df7a/remove-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:26:59.395934+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:26:59.503745+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:26:59.549710+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_29b09fb6", "restored_by": "test_complete_29b09fb6"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:26:59.552750+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_29b09fb6", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "PATCH /api/v1/users/test_complete_29b09fb6/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:26:59.602091+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user 5197ec02-d895-4a66-8f2a-d1ca807e4de2", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/admin/status HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/admin/users HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/admin/users/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:27:00.341405+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Middleware critical failure", "filename": "usage.py", "funcName": "dispatch", "lineno": 145, "pathname": "/app/app/api/middleware/usage.py", "error": "[TypeError('cannot convert dictionary update sequence element #0 to a sequence'), TypeError('vars() argument must have __dict__ attribute')]"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/admin/notes HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/admin/admins HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m 🛡️ Admin Action Log: UPDATE_AI_SETTINGS by dc693fdf-f4a3-4019-9000-9fa86fd80548 on GLOBAL_SYSTEM_SETTINGS
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "POST /api/v1/admin/users/test_complete_29b09fb6/make-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:41676 - "POST /api/v1/admin/users/test_complete_29b09fb6/remove-admin HTTP/1.1" 400 Bad Request

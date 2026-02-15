@@ -105,8 +105,8 @@ class TestAdminUpdates:
         assert patch_resp.json()["name"] == "Updated By Admin"
 
         # Verify in DB
-        db_session.refresh(db_session.query(models.User).get(target_id))
-        assert db_session.query(models.User).get(target_id).name == "Updated By Admin"
+        db_session.refresh(db_session.get(models.User, target_id))
+        assert db_session.get(models.User, target_id).name == "Updated By Admin"
 
 
 class TestNotesRestoration:

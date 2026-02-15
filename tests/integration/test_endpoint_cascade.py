@@ -81,7 +81,7 @@ def client(db_session):
         user_id = request.headers.get("X-Test-User-ID")
         if user_id:
             # Simple mock of user object
-            return db_session.query(models.User).get(user_id)
+            return db_session.get(models.User, user_id)
         raise HTTPException(status_code=401, detail="Test Auth Required")
 
     app.dependency_overrides[get_db] = override_get_db
@@ -122,9 +122,9 @@ class TestEndpointCascadeIntegration:
 
         # 3. Verify Cascade
         db_session.expire_all()
-        user_db = db_session.query(models.User).get(user_id)
-        note_db = db_session.query(models.Note).get(note_id)
-        task_db = db_session.query(models.Task).get(task_id)
+        user_db = db_session.get(models.User, user_id)
+        note_db = db_session.get(models.Note, note_id)
+        task_db = db_session.get(models.Task, task_id)
 
         assert user_db.is_deleted is True
         assert note_db.is_deleted is True
@@ -156,8 +156,8 @@ class TestEndpointCascadeIntegration:
 
         # 3. Verify
         db_session.expire_all()
-        note_db = db_session.query(models.Note).get(note_id)
-        task_db = db_session.query(models.Task).get(task1_id)
+        note_db = db_session.get(models.Note, note_id)
+        task_db = db_session.get(models.Task, task1_id)
 
         assert note_db.is_deleted is True
         assert task_db.is_deleted is True
@@ -181,7 +181,7 @@ class TestEndpointCascadeIntegration:
 
         # 3. Verify
         db_session.expire_all()
-        user_db = db_session.query(models.User).get(user_id)
+        user_db = db_session.get(models.User, user_id)
         assert user_db.is_deleted is False
         assert (
             db_session.query(models.Note)

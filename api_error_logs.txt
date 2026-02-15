@@ -1,0 +1,1001 @@
+Attaching to voicenote_api
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53196 - "GET /api/v1/tasks/4284eafa-6105-48aa-b271-890d23ed2f31 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:39:44.003905+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Note soft-deleted", "filename": "note_service.py", "funcName": "soft_delete_note", "lineno": 238, "pathname": "/app/app/services/note_service.py", "note_id": "af3c10d2-e1bf-4f9b-b241-f3a3dbf7d000", "user_id": "160f3e20-2ab3-4f37-b0cc-14036a57f408"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53202 - "DELETE /api/v1/notes/af3c10d2-e1bf-4f9b-b241-f3a3dbf7d000 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53212 - "GET /api/v1/tasks/4284eafa-6105-48aa-b271-890d23ed2f31 HTTP/1.1" 404 Not Found
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:39:44.095343+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Team created", "filename": "teams.py", "funcName": "create_team", "lineno": 38, "pathname": "/app/app/api/teams.py", "team_id": "4e8f65dd-1cad-4712-a750-99e9a2d5ffaa", "owner_id": "160f3e20-2ab3-4f37-b0cc-14036a57f408"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53214 - "POST /api/v1/teams?name=TestTeam HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:39:44.148957+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Member added to team", "filename": "teams.py", "funcName": "add_team_member", "lineno": 97, "pathname": "/app/app/api/teams.py", "team_id": "4e8f65dd-1cad-4712-a750-99e9a2d5ffaa", "user_id": "d43ecc4e-1686-473a-943b-54d6d658456c"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53216 - "POST /api/v1/teams/4e8f65dd-1cad-4712-a750-99e9a2d5ffaa/members?user_email=u2_20260215_163927@test.com HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53230 - "GET /api/v1/teams HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53234 - "DELETE /api/v1/teams/4e8f65dd-1cad-4712-a750-99e9a2d5ffaa HTTP/1.1" 404 Not Found
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53244 - "GET /api/v1/teams HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53260 - "GET /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53272 - "POST /api/v1/ai/search HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53280 - "GET /api/v1/sse HTTP/1.1" 404 Not Found
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53282 - "GET /api/v1/admin/users/stats HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53292 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53296 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53310 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53326 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53334 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53344 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53352 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53354 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53362 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53368 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53382 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53388 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53394 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53406 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53412 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53420 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53424 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53436 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53444 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53452 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53454 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53466 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53478 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53482 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53490 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53494 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53508 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53520 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53536 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53550 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53576 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53566 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53572 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53588 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53708 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53628 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53684 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53616 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53630 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53600 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53670 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53644 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53656 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53722 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53698 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53760 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53732 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53800 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53768 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53744 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53798 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53814 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53790 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53774 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53824 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:39:45.571480+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting soft delete user", "filename": "deletion_service.py", "funcName": "soft_delete_user", "lineno": 47, "pathname": "/app/app/services/deletion_service.py", "user_id": "d43ecc4e-1686-473a-943b-54d6d658456c", "deleted_by": "d43ecc4e-1686-473a-943b-54d6d658456c"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:39:45.609339+00:00", "level": "INFO", "logger": "VoiceNote", "message": "User soft deleted successfully", "filename": "deletion_service.py", "funcName": "soft_delete_user", "lineno": 131, "pathname": "/app/app/services/deletion_service.py", "user_id": "d43ecc4e-1686-473a-943b-54d6d658456c", "notes_deleted": 0, "tasks_deleted": 0}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:39:45.610211+00:00", "level": "INFO", "logger": "VoiceNote", "message": "User account deleted (soft)", "filename": "users.py", "funcName": "delete_user_account", "lineno": 550, "pathname": "/app/app/api/users.py", "user_id": "d43ecc4e-1686-473a-943b-54d6d658456c"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53832 - "DELETE /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:53844 - "GET /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:48866 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:48878 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:48886 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:30.699864+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "172.18.0.1"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:48898 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:30.748305+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Folder created", "filename": "folders.py", "funcName": "create_folder", "lineno": 80, "pathname": "/app/app/api/folders.py", "folder_id": "380af877-4f4f-47e2-bc80-b0676671f906", "user_id": "31ad702f-a937-4c78-ac18-6f0c5fd82d18"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:48910 - "POST /api/v1/folders HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:30.790017+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user 31ad702f-a937-4c78-ac18-6f0c5fd82d18", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:48912 - "POST /api/v1/notes/create HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:30.877097+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Folder deleted", "filename": "folders.py", "funcName": "delete_folder", "lineno": 190, "pathname": "/app/app/api/folders.py", "folder_id": "380af877-4f4f-47e2-bc80-b0676671f906", "user_id": "31ad702f-a937-4c78-ac18-6f0c5fd82d18"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:48914 - "DELETE /api/v1/folders/380af877-4f4f-47e2-bc80-b0676671f906 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51658 - "GET /api/v1/notes/2109e2ff-d955-427a-b9c2-257e8669c5c3 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51666 - "POST /api/v1/notes/create HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:32.109836+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Task created manually", "filename": "tasks.py", "funcName": "create_task", "lineno": 105, "pathname": "/app/app/api/tasks.py", "task_id": "eb881b43-5761-4eb8-b165-0c365a3da139", "user_id": "31ad702f-a937-4c78-ac18-6f0c5fd82d18", "note_id": "0be1e1aa-0d9d-47b7-92c8-26ef1e753047"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51678 - "POST /api/v1/tasks HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51682 - "PATCH /api/v1/tasks/eb881b43-5761-4eb8-b165-0c365a3da139/complete HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51690 - "GET /api/v1/tasks/eb881b43-5761-4eb8-b165-0c365a3da139 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:32.313865+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Note soft-deleted", "filename": "note_service.py", "funcName": "soft_delete_note", "lineno": 238, "pathname": "/app/app/services/note_service.py", "note_id": "0be1e1aa-0d9d-47b7-92c8-26ef1e753047", "user_id": "31ad702f-a937-4c78-ac18-6f0c5fd82d18"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51706 - "DELETE /api/v1/notes/0be1e1aa-0d9d-47b7-92c8-26ef1e753047 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51716 - "GET /api/v1/tasks/eb881b43-5761-4eb8-b165-0c365a3da139 HTTP/1.1" 404 Not Found
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:32.412724+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Team created", "filename": "teams.py", "funcName": "create_team", "lineno": 38, "pathname": "/app/app/api/teams.py", "team_id": "52e1c964-c28a-444b-ae73-e2a6db36dfe6", "owner_id": "31ad702f-a937-4c78-ac18-6f0c5fd82d18"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51726 - "POST /api/v1/teams?name=TestTeam HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:32.468833+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Member added to team", "filename": "teams.py", "funcName": "add_team_member", "lineno": 97, "pathname": "/app/app/api/teams.py", "team_id": "52e1c964-c28a-444b-ae73-e2a6db36dfe6", "user_id": "5f997e64-ae3b-4890-a283-3d07bcee1087"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51736 - "POST /api/v1/teams/52e1c964-c28a-444b-ae73-e2a6db36dfe6/members?user_email=u2_20260215_164015@test.com HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51742 - "GET /api/v1/teams HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51756 - "DELETE /api/v1/teams/52e1c964-c28a-444b-ae73-e2a6db36dfe6 HTTP/1.1" 404 Not Found
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51770 - "GET /api/v1/teams HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51782 - "GET /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51794 - "POST /api/v1/ai/search HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51796 - "GET /api/v1/sse HTTP/1.1" 404 Not Found
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51812 - "GET /api/v1/admin/users/stats HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51814 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51826 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51842 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51858 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51868 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51880 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51890 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51900 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51902 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51912 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51928 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51934 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51940 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51948 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51964 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51972 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51984 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51988 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:51998 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52000 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52002 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52018 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52024 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52030 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52040 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52048 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52062 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52074 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52084 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52100 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52110 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52122 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52104 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52134 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52180 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52168 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52144 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52198 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52162 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52150 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52212 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52196 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52164 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52222 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52214 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52228 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52226 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52256 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52264 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52282 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52280 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52288 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52298 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52294 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52314 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:33.903811+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting soft delete user", "filename": "deletion_service.py", "funcName": "soft_delete_user", "lineno": 47, "pathname": "/app/app/services/deletion_service.py", "user_id": "5f997e64-ae3b-4890-a283-3d07bcee1087", "deleted_by": "5f997e64-ae3b-4890-a283-3d07bcee1087"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:33.949391+00:00", "level": "INFO", "logger": "VoiceNote", "message": "User soft deleted successfully", "filename": "deletion_service.py", "funcName": "soft_delete_user", "lineno": 131, "pathname": "/app/app/services/deletion_service.py", "user_id": "5f997e64-ae3b-4890-a283-3d07bcee1087", "notes_deleted": 0, "tasks_deleted": 0}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:40:33.949992+00:00", "level": "INFO", "logger": "VoiceNote", "message": "User account deleted (soft)", "filename": "users.py", "funcName": "delete_user_account", "lineno": 550, "pathname": "/app/app/api/users.py", "user_id": "5f997e64-ae3b-4890-a283-3d07bcee1087"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52322 - "DELETE /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:52332 - "GET /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54630 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54634 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54648 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:35.811841+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "172.18.0.1"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54662 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:35.867174+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Folder created", "filename": "folders.py", "funcName": "create_folder", "lineno": 80, "pathname": "/app/app/api/folders.py", "folder_id": "e975715c-c1b4-4147-8c04-02ace037d283", "user_id": "9cd3ddc1-579c-4ff6-afe6-4bbb33bab41b"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54670 - "POST /api/v1/folders HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:35.916277+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user 9cd3ddc1-579c-4ff6-afe6-4bbb33bab41b", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54684 - "POST /api/v1/notes/create HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:36.031492+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Folder deleted", "filename": "folders.py", "funcName": "delete_folder", "lineno": 190, "pathname": "/app/app/api/folders.py", "folder_id": "e975715c-c1b4-4147-8c04-02ace037d283", "user_id": "9cd3ddc1-579c-4ff6-afe6-4bbb33bab41b"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54692 - "DELETE /api/v1/folders/e975715c-c1b4-4147-8c04-02ace037d283 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54708 - "GET /api/v1/notes/ce26ce77-98b7-473a-ad85-8c60e5c924d4 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54718 - "POST /api/v1/notes/create HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:37.295185+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Task created manually", "filename": "tasks.py", "funcName": "create_task", "lineno": 105, "pathname": "/app/app/api/tasks.py", "task_id": "7181c32b-abe8-4dbd-9d77-cf7b7158f2c9", "user_id": "9cd3ddc1-579c-4ff6-afe6-4bbb33bab41b", "note_id": "e450d2de-6a2a-4cb0-9bed-bec831bc58b3"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54732 - "POST /api/v1/tasks HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54742 - "PATCH /api/v1/tasks/7181c32b-abe8-4dbd-9d77-cf7b7158f2c9/complete HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54746 - "GET /api/v1/tasks/7181c32b-abe8-4dbd-9d77-cf7b7158f2c9 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:37.431447+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Note soft-deleted", "filename": "note_service.py", "funcName": "soft_delete_note", "lineno": 238, "pathname": "/app/app/services/note_service.py", "note_id": "e450d2de-6a2a-4cb0-9bed-bec831bc58b3", "user_id": "9cd3ddc1-579c-4ff6-afe6-4bbb33bab41b"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54750 - "DELETE /api/v1/notes/e450d2de-6a2a-4cb0-9bed-bec831bc58b3 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54764 - "GET /api/v1/tasks/7181c32b-abe8-4dbd-9d77-cf7b7158f2c9 HTTP/1.1" 404 Not Found
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:37.514778+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Team created", "filename": "teams.py", "funcName": "create_team", "lineno": 38, "pathname": "/app/app/api/teams.py", "team_id": "cbb14acb-bba0-4011-908b-218541ae6304", "owner_id": "9cd3ddc1-579c-4ff6-afe6-4bbb33bab41b"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54774 - "POST /api/v1/teams?name=TestTeam HTTP/1.1" 201 Created
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:37.568637+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Member added to team", "filename": "teams.py", "funcName": "add_team_member", "lineno": 97, "pathname": "/app/app/api/teams.py", "team_id": "cbb14acb-bba0-4011-908b-218541ae6304", "user_id": "245c0ecb-cdc9-4b9a-8cd0-fa5190395212"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54782 - "POST /api/v1/teams/cbb14acb-bba0-4011-908b-218541ae6304/members?user_email=u2_20260215_164220@test.com HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54796 - "GET /api/v1/teams HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54798 - "DELETE /api/v1/teams/cbb14acb-bba0-4011-908b-218541ae6304 HTTP/1.1" 404 Not Found
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54806 - "GET /api/v1/teams HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54820 - "GET /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54834 - "POST /api/v1/ai/search HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54846 - "GET /api/v1/sse HTTP/1.1" 404 Not Found
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54858 - "GET /api/v1/admin/users/stats HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54870 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54884 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54896 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54908 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54918 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54928 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54936 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54942 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54958 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54966 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54974 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54976 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:54992 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55006 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55012 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55016 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55024 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55030 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55036 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55046 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55058 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55064 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55076 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55084 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55098 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55114 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55128 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55142 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55146 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55154 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55178 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55168 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55194 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55206 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55208 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55196 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55288 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55224 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55256 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55236 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55266 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55298 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55242 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55276 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55258 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55346 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55300 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55336 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55318 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55360 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55368 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55370 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55334 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55364 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55302 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:38.942815+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting soft delete user", "filename": "deletion_service.py", "funcName": "soft_delete_user", "lineno": 47, "pathname": "/app/app/services/deletion_service.py", "user_id": "245c0ecb-cdc9-4b9a-8cd0-fa5190395212", "deleted_by": "245c0ecb-cdc9-4b9a-8cd0-fa5190395212"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:38.961137+00:00", "level": "INFO", "logger": "VoiceNote", "message": "User soft deleted successfully", "filename": "deletion_service.py", "funcName": "soft_delete_user", "lineno": 131, "pathname": "/app/app/services/deletion_service.py", "user_id": "245c0ecb-cdc9-4b9a-8cd0-fa5190395212", "notes_deleted": 0, "tasks_deleted": 0}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T11:42:38.961345+00:00", "level": "INFO", "logger": "VoiceNote", "message": "User account deleted (soft)", "filename": "users.py", "funcName": "delete_user_account", "lineno": 550, "pathname": "/app/app/api/users.py", "user_id": "245c0ecb-cdc9-4b9a-8cd0-fa5190395212"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55376 - "DELETE /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55382 - "GET /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33710 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:06:32.878067+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A1538D039CE, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/4bc74fe7-2034-4e22-8e6e-a90416bcd1c8.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33726 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:06:33.198212+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A154CAC215E, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/340f1fca-20bd-4f2a-b3e2-78d4f2ee1030.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33734 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:06:33.428939+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A155A1B9A35, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/16d597f2-81e4-4fb5-b382-61f3034f6810.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33736 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:06:33.566757+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A15630A200A, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/940b23d9-184f-477e-ac2a-e16343c8aa0e.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33744 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:06:33.618792+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A1566F2E514, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/9660eb26-2059-41f3-9cbb-667cdd83e188.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33752 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33756 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33772 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33784 - "POST /api/v1/notes/process HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33788 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40692 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:07:14.716180+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A1EF86F8649, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/0abc6502-07de-486c-b111-7ac17b28baa1.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40708 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:07:14.846225+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A1F00464B7E, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/105cbb54-0db1-4164-94e6-834be2baf916.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40710 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:07:14.949886+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A1F06705707, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/a19f62d7-37ed-4819-8710-ab2e1608f88b.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40720 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:07:14.995098+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A1F09297C16, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/f02d81be-90d3-4b9c-ad1b-b2b53bc8921c.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40726 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:07:15.036929+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A1F0BA3926F, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/58a0fdb2-2e7b-4494-b92b-ec44f7e79eac.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40734 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40742 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40744 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40746 - "POST /api/v1/notes/process HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40760 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40790 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:08:34.307224+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A318089CE66, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/e38589f7-1868-4ece-a5b5-6c4e9d8a38ce.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40804 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:08:34.423525+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A318773D376, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/6937bd01-9fd3-4645-9016-94180faa9bde.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40808 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:08:34.528531+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A318DBCE295, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/628c68ea-7ffc-472d-8398-c815a6131564.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40814 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:08:34.564953+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A318FE1497F, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/88f66149-201b-417d-bb6f-2cc46a646ea5.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40830 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:08:34.606276+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to generate pre-signed URL", "filename": "storage_service.py", "funcName": "generate_presigned_put_url", "lineno": 27, "pathname": "/app/app/services/storage_service.py", "error": "S3 operation failed; code: SignatureDoesNotMatch, message: The request signature we calculated does not match the signature you provided. Check your key and signing method., resource: /incoming, request_id: 18946A31925D433C, host_id: dd9025bab4ad464b049177c95eb6ebf374d3b3fd1af9251148b658df7ac2e3e8, bucket_name: incoming", "object_name": "9ade7bb4-cb98-496c-9646-a97c785b83e5/72b5361d-c55c-4236-b1da-ffbf444d966c.wav"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40842 - "GET /api/v1/notes/presigned-url HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40856 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40864 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40874 - "POST /api/v1/notes/process HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40890 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     Received SIGTERM, exiting.
+[36mvoicenote_api    |[0m INFO:     Terminated child process [27]
+[36mvoicenote_api    |[0m INFO:     Terminated child process [28]
+[36mvoicenote_api    |[0m INFO:     Terminated child process [29]
+[36mvoicenote_api    |[0m INFO:     Terminated child process [30]
+[36mvoicenote_api    |[0m INFO:     Waiting for child process [27]
+[36mvoicenote_api    |[0m INFO:     Shutting down
+[36mvoicenote_api    |[0m INFO:     Shutting down
+[36mvoicenote_api    |[0m INFO:     Shutting down
+[36mvoicenote_api    |[0m INFO:     Shutting down
+[36mvoicenote_api    |[0m INFO:     Waiting for application shutdown.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:02.522675+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Application shutting down...", "filename": "main.py", "funcName": "lifespan", "lineno": 72, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Application shutdown complete.
+[36mvoicenote_api    |[0m INFO:     Finished server process [30]
+[36mvoicenote_api    |[0m INFO:     Waiting for application shutdown.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:02.558533+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Application shutting down...", "filename": "main.py", "funcName": "lifespan", "lineno": 72, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Application shutdown complete.
+[36mvoicenote_api    |[0m INFO:     Waiting for application shutdown.
+[36mvoicenote_api    |[0m INFO:     Waiting for application shutdown.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:02.587335+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Application shutting down...", "filename": "main.py", "funcName": "lifespan", "lineno": 72, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Finished server process [28]
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:02.591331+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Application shutting down...", "filename": "main.py", "funcName": "lifespan", "lineno": 72, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Application shutdown complete.
+[36mvoicenote_api    |[0m INFO:     Application shutdown complete.
+[36mvoicenote_api    |[0m INFO:     Finished server process [29]
+[36mvoicenote_api    |[0m INFO:     Finished server process [27]
+[36mvoicenote_api    |[0m INFO:     Waiting for child process [28]
+[36mvoicenote_api    |[0m INFO:     Waiting for child process [29]
+[36mvoicenote_api    |[0m INFO:     Waiting for child process [30]
+[36mvoicenote_api    |[0m INFO:     Stopping parent process [1]
+[36mvoicenote_api    |[0m Cleaning Python cache...
+[36mvoicenote_api    |[0m Cache cleaned.
+[36mvoicenote_api    |[0m Running database migrations...
+[36mvoicenote_api    |[0m INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+[36mvoicenote_api    |[0m INFO  [alembic.runtime.migration] Will assume transactional DDL.
+[36mvoicenote_api    |[0m =========================================
+[36mvoicenote_api    |[0m Starting FastAPI application...
+[36mvoicenote_api    |[0m =========================================
+[36mvoicenote_api    |[0m INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+[36mvoicenote_api    |[0m INFO:     Started parent process [1]
+[36mvoicenote_api    |[0m Warning: deepgram SDK not available or incompatible, websockets will fail.
+[36mvoicenote_api    |[0m Warning: deepgram SDK not available or incompatible, websockets will fail.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.076227+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Testing endpoints disabled (production environment)", "filename": "main.py", "funcName": "<module>", "lineno": 327, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Started server process [29]
+[36mvoicenote_api    |[0m INFO:     Waiting for application startup.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.079133+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Application starting up: Warming up AI models...", "filename": "main.py", "funcName": "lifespan", "lineno": 59, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.079301+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Loading local embedding model: all-MiniLM-L6-v2", "filename": "ai_service.py", "funcName": "_get_local_embedding_model", "lineno": 74, "pathname": "/app/app/services/ai_service.py"}
+[36mvoicenote_api    |[0m Warning: deepgram SDK not available or incompatible, websockets will fail.
+[36mvoicenote_api    |[0m Warning: deepgram SDK not available or incompatible, websockets will fail.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.680307+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Testing endpoints disabled (production environment)", "filename": "main.py", "funcName": "<module>", "lineno": 327, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Started server process [30]
+[36mvoicenote_api    |[0m INFO:     Waiting for application startup.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.684181+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Application starting up: Warming up AI models...", "filename": "main.py", "funcName": "lifespan", "lineno": 59, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.684680+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Loading local embedding model: all-MiniLM-L6-v2", "filename": "ai_service.py", "funcName": "_get_local_embedding_model", "lineno": 74, "pathname": "/app/app/services/ai_service.py"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.760159+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Testing endpoints disabled (production environment)", "filename": "main.py", "funcName": "<module>", "lineno": 327, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Started server process [28]
+[36mvoicenote_api    |[0m INFO:     Waiting for application startup.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.763660+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Application starting up: Warming up AI models...", "filename": "main.py", "funcName": "lifespan", "lineno": 59, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.763934+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Loading local embedding model: all-MiniLM-L6-v2", "filename": "ai_service.py", "funcName": "_get_local_embedding_model", "lineno": 74, "pathname": "/app/app/services/ai_service.py"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.816792+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Testing endpoints disabled (production environment)", "filename": "main.py", "funcName": "<module>", "lineno": 327, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Started server process [27]
+[36mvoicenote_api    |[0m INFO:     Waiting for application startup.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.819962+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Application starting up: Warming up AI models...", "filename": "main.py", "funcName": "lifespan", "lineno": 59, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:09:38.820152+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Loading local embedding model: all-MiniLM-L6-v2", "filename": "ai_service.py", "funcName": "_get_local_embedding_model", "lineno": 74, "pathname": "/app/app/services/ai_service.py"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:10:03.001684+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Model warmup complete.", "filename": "main.py", "funcName": "lifespan", "lineno": 65, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Application startup complete.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:10:03.021757+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Model warmup complete.", "filename": "main.py", "funcName": "lifespan", "lineno": 65, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Application startup complete.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:10:03.195422+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Model warmup complete.", "filename": "main.py", "funcName": "lifespan", "lineno": 65, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Application startup complete.
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T12:10:03.506027+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Model warmup complete.", "filename": "main.py", "funcName": "lifespan", "lineno": 65, "pathname": "/app/app/main.py"}
+[36mvoicenote_api    |[0m INFO:     Application startup complete.
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55966 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55972 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55976 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60756 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60768 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60782 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60788 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60802 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60808 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60810 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60824 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60838 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59608 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59624 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59630 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59640 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59642 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53642 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53644 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53660 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53666 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53682 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34482 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34496 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34508 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34522 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34524 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53884 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53888 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53904 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53918 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53928 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:38412 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:38418 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:38420 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:38434 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:38436 - "GET /api/v1/notes/2c8aa551-b48d-4440-9fae-d0a2afee26cc HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52418 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52434 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52442 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52444 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52454 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52460 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52464 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53468 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53482 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53488 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53496 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53502 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55858 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55870 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55874 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55882 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:45322 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:45326 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:45336 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:45340 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:45342 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:45354 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:45358 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:45370 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:45386 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:45388 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37638 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37654 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37662 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37670 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37682 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:47394 - "GET /api/v1/notes/855095ea-d496-42df-ac1c-8bc3346cbc36 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:47400 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:47410 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:47416 - "POST /api/v1/notes/process HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:47428 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41840 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41854 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41860 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41864 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41874 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41890 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41902 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41918 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41928 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41942 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41954 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41628 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41634 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41640 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41650 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41666 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49778 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49788 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49794 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49796 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49810 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33360 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33364 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33370 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33386 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33402 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43962 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43976 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43990 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43994 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:44004 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:58052 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:58068 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:58076 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:58092 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:58098 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59510 - "GET /api/v1/notes/71922a04-c6fe-46ee-ae2a-f83eac020ad7 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59512 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59526 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59538 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59544 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59552 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52924 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52936 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52952 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52968 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52972 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33464 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33474 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33484 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33500 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33514 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:58186 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:58194 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:58204 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:58206 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:58216 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:57688 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:57702 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:57708 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:57720 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:57736 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51350 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51362 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51364 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51368 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51374 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48440 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48456 - "GET /api/v1/notes/fbd2c2d6-3001-4a70-97b1-e0a02bba6282 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48460 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48470 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48476 - "POST /api/v1/notes/process HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48482 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48938 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48946 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48960 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48970 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48976 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48986 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48992 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49004 - "GET /api/v1/notes/None HTTP/1.1" 404 Not Found
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49018 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49026 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49038 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49048 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49054 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:35328 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:35334 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:35338 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:35344 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:35358 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51976 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51982 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51992 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51996 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52006 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49268 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49280 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49286 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49296 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49310 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:36354 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:36356 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:36372 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:36384 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50070 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50074 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50090 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50106 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50108 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37812 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37814 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37820 - "GET /api/v1/notes/761d238e-32c4-44c7-9eb7-b342a743bab5 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37826 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37830 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37844 - "POST /api/v1/notes/process HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37852 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:44770 - "GET /docs HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:44770 - "GET /openapi.json HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:44772 - "GET /docs HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:44772 - "GET /openapi.json HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:46552 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:46564 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:46574 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:46576 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:46580 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:46584 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:46586 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:46602 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55264 - "GET /docs HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52412 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.1:55264 - "GET /openapi.json HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52426 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52432 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52442 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52456 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:47490 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:47506 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:47522 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:47530 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:47534 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:39118 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:39134 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:39136 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:39142 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:39156 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52544 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52546 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52548 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52560 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52564 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53690 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53706 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53718 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53720 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53732 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55570 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55582 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55594 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55596 - "GET /api/v1/notes/724d7d4b-b3f2-4f4c-bad9-91ac6e044991 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55604 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55616 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55624 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52154 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52164 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52176 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52188 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52194 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42622 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42638 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42642 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42648 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42664 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49760 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49772 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49786 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49800 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49812 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41334 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41342 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41356 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:41364 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48578 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48582 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48584 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48586 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48592 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52290 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52302 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52308 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52318 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52322 - "GET /api/v1/notes/fa068d5c-e7b3-4c4e-b66d-837f39a86eb0 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50154 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50156 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50172 - "POST /api/v1/notes/process HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50188 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:55388 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:36500 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:38446 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:01:41.816307+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Login failed: Incorrect password", "filename": "users.py", "funcName": "login_user", "lineno": 123, "pathname": "/app/app/api/users.py", "email": "pytest-admin@voicenote.test"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:44558 - "POST /api/v1/users/login HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42674 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:02:12.142747+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Login failed: Incorrect password", "filename": "users.py", "funcName": "login_user", "lineno": 123, "pathname": "/app/app/api/users.py", "email": "pytest-admin@voicenote.test"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42676 - "POST /api/v1/users/login HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49634 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:03:21.054249+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Login failed: Incorrect password", "filename": "users.py", "funcName": "login_user", "lineno": 123, "pathname": "/app/app/api/users.py", "email": "pytest-admin@voicenote.test"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49636 - "POST /api/v1/users/login HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49150 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33624 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33628 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33630 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33642 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:03:53.216575+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user 34ed963a-8b4b-46e7-a634-ddeb1613b4df", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33652 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33656 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33664 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33672 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33680 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33686 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33702 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40296 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40312 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40328 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40342 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:40356 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33330 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33340 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33350 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33364 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:33372 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42088 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42100 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42104 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42106 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42108 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53736 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53740 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53744 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53754 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53770 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:59984 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60000 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60006 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60012 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60020 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34136 - "GET /api/v1/notes/02f5a385-e3fb-40f9-b994-912a2ad94a20 HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34150 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34166 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34174 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34182 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34196 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:34204 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51918 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51924 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51932 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51936 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51942 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52968 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52984 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52990 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52998 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53012 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42020 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42036 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42052 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42064 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42074 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32796 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32798 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32802 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32814 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32820 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43496 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43510 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43512 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43514 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49602 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49608 - "GET /api/v1/notes/ee2ee5fb-5708-45eb-95c4-7c17659a945a HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49620 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49636 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49652 - "POST /api/v1/notes/process HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49664 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49642 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49650 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49664 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49674 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49684 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:07:50.553418+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user e77163d9-60aa-439a-9a97-64923afbf62c", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49686 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49696 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49708 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:49724 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53404 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53408 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53416 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53424 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:53430 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48614 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48618 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48634 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48638 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:48640 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37576 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "POST /api/v1/users/sync HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:08:13.277824+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:08:13.413702+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:08:13.463932+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_3817d715", "restored_by": "test_complete_3817d715"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:08:13.467412+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_3817d715", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "PATCH /api/v1/users/test_complete_3817d715/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:08:13.522820+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user 589d2702-58b9-4533-b5de-0dc6e41fba8e", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/admin/status HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/admin/users HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/admin/users/stats HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/admin/notes HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/admin/admins HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "GET /api/v1/admin/settings/ai HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "POST /api/v1/admin/users/test_complete_3817d715/make-admin HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:54464 - "POST /api/v1/admin/users/test_complete_3817d715/remove-admin HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37592 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37594 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37604 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37614 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52108 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52118 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52126 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52142 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52150 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51942 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51954 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51958 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51964 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:51970 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:60998 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32782 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32796 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32798 - "GET /api/v1/notes/b81a567e-c78f-4612-b064-b1f20a3634df HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32804 - "GET /api/v1/notes/presigned-url HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32810 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:32814 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42202 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42210 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42226 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42238 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42244 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37290 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37298 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37302 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37318 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:37332 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43634 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43640 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43656 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:43660 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:44344 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:44348 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:44362 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:44370 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:44386 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52572 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52588 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52600 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52612 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:52618 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42228 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42236 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42242 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42258 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:42264 - "GET /api/v1/notes/c236d23d-42b7-43a1-acf4-1f3c6970152f HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50770 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50776 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50788 - "POST /api/v1/notes/process HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     172.18.0.8:50794 - "POST /api/v1/notes/process HTTP/1.1" 202 Accepted
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:10:02.415730+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:10:02.541267+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:10:02.591914+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_691787e8", "restored_by": "test_complete_691787e8"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:10:02.595944+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_691787e8", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "PATCH /api/v1/users/test_complete_691787e8/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:10:02.660661+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user a4d5dbf8-4962-4838-9d96-0585c2e1fa91", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/admin/status HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/admin/users HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/admin/users/stats HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/admin/notes HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/admin/admins HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "GET /api/v1/admin/settings/ai HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "POST /api/v1/admin/users/test_complete_691787e8/make-admin HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:35258 - "POST /api/v1/admin/users/test_complete_691787e8/remove-admin HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:11:57.443863+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:11:57.552136+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:11:57.598097+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_e684c55e", "restored_by": "test_complete_e684c55e"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:11:57.601038+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_e684c55e", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "PATCH /api/v1/users/test_complete_e684c55e/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:11:57.649848+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user ea1d704e-5e67-48f5-b842-4d3d3fdc587e", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/admin/status HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/admin/users HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/admin/users/stats HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/admin/notes HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/admin/admins HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "POST /api/v1/admin/users/test_complete_e684c55e/make-admin HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46700 - "POST /api/v1/admin/users/test_complete_e684c55e/remove-admin HTTP/1.1" 403 Forbidden
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:13:01.995962+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:13:02.161623+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:13:02.214752+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_0e1982e7", "restored_by": "test_complete_0e1982e7"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:13:02.220767+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_0e1982e7", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "PATCH /api/v1/users/test_complete_0e1982e7/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:13:02.282723+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user f2d56d69-19f8-4e3a-84af-7a9119a3298a", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/admin/status HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/admin/users HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/admin/users/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:13:03.595458+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Middleware critical failure", "filename": "usage.py", "funcName": "dispatch", "lineno": 145, "pathname": "/app/app/api/middleware/usage.py", "error": "[TypeError('cannot convert dictionary update sequence element #0 to a sequence'), TypeError('vars() argument must have __dict__ attribute')]"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/admin/notes HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/admin/admins HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m 🛡️ Admin Action Log: UPDATE_AI_SETTINGS by dc693fdf-f4a3-4019-9000-9fa86fd80548 on GLOBAL_SYSTEM_SETTINGS
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "POST /api/v1/admin/users/test_complete_0e1982e7/make-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:40668 - "POST /api/v1/admin/users/test_complete_0e1982e7/remove-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:14:33.128215+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:14:33.239903+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:14:33.287612+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_06043bff", "restored_by": "test_complete_06043bff"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:14:33.290012+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_06043bff", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "PATCH /api/v1/users/test_complete_06043bff/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:14:33.344015+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user e46b3678-7818-4d16-ba3a-25f58213cb6d", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/admin/status HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/admin/users HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/admin/users/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:14:34.162737+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Middleware critical failure", "filename": "usage.py", "funcName": "dispatch", "lineno": 145, "pathname": "/app/app/api/middleware/usage.py", "error": "[TypeError('cannot convert dictionary update sequence element #0 to a sequence'), TypeError('vars() argument must have __dict__ attribute')]"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/admin/notes HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/admin/admins HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m 🛡️ Admin Action Log: UPDATE_AI_SETTINGS by dc693fdf-f4a3-4019-9000-9fa86fd80548 on GLOBAL_SYSTEM_SETTINGS
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "POST /api/v1/admin/users/test_complete_06043bff/make-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:46264 - "POST /api/v1/admin/users/test_complete_06043bff/remove-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "POST /api/v1/users/register HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "POST /api/v1/users/register HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "POST /api/v1/users/login HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/users/me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:15:47.974079+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "PATCH", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "PATCH /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/users/search?query=Test HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:15:48.087204+00:00", "level": "WARNING", "logger": "VoiceNote", "message": "Missing device signature or timestamp", "filename": "security.py", "funcName": "verify_device_signature", "lineno": 65, "pathname": "/app/app/utils/security.py", "path": "/api/v1/users/me", "method": "DELETE", "ip": "127.0.0.1"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "DELETE /api/v1/users/me HTTP/1.1" 401 Unauthorized
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:15:48.134199+00:00", "level": "INFO", "logger": "VoiceNote", "message": "Starting restore user", "filename": "deletion_service.py", "funcName": "restore_user", "lineno": 359, "pathname": "/app/app/services/deletion_service.py", "user_id": "test_complete_e64a5a19", "restored_by": "test_complete_e64a5a19"}
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:15:48.136531+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Failed to restore user account", "filename": "users.py", "funcName": "restore_user_account", "lineno": 559, "pathname": "/app/app/api/users.py", "user_id": "test_complete_e64a5a19", "error": "User not found"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "PATCH /api/v1/users/test_complete_e64a5a19/restore HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:15:48.187805+00:00", "level": "INFO", "logger": "VoiceNote.Billing", "message": "Creating new wallet for user 78e8b284-e375-4d4c-b046-eaadd2f6fdc8", "filename": "billing_service.py", "funcName": "get_or_create_wallet", "lineno": 28, "pathname": "/app/app/services/billing_service.py"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/notes HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/notes/dashboard HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/tasks HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/tasks/due-today HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/tasks/overdue HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/tasks/assigned-to-me HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/tasks/search?query=test HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/tasks/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/ai/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/admin/status HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/admin/users HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/admin/users/stats HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m {"timestamp": "2026-02-15T13:15:48.876694+00:00", "level": "ERROR", "logger": "VoiceNote", "message": "Middleware critical failure", "filename": "usage.py", "funcName": "dispatch", "lineno": 145, "pathname": "/app/app/api/middleware/usage.py", "error": "[TypeError('cannot convert dictionary update sequence element #0 to a sequence'), TypeError('vars() argument must have __dict__ attribute')]"}
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/admin/notes HTTP/1.1" 500 Internal Server Error
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/admin/admins HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "GET /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m 🛡️ Admin Action Log: UPDATE_AI_SETTINGS by dc693fdf-f4a3-4019-9000-9fa86fd80548 on GLOBAL_SYSTEM_SETTINGS
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "PATCH /api/v1/admin/settings/ai HTTP/1.1" 200 OK
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "POST /api/v1/admin/users/test_complete_e64a5a19/make-admin HTTP/1.1" 400 Bad Request
+[36mvoicenote_api    |[0m INFO:     127.0.0.1:33784 - "POST /api/v1/admin/users/test_complete_e64a5a19/remove-admin HTTP/1.1" 400 Bad Request

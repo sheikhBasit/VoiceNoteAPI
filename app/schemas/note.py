@@ -13,6 +13,7 @@ class ExternalLink(BaseModel):
 class NoteBase(BaseModel):
     title: str
     summary: str
+    folder_id: Optional[str] = None
     priority: Priority = Priority.MEDIUM
     status: NoteStatus = NoteStatus.PENDING
 
@@ -49,6 +50,7 @@ class NoteUpdate(BaseModel):
     image_uris: Optional[List[str]] = None  # Client-side image URIs
     links: Optional[List[ExternalLink]] = None
     is_deleted: Optional[bool] = None
+    folder_id: Optional[str] = None
     team_id: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -98,6 +100,7 @@ class NoteResponse(NoteBase):
     transcript_groq: Optional[str] = None
     transcript_deepgram: Optional[str] = None
     transcript_android: Optional[str] = None
+    folder_id: Optional[str] = None
     team_id: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 

@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 from starlette.background import BackgroundTask
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import location_config
 from app.db import models
@@ -83,50 +84,69 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
         db = None
         try:
             if user_id != "anonymous" and (gps_header or estimated_cost > 0):
-                db = SessionLocal()
-                user = db.query(models.User).filter(models.User.id == user_id).first()
-                request.state.user = user
-
-                if user and user.org_id and gps_header:
+                def get_user_and_check_billing():
+                    nonlocal corporate_wallet_id
+                    _db = SessionLocal()
                     try:
-                        lat_str, lon_str = gps_header.split(",")
-                        user_lat, user_lon = float(lat_str), float(lon_str)
-                        locations = (
-                            db.query(models.WorkLocation)
-                            .filter(models.WorkLocation.org_id == user.org_id)
-                            .all()
-                        )
-                        for loc in locations:
-                            dist = calculate_distance(user_lat, user_lon, loc.latitude, loc.longitude)
-                            # Use config minimum radius if loc.radius is too small (GPS Drift)
-                            effective_radius = max(loc.radius, location_config.DEFAULT_GEOFENCE_RADIUS)
-                            if dist <= effective_radius:
-                                org = db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
-                                if org: 
-                                    corporate_wallet_id = org.corporate_wallet_id
-                                    JLogger.info("Middleware: Within geofence, corporate wallet selected", wallet=corporate_wallet_id)
-                                break
-                    except Exception as e: 
-                        JLogger.error("Middleware: Geofence error", error=str(e))
+                        user = _db.query(models.User).filter(models.User.id == user_id).first()
+                        if not user:
+                            return None, None
 
-                if estimated_cost > 0:
-                    # Premium users get free notes processing
-                    if user and user.tier == models.SubscriptionTier.PREMIUM and "/api/v1/notes" in request.url.path:
-                        estimated_cost = 0
+                        # Eagerly load roles/tier to avoid detached session issues later
+                        _ = user.tier 
+                        
+                        if user.org_id and gps_header:
+                            try:
+                                lat_str, lon_str = gps_header.split(",")
+                                user_lat, user_lon = float(lat_str), float(lon_str)
+                                locations = (
+                                    _db.query(models.WorkLocation)
+                                    .filter(models.WorkLocation.org_id == user.org_id)
+                                    .all()
+                                )
+                                for loc in locations:
+                                    dist = calculate_distance(user_lat, user_lon, loc.latitude, loc.longitude)
+                                    effective_radius = max(loc.radius, location_config.DEFAULT_GEOFENCE_RADIUS)
+                                    if dist <= effective_radius:
+                                        org = _db.query(models.Organization).filter(models.Organization.id == user.org_id).first()
+                                        if org: 
+                                            corporate_wallet_id = org.corporate_wallet_id
+                                        break
+                            except Exception:
+                                pass
 
-                    if estimated_cost > 0:
-                        billing = BillingService(db)
-                        target_wallet = corporate_wallet_id or user_id
-                        if not billing.check_balance(target_wallet, estimated_cost, for_update=True):
-                            return JSONResponse(
-                                status_code=402,
-                                content={"detail": f"Payment Required: balance depleted."},
-                            )
+                        if estimated_cost > 0:
+                            if user.tier == models.SubscriptionTier.PREMIUM and "/api/v1/notes" in request.url.path:
+                                return user, 0 # Free for premium
+
+                            billing = BillingService(_db)
+                            target_wallet = corporate_wallet_id or user_id
+                            if not billing.check_balance(target_wallet, estimated_cost, for_update=True):
+                                return user, -1 # Insufficient balance
+                        
+                        return user, estimated_cost
+                    finally:
+                        _db.close()
+
+                user, final_cost = await run_in_threadpool(get_user_and_check_billing)
+                # Note: We don't set request.state.user to the thread-loaded user 
+                # because relationships (like user.teams) will fail if accessed later.
+                # Instead, we just use it for middleware-level billing checks.
+                
+                if final_cost == -1:
+                    return JSONResponse(
+                        status_code=402,
+                        content={"detail": "Payment Required: balance depleted."},
+                    )
+                estimated_cost = final_cost if final_cost is not None else estimated_cost
 
             response = await call_next(request)
+        except Exception as e:
+            JLogger.error(f"Middleware critical failure: {e}", traceback=True)
+            # Do NOT retry call_next, it's unsafe. Raise allows global handler to catch it.
+            raise e
         finally:
-            if db:
-                db.close()
+            pass
 
         process_time = time.time() - start_time
         response.background = BackgroundTask(

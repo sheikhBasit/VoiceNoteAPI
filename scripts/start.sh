@@ -75,4 +75,12 @@ rm -f /tmp/alembic_output.log
 echo "========================================="
 echo "Starting FastAPI application..."
 echo "========================================="
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
+
+# Detect if we should use reload or workers
+if [ "$RELOAD" == "true" ] || [ "$ENVIRONMENT" == "development" ]; then
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
+else
+    # Default to 4 workers for production-like load if not specified
+    WORKERS=${WEB_CONCURRENCY:-4}
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "$WORKERS" --proxy-headers
+fi

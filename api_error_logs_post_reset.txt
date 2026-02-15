@@ -1,0 +1,14 @@
+Attaching to voicenote_api
+[36mvoicenote_api    |[0m Cleaning Python cache...
+[36mvoicenote_api    |[0m Cache cleaned.
+[36mvoicenote_api    |[0m Running database migrations...
+[36mvoicenote_api    |[0m INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+[36mvoicenote_api    |[0m INFO  [alembic.runtime.migration] Will assume transactional DDL.
+[36mvoicenote_api    |[0m INFO  [alembic.runtime.migration] Running upgrade  -> b891cb8863b5, Initial squashed migration
+[36mvoicenote_api    |[0m INFO  [alembic.runtime.migration] Running upgrade b891cb8863b5 -> 5eabacb91235, Add processing_time_ms to notes
+[36mvoicenote_api    |[0m INFO  [alembic.runtime.migration] Running upgrade 5eabacb91235 -> c075ce5909f9, Add Team model and relationships
+[36mvoicenote_api    |[0m =========================================
+[36mvoicenote_api    |[0m Starting FastAPI application...
+[36mvoicenote_api    |[0m =========================================
+[36mvoicenote_api    |[0m INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+[36mvoicenote_api    |[0m INFO:     Started parent process [1]

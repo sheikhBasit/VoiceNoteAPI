@@ -18,7 +18,7 @@ class DeletionLoadUser(HttpUser):
         self.user_id = f"load_user_{uuid.uuid4()}"
         # Register user
         self.client.post(
-            "/api/v1/users/sync",
+            "/api/v1/users/register",
             json={
                 "id": self.user_id,
                 "name": "Load Test",

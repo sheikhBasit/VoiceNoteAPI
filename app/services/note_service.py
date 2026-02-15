@@ -73,6 +73,7 @@ class NoteService:
             image_uris=data.get("image_uris") or [],
             stt_model=data.get("stt_model") or "nova",
             team_id=data.get("team_id"),
+            folder_id=data.get("folder_id"),
             timestamp=int(time.time() * 1000),
             updated_at=int(time.time() * 1000),
         )

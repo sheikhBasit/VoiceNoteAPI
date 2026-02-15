@@ -199,6 +199,17 @@ async def get_user_statistics(
 # ==================== CONTENT MODERATION ====================
 
 
+from app.schemas import note as note_schema
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
+
+class AdminNoteListResponse(BaseModel):
+    total: int
+    skip: int
+    limit: int
+    notes: List[dict]
+
+
 @router.get("/notes")
 async def list_all_notes(
     skip: int = Query(0, ge=0),
@@ -208,8 +219,6 @@ async def list_all_notes(
 ):
     """
     View all notes across all users
-
-    Permission Required: can_view_all_notes
     """
     if not AdminManager.is_admin(admin_user):
         raise HTTPException(
@@ -223,10 +232,34 @@ async def list_all_notes(
             detail="Permission denied: Required permission 'can_view_all_notes' is missing",
         )
 
-    notes = db.query(models.Note).offset(skip).limit(limit).all()
-    total = db.query(models.Note).count()
-
-    return {"total": total, "skip": skip, "limit": limit, "notes": notes}
+    try:
+        notes = db.query(models.Note).offset(skip).limit(limit).all()
+        total = db.query(models.Note).count()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"❌ DB QUERY ERROR: {e}")
+        raise HTTPException(status_code=500, detail=f"Database Query Error: {e}")
+    
+    # Manual serialization to avoid Pydantic/SQLAlchemy issues
+    serialized_notes = []
+    try:
+        for n in notes:
+            serialized_notes.append({
+                "id": str(n.id),
+                "title": str(n.title or "Untitled"),
+                "user_id": str(n.user_id) if n.user_id else None,
+                "timestamp": int(n.timestamp) if n.timestamp is not None else 0,
+                "summary": str(n.summary or ""),
+                "is_deleted": bool(n.is_deleted),
+                "is_pinned": bool(n.is_pinned),
+                "is_archived": bool(n.is_archived)
+            })
+    except Exception as e:
+        print(f"❌ SERIALIZATION ERROR: {e}")
+        raise HTTPException(status_code=500, detail=f"Serialization Error: {e}")
+    
+    return {"total": total, "skip": skip, "limit": limit, "notes": serialized_notes}
 
 
 @router.delete("/notes/{note_id}")
