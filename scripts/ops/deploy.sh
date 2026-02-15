@@ -62,7 +62,7 @@ ssh -i "$KEY_PATH" -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP << EOF
 
     # Targeted health check for core services
     echo "⏳ Waiting for core services (db, redis, api) to be healthy..."
-    for i in {1..60}; do
+    for i in {1..120}; do
       # Note: No 'sudo' inside here since typically azureuser has permissions or it's handled by shell
       DOCKER_STATUS=$(docker compose ps --format json)
       
@@ -78,7 +78,7 @@ ssh -i "$KEY_PATH" -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP << EOF
           API_HEALTH=$(echo "$DOCKER_STATUS" | grep '"Service":"api"' | grep -c '"Health":"healthy"')
       fi
       
-      echo "   Status ($i/60): DB=$DB_HEALTH, Redis=$REDIS_HEALTH, API=$API_HEALTH"
+      echo "   Status ($i/120): DB=$DB_HEALTH, Redis=$REDIS_HEALTH, API=$API_HEALTH"
       
       if [ "$DB_HEALTH" -eq 1 ] && [ "$REDIS_HEALTH" -eq 1 ] && [ "$API_HEALTH" -eq 1 ]; then
         echo "✅ Core services are healthy!"
@@ -86,7 +86,7 @@ ssh -i "$KEY_PATH" -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP << EOF
       fi
       
       sleep 2
-      if [ $i -eq 60 ]; then
+      if [ $i -eq 120 ]; then
         echo "❌ Timing out waiting for services to be healthy."
         docker compose ps
         exit 1
