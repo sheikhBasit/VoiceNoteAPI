@@ -76,12 +76,18 @@ echo "========================================="
 echo "[$(date)] Starting FastAPI application..."
 echo "========================================="
 
-# Detect if we should use reload or workers
-if [ "$RELOAD" == "true" ] || [ "$ENVIRONMENT" == "development" ]; then
-    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
+# Determine worker count
+if [[ "$ENVIRONMENT" == "development" ]] || [[ "$RELOAD" == "true" ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting FastAPI in development mode (reload enabled)..."
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 else
-    # Default to 4 workers for production-like load if not specified
     # Default to 1 worker to prevent OOM/CPU choke during AI model loading
+    # WEB_CONCURRENCY should be set in docker-compose.yml or .env
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Determining worker count..."
+    echo "   WEB_CONCURRENCY override: ${WEB_CONCURRENCY:-'Not set'}"
     WORKERS=${WEB_CONCURRENCY:-1}
+    echo "   Final uvicorn worker count: $WORKERS"
+    
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting FastAPI with uvicorn..."
     exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "$WORKERS" --proxy-headers
 fi

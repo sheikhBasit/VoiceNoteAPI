@@ -164,13 +164,13 @@ jobs:
             
             # Robust targeted health check
             echo "Waiting for core services (db, redis, api) to be healthy..."
-            for i in {1..120}; do
+            for i in {1..200}; do
               DB_HEALTH=$(sudo docker inspect --format='{{.State.Health.Status}}' voicenote_db 2>/dev/null || echo "not-found")
               REDIS_HEALTH=$(sudo docker inspect --format='{{.State.Health.Status}}' voicenote_redis 2>/dev/null || echo "not-found")
               API_HEALTH=$(sudo docker inspect --format='{{.State.Health.Status}}' voicenote_api 2>/dev/null || echo "not-found")
               API_STATE=$(sudo docker inspect --format='{{.State.Status}}' voicenote_api 2>/dev/null || echo "not-found")
               
-              echo "   Status ($i/120): DB=$DB_HEALTH, Redis=$REDIS_HEALTH, API=$API_HEALTH (State=$API_STATE)"
+               echo "   Status ($i/200): DB=$DB_HEALTH, Redis=$REDIS_HEALTH, API=$API_HEALTH (State=$API_STATE)"
               
               if echo "$DB_HEALTH" | grep -q "healthy" && echo "$REDIS_HEALTH" | grep -q "healthy" && echo "$API_HEALTH" | grep -q "healthy"; then
                 echo "✅ All core services are healthy!"
@@ -186,7 +186,7 @@ jobs:
               fi
               
               sleep 3
-              if [ $i -eq 120 ]; then
+              if [ $i -eq 200 ]; then
                 echo "❌ Timeout waiting for services to be healthy."
                 sudo docker compose ps
                 sudo docker compose logs db

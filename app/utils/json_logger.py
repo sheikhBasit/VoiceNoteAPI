@@ -30,8 +30,10 @@ class JsonFormatter(logging.Formatter):
 
         # Merge in structured fields if present
         extra_fields = getattr(record, "structured_data", None)
-        if extra_fields:
+        if isinstance(extra_fields, dict):
             log_record.update(extra_fields)
+        elif extra_fields:
+            log_record["extra_data"] = str(extra_fields)
 
         # Add exception info if present
         if record.exc_info:

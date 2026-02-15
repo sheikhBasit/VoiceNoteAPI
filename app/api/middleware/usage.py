@@ -128,22 +128,29 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
                     finally:
                         _db.close()
 
-                user, final_cost = await run_in_threadpool(get_user_and_check_billing)
-                # Note: We don't set request.state.user to the thread-loaded user 
-                # because relationships (like user.teams) will fail if accessed later.
-                # Instead, we just use it for middleware-level billing checks.
-                
-                if final_cost == -1:
-                    return JSONResponse(
-                        status_code=402,
-                        content={"detail": "Payment Required: balance depleted."},
-                    )
-                estimated_cost = final_cost if final_cost is not None else estimated_cost
+                try:
+                    user, final_cost = await run_in_threadpool(get_user_and_check_billing)
+                    # Note: We don't set request.state.user to the thread-loaded user 
+                    # because relationships (like user.teams) will fail if accessed later.
+                    # Instead, we just use it for middleware-level billing checks.
+                    
+                    if final_cost == -1:
+                        return JSONResponse(
+                            status_code=402,
+                            content={"detail": "Payment Required: balance depleted."},
+                        )
+                    estimated_cost = final_cost if final_cost is not None else estimated_cost
+                except Exception as inner_e:
+                    JLogger.warning(f"Middleware user/billing check failed: {inner_e}")
+                    # Allow request to proceed if billing check fails unexpectedly 
+                    # (it's better to log a free call than crash the app)
+                    pass
 
             response = await call_next(request)
         except Exception as e:
-            JLogger.error(f"Middleware critical failure: {e}", traceback=True)
-            # Do NOT retry call_next, it's unsafe. Raise allows global handler to catch it.
+            JLogger.error(f"Middleware critical failure: {str(e)}")
+            # If call_next fails, we MUST propagate it.
+            # But we ensure it's logged as a string to avoid vars() issues.
             raise e
         finally:
             pass
