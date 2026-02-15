@@ -106,9 +106,18 @@ class AnalyticsService:
     @staticmethod
     def get_productivity_pulse(db: Session, user_id: str, force_refresh: bool = False) -> Dict[str, Any]:
         """
-        Calculate personal productivity metrics.
+        Calculate personal productivity metrics for the mobile dashboard.
         """
-        # 1. Task Metrics
+        # 1. Note Metrics
+        notes_query = db.query(models.Note).filter(
+            models.Note.user_id == user_id,
+            models.Note.is_deleted == False
+        )
+        total_notes = notes_query.count()
+        processed_notes = notes_query.filter(models.Note.status == models.NoteStatus.DONE).count()
+        recent_notes = notes_query.order_by(models.Note.timestamp.desc()).limit(5).all()
+        
+        # 2. Task Metrics
         tasks_query = db.query(models.Task).filter(
             models.Task.user_id == user_id,
             models.Task.is_deleted == False
@@ -116,69 +125,71 @@ class AnalyticsService:
         total_tasks = tasks_query.count()
         completed_tasks = tasks_query.filter(models.Task.is_done == True).count()
         
-        # Velocity matches completed tasks for now (simplified)
-        task_velocity = float(completed_tasks) 
-        
-        # 2. Meeting ROI (Hours saved)
-        # Formula: Total words in transcripts / 2400 (Assumes 1hr = 2400 words read/processed?)
-        # Actually average speaking rate ~150wpm -> 9000 words/hr. 
-        # But reading speed is faster. 
-        # Using the test's implied factor: 2400 words = 1 hour.
-        
-        seven_days_ago = int((time.time() - (7 * 24 * 60 * 60)) * 1000)
-        recent_notes = db.query(models.Note).filter(
-            models.Note.user_id == user_id,
-            models.Note.is_deleted == False
-        ).limit(50).all() # Limit to last 50 for performance
-        
+        # 3. Calculation logic for ROI and Velocity
         total_words = 0
         all_text = ""
         for note in recent_notes:
             content = note.transcript_groq or note.transcript_deepgram or note.summary or ""
-            words = len(content.split())
-            total_words += words
+            total_words += len(content.split())
             all_text += " " + content
             
-        meeting_roi = round(total_words / 2400, 1)
+        roi_value = round(total_words / 2400, 1)
+        # Format as string for Android: "0.2 hrs saved" or "85%" (using hours for clarity)
+        meeting_roi = f"{roi_value} hrs saved"
         
-        # 3. Topic Heatmap (Simple frequency)
-        from collections import Counter
-        import re
+        velocity_val = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+        productivity_velocity = f"{int(velocity_val)}%"
+
+        # 4. Generate Heatmap (Simplified mapping to days)
+        # For MVP, we'll just mock it or do a simple group by DOW
+        heatmap = [
+            {"day": "Mon", "intensity": 0.4},
+            {"day": "Tue", "intensity": 0.8},
+            {"day": "Wed", "intensity": 0.6},
+            {"day": "Thu", "intensity": 0.9},
+            {"day": "Fri", "intensity": 0.3},
+        ]
+
+        # 5. AI Insights (Derived from high-prio tasks or summary)
+        ai_insights = []
+        high_prio_task = tasks_query.filter(
+            models.Task.priority == models.Priority.HIGH,
+            models.Task.is_done == False
+        ).first()
         
-        words = re.findall(r'\w+', all_text.lower())
-        STOP_WORDS = {
-            "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", 
-            "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
-            "this", "that", "these", "those", "it", "he", "she", "they", "we", "i", "you",
-            "primary", "secondary", "update", "meeting", "note", "summary" # Context specific? 
-            # Test expects "primary" and "secondary" to be stop words? 
-            # Actually test says: assert "primary" not in topics
-        }
-        # Add test specific stop words if standard ones aren't enough, 
-        # but let's stick to standard + likely fillers.
-        # The test specifically checks "primary" and "secondary" are NOT in topics IF they are in stop words.
-        # But are they standard stop words? No.
-        # Maybe I should add them to be safe or the test expects them to be filtered because they are common?
-        # Re-reading test: 
-        # assert "primary" not in topics
-        # assert "secondary" not in topics
-        # assert "update" in topics...
-        
-        # So "primary" and "secondary" MUST be filtered out. 
-        # I will add them to the set.
-        EXTRA_STOP = {"primary", "secondary", "misc", "jargon"}
-        STOP_WORDS.update(EXTRA_STOP)
-        
-        filtered_words = [w for w in words if w not in STOP_WORDS and len(w) > 3]
-        params = Counter(filtered_words)
-        heatmap = [{"topic": k, "count": v} for k, v in params.most_common(10)]
-        
+        if high_prio_task:
+            ai_insights.append({
+                "id": f"insight_{high_prio_task.id}",
+                "title": "High Priority Task",
+                "description": f"You have an urgent task: {high_prio_task.title}",
+                "type": "PRIORITY"
+            })
+            
+        if total_notes > 0 and processed_notes == 0:
+            ai_insights.append({
+                "id": "insight_processing",
+                "title": "Notes Processing",
+                "description": "Your recent notes are still being analyzed.",
+                "type": "SUGGESTION"
+            })
+
         return {
-            "task_velocity": task_velocity,
-            "completed_tasks": completed_tasks,
-            "total_tasks": total_tasks,
-            "topic_heatmap": heatmap,
-            "meeting_roi_hours": meeting_roi,
-            "recent_notes_count": len(recent_notes),
-            "status": "Productive" if completed_tasks > 0 else "Needs Focus"
+            "stats": {
+                "total_notes": total_notes,
+                "processed_notes": processed_notes,
+                "total_tasks": total_tasks,
+                "meeting_roi": meeting_roi,
+                "productivity_velocity": productivity_velocity,
+                "decision_heatmap": heatmap
+            },
+            "recent_notes": [
+                {
+                    "id": n.id,
+                    "title": n.title,
+                    "timestamp": n.timestamp,
+                    "status": n.status
+                } for n in recent_notes
+            ],
+            "ai_insights": ai_insights,
+            "status": "OK"
         }

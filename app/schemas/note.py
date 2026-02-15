@@ -71,6 +71,7 @@ class NoteResponseSummary(BaseModel):
     id: str
     title: str
     timestamp: int
+    status: NoteStatus # Added to match Android NoteSummary
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -94,6 +95,7 @@ class NoteResponse(NoteBase):
     is_encrypted: bool = False
     tags: List[str] = []
     semantic_analysis: Optional[dict] = None
+    conflicts: List[dict] = []  # NEW: Contradictions found by AI
     processing_time_ms: Optional[int] = None  # New: Time taken for AI analysis
     related_notes: List[NoteResponseSummary] = []  # NEW: Top 3 semantic links
     # Comparison Fields (NEW: populated only if verbose=true)
@@ -141,11 +143,26 @@ class TopicHeatmapItem(BaseModel):
     count: int
 
 
-class DashboardResponse(BaseModel):
-    task_velocity: float
-    completed_tasks: int
+class HeatmapData(BaseModel):
+    day: str
+    intensity: float
+
+class DashboardStats(BaseModel):
+    total_notes: int
+    processed_notes: int
     total_tasks: int
-    topic_heatmap: List[TopicHeatmapItem]
-    meeting_roi_hours: float
-    recent_notes_count: int
-    status: str
+    meeting_roi: Optional[str] = None
+    productivity_velocity: Optional[str] = None
+    decision_heatmap: List[HeatmapData] = []
+
+class AIInsight(BaseModel):
+    id: str
+    title: str
+    description: str
+    type: str # "PRIORITY", "SUGGESTION", etc.
+
+class DashboardResponse(BaseModel):
+    stats: DashboardStats
+    recent_notes: List[NoteResponseSummary]
+    ai_insights: List[AIInsight] = []
+    status: str = "OK"

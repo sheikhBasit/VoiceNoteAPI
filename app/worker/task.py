@@ -537,6 +537,9 @@ def note_process_pipeline(
                 all_conflicts = [{"type": "SCHEDULE", **c} for c in schedule_conflicts] + [
                     {"type": "FACTUAL", **c} for c in note_conflicts
                 ]
+                
+                # Persist conflicts for UI display
+                note.conflicts = all_conflicts
 
                 for conflict in all_conflicts:
                     device_token = "mock_token"

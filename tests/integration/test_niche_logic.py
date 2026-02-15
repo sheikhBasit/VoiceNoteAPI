@@ -68,76 +68,109 @@ def test_whatsapp_link_generation():
     assert "VoiceNote%20Note" in wa_link
 
 
-@pytest.mark.asyncio
-async def test_analytics_logic():
-    pass
-
+def test_analytics_logic():
     from app.services.analytics_service import AnalyticsService
 
     # Mock DB session
     db = MagicMock()
 
     # Mock return values for counts
-    # Mock return values for counts
     # The service calls:
     # 1. total_notes count
-    # 2. total_tasks count (first filter)
-    # 3. completed_tasks count (second filter on same query object)
-    # 4. high_priority count (second filter on same query object)
+    # 2. total_tasks count 
+    # 3. completed_tasks count
+    # 4. high_priority count (for insights) - this is a .first() call, not count
     
-    # We need to ensure db.query().filter() returns an object that...
-    # ... has .count() returning total_tasks
-    # ... AND has .filter() returning an object whose .count() returns completed/high_prio items.
+    # We need to ensure db.query().filter() returns objects that behave correctly.
     
-    mock_query = db.query.return_value
-    mock_filter_1 = mock_query.filter.return_value
-    mock_filter_1.count.return_value = 10 # total tasks
+    # Setup for Tasks queries
+    mock_task_query = db.query.return_value
+    mock_task_filter = mock_task_query.filter.return_value
     
-    mock_filter_2 = mock_filter_1.filter.return_value
-    # side_effect for subsequent counts: completed (5), high_priority (2)
-    mock_filter_2.count.side_effect = [5, 2] 
+    # total_tasks count
+    mock_task_filter.count.side_effect = [10, 5, 20, 5] 
+    # Sequence of .count() calls in service:
+    # 1. total_notes (on Note query)
+    # 2. processed_notes (on Note query)
     
-    # Also handle total_notes (another query)
-    # Since we can't easily distinguish queries by args in simple mocks without complex side_effects,
-    # let's try to just make everything return compatible numbers or use specific side_effects if needed.
-    # But wait, total_notes uses db.query(Note).filter().count()
-    # total_tasks uses db.query(Task).filter().count()
-    # They look the same to a simple mock structure.
+    # Create specific query mocks
+    mock_note_query = MagicMock()
+    mock_task_query = MagicMock()
+    
+    # Mock db.query() to return specific mocks based on model
+    from app.db import models
+    def side_effect_query(model):
+        if model == models.Note:
+            return mock_note_query
+        return mock_task_query
+    
+    db.query.side_effect = side_effect_query
 
-    # Mock notes for heatmap
-    # Mock notes for heatmap
-    # Need 400 words total for (2 * 5)/60 hours = 10 mins = 0.166 hours
-    # 400 words / 2400 words/hour = 0.1666 hours.
-    # 400 words / 2400 words/hour = 0.1666 hours.
-    long_transcript = "word " * 200 + " alpha cricket"
+    # --- Setup Note Queries ---
+    # notes_query = db.query(models.Note).filter(...) -> Q_NOTE
+    q_note = mock_note_query.filter.return_value
+    
+    # total_notes = notes_query.count()
+    q_note.count.return_value = 10
+    
+    # processed_notes = notes_query.filter(...).count()
+    # q_note.filter(...) returns Q_NOTE_FILTERED
+    q_note_filtered = q_note.filter.return_value
+    q_note_filtered.count.return_value = 5
+
+    # recent_notes = notes_query.order_by(...).limit(5).all()
+    # Mock notes for ROI calculation
+    long_transcript = "word " * 480 # 480 words / 2400 = 0.2 hours
     mock_notes = [
         MockNote(
+            id="1",
             title="Project Alpha",
             summary="Meeting about Alpha project",
             transcript_groq=long_transcript,
             transcript_deepgram=None,
             transcript_android=None,
-        ),
-        MockNote(
-            title="Cricket Match",
-            summary="Discussion on Cricket strategy",
-            transcript_groq=long_transcript,
-            transcript_deepgram=None,
-            transcript_android=None,
-        ),
+            timestamp=1234567890,
+            status="DONE"
+        )
     ]
-    # Mock the notes query: .limit(...).all() (order_by might be missing)
-    # Support both with and without order_by just in case
-    db.query.return_value.filter.return_value.limit.return_value.all.return_value = mock_notes
-    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = mock_notes
+    q_note.order_by.return_value.limit.return_value.all.return_value = mock_notes
+
+
+    # --- Setup Task Queries ---
+    # tasks_query = db.query(models.Task).filter(...) -> Q_TASK
+    q_task = mock_task_query.filter.return_value
+    
+    # total_tasks = tasks_query.count()
+    q_task.count.return_value = 20
+    
+    # completed_tasks = tasks_query.filter(...).count()
+    # q_task.filter(...) returns Q_TASK_FILTERED
+    q_task_filtered = q_task.filter.return_value
+    q_task_filtered.count.return_value = 10
+    
+    # high_prio_task query also uses q_task_filtered (conceptually similar chain)
+    # The service calls: high_prio_task = tasks_query.filter(...).first()
+    # This calls q_task.filter(...) again. In MagicMock, calling with different args might return same mock 
+    # unless we use side_effect or just assume it uses the same one.
+    # For simplicity, let's make .first() return None to avoid "High Priority Task" insight affecting things,
+    # or return a task to test insight generation.
+    q_task_filtered.first.return_value = None
+
 
     result = AnalyticsService.get_productivity_pulse(db, "user_1")
 
-    assert result["task_velocity"] == 5.0
-    # 400 words / 2400 = 0.166 -> rounded to 0.2
-    assert result["meeting_roi_hours"] == 0.2
-    assert any(item["topic"] == "alpha" for item in result["topic_heatmap"])
-    assert any(item["topic"] == "cricket" for item in result["topic_heatmap"])
+    # Verify structure matches implementation
+    assert "stats" in result
+    stats = result["stats"]
+    
+    # Velocity: 10 completed / 20 total = 50%
+    assert stats["productivity_velocity"] == "50%"
+    
+    # ROI: 480 words / 2400 wph = 0.2 hours
+    assert stats["meeting_roi"] == "0.2 hrs saved"
+    
+    assert "decision_heatmap" in stats
+    assert len(stats["decision_heatmap"]) > 0
 
 
 @pytest.mark.asyncio

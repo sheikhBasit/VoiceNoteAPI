@@ -31,6 +31,7 @@ from app.api import (
     teams,
 )
 from app.api.middleware.usage import UsageTrackingMiddleware  # NEW
+from app.api.middleware.body_cache import RequestBodyCacheMiddleware  # NEW
 from app.db.session import get_db
 from app.utils.json_logger import JLogger
 
@@ -80,6 +81,9 @@ app = FastAPI(
     lifespan=lifespan,
     swagger_ui_parameters={"persistAuthorization": True},
 )
+
+# Apply Request Body Caching (Required for device signature verification)
+app.add_middleware(RequestBodyCacheMiddleware)
 
 # Apply Compression (Speeds up large JSON responses like notes lists)
 app.add_middleware(GZipMiddleware, minimum_size=1000)

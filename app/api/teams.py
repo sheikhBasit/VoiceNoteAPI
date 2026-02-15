@@ -125,6 +125,28 @@ def remove_team_member(
     return {"message": "Member removed successfully"}
 
 
+@router.delete("/{team_id}", status_code=status.HTTP_200_OK)
+def delete_team(
+    team_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Delete a team. Only the owner can delete a team."""
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    
+    if team.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the team owner can delete the team")
+    
+    # Cascade cleanup (M2M and relationships)
+    db.delete(team)
+    db.commit()
+    
+    JLogger.info("Team deleted", team_id=team_id, owner_id=current_user.id)
+    return {"message": "Team deleted successfully"}
+
+
 @router.get("/{team_id}/analytics")
 def get_team_analytics(
     team_id: str,

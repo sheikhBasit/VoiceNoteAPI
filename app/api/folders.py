@@ -182,6 +182,7 @@ def delete_folder(
     db.query(models.Note).filter(models.Note.folder_id == folder_id).update(
         {"folder_id": None}, synchronize_session="fetch"
     )
+    db.flush()
 
     db.delete(folder)
     db.commit()

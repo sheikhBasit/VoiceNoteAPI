@@ -300,6 +300,7 @@ class Note(Base):
 
     # AI Background Results (NEW)
     semantic_analysis = Column(JSONB, nullable=True)  # Result of background analysis
+    conflicts = Column(JSONB, default=list) # NEW: Persist detected contradictions
     ai_responses = Column(JSONB, default=lambda: [])  # History of Q&A task results
     processing_time_ms = Column(BigInteger, nullable=True)  # New: Time taken for AI analysis
 
