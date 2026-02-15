@@ -94,13 +94,13 @@ echo -e "\n${MAGENTA}===> STEP 1: AUTHENTICATION & USERS${NC}\n"
 U1_EMAIL="u1_$TIMESTAMP@test.com"
 U2_EMAIL="u2_$TIMESTAMP@test.com"
 
-U1_PL="{\"email\":\"$U1_EMAIL\",\"name\":\"User1\",\"device_id\":\"d1_$TIMESTAMP\",\"device_model\":\"RobustRunner\",\"token\":\"t1\",\"timezone\":\"UTC\"}"
-BODY=$(run_test "User1 Register" "POST" "/api/v1/users/sync" "$U1_PL" "200|201" "")
+U1_PL="{\"email\":\"$U1_EMAIL\",\"name\":\"User1\",\"password\":\"testpass123\",\"device_id\":\"d1_$TIMESTAMP\",\"device_model\":\"RobustRunner\",\"token\":\"t1\",\"timezone\":\"UTC\"}"
+BODY=$(run_test "User1 Register" "POST" "/api/v1/users/register" "$U1_PL" "200|201" "")
 U1_TOKEN=$(echo "$BODY" | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
 U1_ID=$(echo "$BODY" | grep -o '"id":"[^"]*' | cut -d'"' -f4)
 
-U2_PL="{\"email\":\"$U2_EMAIL\",\"name\":\"User2\",\"device_id\":\"d2_$TIMESTAMP\",\"device_model\":\"RobustRunner\",\"token\":\"t2\",\"timezone\":\"UTC\"}"
-BODY=$(run_test "User2 Register" "POST" "/api/v1/users/sync" "$U2_PL" "200|201" "")
+U2_PL="{\"email\":\"$U2_EMAIL\",\"name\":\"User2\",\"password\":\"testpass123\",\"device_id\":\"d2_$TIMESTAMP\",\"device_model\":\"RobustRunner\",\"token\":\"t2\",\"timezone\":\"UTC\"}"
+BODY=$(run_test "User2 Register" "POST" "/api/v1/users/register" "$U2_PL" "200|201" "")
 U2_TOKEN=$(echo "$BODY" | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
 U2_ID=$(echo "$BODY" | grep -o '"id":"[^"]*' | cut -d'"' -f4)
 
