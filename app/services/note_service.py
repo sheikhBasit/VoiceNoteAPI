@@ -13,6 +13,7 @@ from app.services.storage_service import StorageService
 from app.services.analytics_service import AnalyticsService
 from app.utils.security import verify_note_ownership
 from app.worker.task import generate_note_embeddings_task, analyze_note_semantics_task, note_process_pipeline
+from app.utils.encryption import EncryptionService
 
 class NoteService:
     @staticmethod
@@ -39,6 +40,16 @@ class NoteService:
                 models.Team.members.any(id=user.id)
             ).first() or note.team.owner_id == user.id
             if is_member:
+                return note
+                
+        # Folder check (Shared Folders)
+        if note.folder_id:
+            from app.db.models import folder_participants
+            is_participant = db.query(folder_participants).filter(
+                folder_participants.c.folder_id == note.folder_id,
+                folder_participants.c.user_id == user.id
+            ).first() is not None
+            if is_participant:
                 return note
                 
         raise PermissionDeniedError("You do not have permission to access this note")
@@ -72,11 +83,18 @@ class NoteService:
             document_uris=data.get("document_uris") or [],
             image_uris=data.get("image_uris") or [],
             stt_model=data.get("stt_model") or "nova",
+            is_encrypted=data.get("is_encrypted") or False,
             team_id=data.get("team_id"),
             folder_id=data.get("folder_id"),
             timestamp=int(time.time() * 1000),
             updated_at=int(time.time() * 1000),
         )
+        
+        # Apply Encryption if requested
+        if db_note.is_encrypted:
+            db_note.summary = EncryptionService.encrypt(db_note.summary)
+            db_note.transcript_groq = EncryptionService.encrypt(db_note.transcript_groq)
+            db_note.transcript_android = EncryptionService.encrypt(db_note.transcript_android)
         
         db.add(db_note)
         db.commit()
@@ -109,7 +127,7 @@ class NoteService:
         """
         team_ids = [t.id for t in user.teams] + [t.id for t in user.owned_teams]
         
-        return (
+        notes = (
             db.query(models.Note)
             .options(joinedload(models.Note.tasks))
             .filter(
@@ -124,6 +142,12 @@ class NoteService:
             .limit(limit)
             .all()
         )
+        
+        # Decrypt for display
+        for n in notes:
+            if n.is_encrypted:
+                n.summary = EncryptionService.decrypt(n.summary)
+        return notes
 
     @classmethod
     def get_note(cls, db: Session, user: models.User, note_id: str, verbose: bool = False) -> models.Note:
@@ -154,10 +178,13 @@ class NoteService:
             note.related_notes = []
             
         # Comparison toggle
-        if not verbose:
-            note.transcript_groq = None
-            note.transcript_deepgram = None
-            note.transcript_android = None
+            
+        # Decrypt if encrypted
+        if note.is_encrypted:
+            note.summary = EncryptionService.decrypt(note.summary)
+            note.transcript_groq = EncryptionService.decrypt(note.transcript_groq)
+            note.transcript_deepgram = EncryptionService.decrypt(note.transcript_deepgram)
+            note.transcript_android = EncryptionService.decrypt(note.transcript_android)
             
         return note
 

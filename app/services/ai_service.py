@@ -609,6 +609,12 @@ Use this temporal context to intelligently assign task priorities based on urgen
                 "SPECIALIZATION (STUDENT): Extract formulas, academic definitions, exam tips, "
                 "logical proofs, and study mnemonics. Focus on educational clarity and retrieval-practice questions."
             )
+        elif user_role in ["PSYCHIATRIST", "PSYCHOLOGIST"]:
+            role_specialization = (
+                f"SPECIALIZATION ({user_role}): Focus on patient sentiment shifts, cognitive distortions, "
+                "underlying emotional needs, and therapeutic progress indicators. Maintain extreme clinical neutrality "
+                "and identify repetitive behavioral loops or resistance markers."
+            )
 
         system_prompt = f"""
         Role: SEMANTIC_ANALYST (Expert in psychology, linguistics, and logical reasoning)

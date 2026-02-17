@@ -189,3 +189,88 @@ def delete_folder(
 
     JLogger.info("Folder deleted", folder_id=folder_id, user_id=current_user.id)
     return {"message": "Folder deleted successfully"}
+
+
+@router.post("/{folder_id}/participants", status_code=status.HTTP_200_OK)
+def add_folder_participant(
+    folder_id: str,
+    user_email: str,
+    role: str = "MEMBER",
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Add a participant to a folder by email."""
+    folder = (
+        db.query(models.Folder)
+        .filter(models.Folder.id == folder_id, models.Folder.user_id == current_user.id)
+        .first()
+    )
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found or not authorized")
+
+    new_participant = (
+        db.query(models.User).filter(models.User.email == user_email).first()
+    )
+    if not new_participant:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check if already participant
+    existing = db.query(models.folder_participants).filter(
+        models.folder_participants.c.folder_id == folder_id,
+        models.folder_participants.c.user_id == new_participant.id
+    ).first()
+    
+    if existing:
+        return {"message": "User is already a participant"}
+
+    # Insert into M2M table
+    from sqlalchemy import insert
+    stmt = insert(models.folder_participants).values(
+        folder_id=folder_id,
+        user_id=new_participant.id,
+        role=role
+    )
+    db.execute(stmt)
+    db.commit()
+
+    JLogger.info(
+        "Participant added to folder",
+        folder_id=folder_id,
+        user_id=new_participant.id,
+        role=role,
+    )
+    return {"message": f"User {user_email} added to folder {folder.name} as {role}"}
+
+
+@router.get("/{folder_id}/participants")
+def list_folder_participants(
+    folder_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """List participants of a folder."""
+    folder = db.query(models.Folder).filter(models.Folder.id == folder_id).first()
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    # Check if user is owner or participant
+    is_owner = folder.user_id == current_user.id
+    is_participant = db.query(models.folder_participants).filter(
+        models.folder_participants.c.folder_id == folder_id,
+        models.folder_participants.c.user_id == current_user.id
+    ).first() is not None
+
+    if not is_owner and not is_participant:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    participants = (
+        db.query(models.User, models.folder_participants.c.role)
+        .join(models.folder_participants, models.User.id == models.folder_participants.c.user_id)
+        .filter(models.folder_participants.c.folder_id == folder_id)
+        .all()
+    )
+
+    return [
+        {"id": u.id, "name": u.name, "email": u.email, "role": role}
+        for u, role in participants
+    ]

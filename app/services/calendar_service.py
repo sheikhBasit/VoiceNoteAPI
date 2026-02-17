@@ -58,10 +58,19 @@ class CalendarService:
                 headers = {"Authorization": f"Bearer {integration.access_token}"}
                 
                 resp = requests.get(url, headers=headers, params=params, timeout=5)
-                if resp.status_code == 401:
-                    logger.warning(f"Google Token Expired for {user_id}")
-                    # TODO: Implement Refresh Token Flow here
-                    return []
+                if resp.is_successful is False and resp.status_code == 401:
+                    logger.warning(f"Google Token Expired for {user_id}. Attempting refresh.")
+                    if CalendarService._refresh_google_token(user_id):
+                        # Retry once with new token
+                        with SessionLocal() as db_retry:
+                            integration = db_retry.query(UserIntegration).filter(
+                                UserIntegration.user_id == user_id,
+                                UserIntegration.provider == "google"
+                            ).first()
+                            if integration and integration.access_token:
+                                headers["Authorization"] = f"Bearer {integration.access_token}"
+                                resp = requests.get(url, headers=headers, params=params, timeout=5)
+
                 resp.raise_for_status()
                 
                 items = resp.json().get("items", [])
@@ -90,6 +99,54 @@ class CalendarService:
                 return []
                 
         return events
+
+    @staticmethod
+    def _refresh_google_token(user_id: str) -> bool:
+        """
+        Uses the stored refresh token to get a new access token from Google.
+        """
+        from app.db.session import SessionLocal
+        from app.db.models import UserIntegration
+        from app.core.config import ai_config
+        import requests
+        import time
+
+        with SessionLocal() as db:
+            integration = (
+                db.query(UserIntegration)
+                .filter(
+                    UserIntegration.user_id == user_id,
+                    UserIntegration.provider == "google",
+                )
+                .first()
+            )
+
+            if not integration or not integration.refresh_token:
+                logger.error(f"No refresh token available for user {user_id}")
+                return False
+
+            try:
+                payload = {
+                    "client_id": ai_config.GOOGLE_CLIENT_ID,
+                    "client_secret": ai_config.GOOGLE_CLIENT_SECRET,
+                    "refresh_token": integration.refresh_token,
+                    "grant_type": "refresh_token",
+                }
+                
+                resp = requests.post("https://oauth2.googleapis.com/token", data=payload, timeout=10)
+                resp.raise_for_status()
+                
+                data = resp.json()
+                integration.access_token = data["access_token"]
+                if "expires_in" in data:
+                    integration.expires_at = int(time.time() * 1000) + (data["expires_in"] * 1000)
+                
+                db.commit()
+                logger.info(f"Successfully refreshed Google token for user {user_id}")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to refresh Google token: {e}")
+                return False
 
     @staticmethod
     def detect_conflicts(
@@ -129,6 +186,40 @@ class CalendarService:
         
         logger.info(f"📅 Calendar Sync: user={user_id}, event={event_data.get('title')}")
         
+        def _execute_create(token):
+            # 2. Construct Google Calendar Payload
+            start_time = None
+            end_time = None
+            
+            if event_data.get("deadline"):
+                 ts = event_data["deadline"] / 1000 
+                 from datetime import datetime, timedelta
+                 start_dt = datetime.fromtimestamp(ts)
+                 end_dt = start_dt + timedelta(hours=1)
+                 
+                 start_time = start_dt.isoformat() + "Z"
+                 end_time = end_dt.isoformat() + "Z"
+            
+            if not start_time:
+                 return None
+
+            payload = {
+                "summary": event_data.get("title", "New Task"),
+                "description": event_data.get("description", ""),
+                "start": {"dateTime": start_time},
+                "end": {"dateTime": end_time},
+            }
+
+            return requests.post(
+                "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                },
+                json=payload,
+                timeout=10
+            )
+
         with SessionLocal() as db:
             integration = (
                 db.query(UserIntegration)
@@ -143,46 +234,17 @@ class CalendarService:
                 logger.error(f"No Google Calendar integration found for user {user_id}")
                 return False
 
-            # 2. Construct Google Calendar Payload
-            start_time = None
-            end_time = None
-            
-            if event_data.get("deadline"):
-                 ts = event_data["deadline"] / 1000 
-                 from datetime import UTC, datetime, timedelta
-                 start_dt = datetime.fromtimestamp(ts)
-                 end_dt = start_dt + timedelta(hours=1)
-                 
-                 start_time = start_dt.isoformat() + "Z"
-                 end_time = end_dt.isoformat() + "Z"
-            
-            if not start_time:
-                 return False
+            response = _execute_create(integration.access_token)
+            if response and response.status_code == 401:
+                logger.warning("Google Access Token Expired. Refreshing.")
+                if CalendarService._refresh_google_token(user_id):
+                    # Refresh successful, get new token
+                    db.refresh(integration)
+                    response = _execute_create(integration.access_token)
 
-            payload = {
-                "summary": event_data.get("title", "New Task"),
-                "description": event_data.get("description", ""),
-                "start": {"dateTime": start_time},
-                "end": {"dateTime": end_time},
-            }
-
-            try:
-                response = requests.post(
-                    "https://www.googleapis.com/calendar/v3/calendars/primary/events",
-                    headers={
-                        "Authorization": f"Bearer {integration.access_token}",
-                        "Content-Type": "application/json"
-                    },
-                    json=payload,
-                    timeout=10
-                )
-                if response.status_code == 401:
-                    logger.warning("Google Access Token Expired")
-                    return False
-                    
-                response.raise_for_status()
+            if response and response.status_code < 400:
                 logger.info("Successfully created Google Calendar event")
                 return True
-            except Exception as e:
-                logger.error(f"Failed to create calendar event: {e}")
+            else:
+                logger.error(f"Failed to create calendar event. Status: {response.status_code if response else 'N/A'}")
                 return False
