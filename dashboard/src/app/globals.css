@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 226, 232, 240;
+  --background-start-rgb: 2, 6, 23;
+  --background-end-rgb: 0, 0, 0;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  min-height: 100vh;
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-slate-900/40 backdrop-blur-md border border-slate-800/50 rounded-xl transition-all duration-300;
+  }
+  
+  .glass-card:hover {
+    @apply bg-slate-900/60 border-indigo-500/30 shadow-lg shadow-indigo-500/10;
+  }
+
+  .stat-card-gradient-1 {
+    @apply from-indigo-500/20 to-cyan-500/5;
+  }
+  
+  .stat-card-gradient-2 {
+    @apply from-purple-500/20 to-pink-500/5;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-950;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-800 rounded-full hover:bg-slate-700 transition-colors;
+}

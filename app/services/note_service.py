@@ -178,13 +178,18 @@ class NoteService:
             note.related_notes = []
             
         # Comparison toggle
+        if not verbose:
+            note.transcript_groq = None
+            note.transcript_deepgram = None
+            note.transcript_android = None
             
         # Decrypt if encrypted
         if note.is_encrypted:
             note.summary = EncryptionService.decrypt(note.summary)
-            note.transcript_groq = EncryptionService.decrypt(note.transcript_groq)
-            note.transcript_deepgram = EncryptionService.decrypt(note.transcript_deepgram)
-            note.transcript_android = EncryptionService.decrypt(note.transcript_android)
+            if verbose:
+                note.transcript_groq = EncryptionService.decrypt(note.transcript_groq)
+                note.transcript_deepgram = EncryptionService.decrypt(note.transcript_deepgram)
+                note.transcript_android = EncryptionService.decrypt(note.transcript_android)
             
         return note
 

@@ -1231,3 +1231,1222 @@ async def get_org_balance(
         "balance": wallet.balance if wallet else 0,
         "currency": wallet.currency if wallet else "USD"
     }
+
+# ============================================================================
+# PHASE 1: CRITICAL ADMIN ENDPOINTS (NEW)
+# ============================================================================
+
+
+@router.get("/dashboard/overview")
+async def get_dashboard_overview(
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get dashboard overview with all key metrics
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        Dashboard metrics including users, content, activity, system health, revenue, and recent admin activity
+    """
+    from app.services.metrics_service import MetricsService
+    from app.services.admin_audit_service import AdminAuditService
+    
+    overview = MetricsService.get_dashboard_overview(db)
+    
+    # Add recent activity logs
+    recent_activity = AdminAuditService.get_recent_activity(db, hours=24, limit=10)
+    overview["recent_activity"] = recent_activity["recent_activity"]
+    
+    # Log admin action
+    AdminManager.log_admin_action(
+        db, admin_user.id, "VIEW_DASHBOARD", None,
+        details={"action": "viewed dashboard overview"}
+    )
+    
+    return overview
+
+
+
+@router.get("/metrics/realtime")
+async def get_realtime_metrics(
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get real-time system metrics
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        Real-time metrics including users online, API RPM, processing status, error rates
+    """
+    from app.services.metrics_service import MetricsService
+    
+    return MetricsService.get_realtime_metrics(db)
+
+
+@router.get("/system/health")
+async def get_system_health(
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """
+    Get system health status
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        Health status of database, Redis, Celery, and disk
+    """
+    from app.services.system_health_service import SystemHealthService
+    
+    return SystemHealthService.get_overall_health()
+
+
+@router.get("/tasks")
+async def list_admin_tasks(
+    limit: int = Query(20, ge=1, le=100),
+    skip: int = Query(0, ge=0),
+    user_id: Optional[str] = None,
+    status: Optional[str] = None,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    List all tasks (admin view)
+    
+    **Authorization:** Admin only
+    
+    Args:
+        limit: Number of tasks to return (1-100)
+        skip: Number of tasks to skip
+        user_id: Filter by user ID
+        status: Filter by task status
+    
+    Returns:
+        List of tasks with total count
+    """
+    query = db.query(models.Task)
+    
+    if user_id:
+        query = query.filter(models.Task.user_id == user_id)
+    
+    if status:
+        query = query.filter(models.Task.status == status)
+    
+    # Order by created_at descending
+    query = query.order_by(models.Task.created_at.desc())
+    
+    total = query.count()
+    tasks = query.offset(skip).limit(limit).all()
+    
+    return {
+        "total": total,
+        "tasks": tasks,
+        "limit": limit,
+        "skip": skip
+    }
+
+
+@router.delete("/tasks/{task_id}")
+async def delete_admin_task(
+    task_id: str,
+    reason: str = Query(..., description="Reason for deletion"),
+    hard: bool = Query(False, description="Hard delete (permanent)"),
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a task (admin override)
+    
+    **Authorization:** Admin only
+    
+    Args:
+        task_id: Task ID to delete
+        reason: Reason for deletion
+        hard: If True, permanently delete; if False, soft delete
+    
+    Returns:
+        Deletion result
+    """
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    if hard:
+        # Hard delete - permanently remove
+        db.delete(task)
+        db.commit()
+        result = {"deleted": True, "permanent": True}
+    else:
+        # Soft delete using DeletionService
+        from app.services.deletion_service import DeletionService
+        result = DeletionService.soft_delete_task(db, task_id, admin_user.id, reason)
+    
+    # Log admin action
+    AdminManager.log_admin_action(
+        db, admin_user.id, "DELETE_TASK",
+        target_id=task_id,
+        details={"reason": reason, "hard": hard}
+    )
+    
+    return {"status": "success", "result": result}
+
+
+@router.patch("/tasks/{task_id}/restore")
+async def restore_admin_task(
+    task_id: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Restore a soft-deleted task
+    
+    **Authorization:** Admin only
+    
+    Args:
+        task_id: Task ID to restore
+    
+    Returns:
+        Restoration result
+    """
+    from app.services.deletion_service import DeletionService
+    
+    result = DeletionService.restore_task(db, task_id, admin_user.id)
+    
+    AdminManager.log_admin_action(
+        db, admin_user.id, "RESTORE_TASK",
+        target_id=task_id
+    )
+    
+    return {"status": "success", "result": result}
+
+
+@router.post("/notes/create")
+async def create_test_note(
+    user_id: str,
+    title: str = "Test Note",
+    summary: str = "",
+    transcript_groq: str = "",
+    priority: str = "MEDIUM",
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Create a test note from dashboard
+    
+    **Authorization:** Admin only
+    
+    Args:
+        user_id: User ID to create note for
+        title: Note title
+        summary: Note summary
+        transcript_groq: Transcript text
+        priority: Note priority (LOW, MEDIUM, HIGH)
+    
+    Returns:
+        Created note
+    """
+    import uuid
+    
+    # Verify user exists
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Create note
+    note = models.Note(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        title=title,
+        summary=summary,
+        transcript_groq=transcript_groq,
+        priority=models.Priority[priority],
+        timestamp=int(time.time() * 1000),
+        updated_at=int(time.time() * 1000),
+        languages=["en"]
+    )
+    
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    
+    AdminManager.log_admin_action(
+        db, admin_user.id, "CREATE_TEST_NOTE",
+        target_id=note.id,
+        details={"user_id": user_id, "title": title}
+    )
+    
+    return {"status": "success", "note": note}
+
+
+# ============================================================================
+# PHASE 2: OPERATIONS ENDPOINTS (NEW)
+# ============================================================================
+
+
+@router.get("/api-keys")
+async def list_api_keys(
+    service_name: Optional[str] = None,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    List all API keys
+    
+    **Authorization:** Admin only
+    
+    Args:
+        service_name: Optional filter by service (groq, deepgram, openai, anthropic)
+    
+    Returns:
+        List of API keys (masked for security)
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    return AdminOperationsService.list_api_keys(db, service_name)
+
+
+@router.post("/api-keys")
+async def create_api_key(
+    service_name: str,
+    api_key: str,
+    priority: int = 1,
+    is_active: bool = True,
+    notes: Optional[str] = None,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new API key
+    
+    **Authorization:** Admin only
+    
+    Args:
+        service_name: Service name (groq, deepgram, openai, anthropic)
+        api_key: The API key
+        priority: Priority (lower = higher priority)
+        is_active: Whether the key is active
+        notes: Optional notes
+    
+    Returns:
+        Created key info
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    try:
+        result = AdminOperationsService.create_api_key(
+            db, service_name, api_key, priority, is_active, notes
+        )
+        
+        AdminManager.log_admin_action(db, admin_user.id, "CREATE_API_KEY", None, details={"service": service_name}
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/api-keys/{key_id}")
+async def update_api_key(
+    key_id: str,
+    priority: Optional[int] = None,
+    is_active: Optional[bool] = None,
+    notes: Optional[str] = None,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Update an API key
+    
+    **Authorization:** Admin only
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    try:
+        result = AdminOperationsService.update_api_key(
+            db, key_id, priority, is_active, notes
+        )
+        
+        AdminManager.log_admin_action(
+            db, admin_user.id, "UPDATE_API_KEY",
+            target_id=key_id
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/api-keys/{key_id}")
+async def delete_api_key(
+    key_id: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete an API key
+    
+    **Authorization:** Admin only
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    try:
+        result = AdminOperationsService.delete_api_key(db, key_id)
+        
+        AdminManager.log_admin_action(
+            db, admin_user.id, "DELETE_API_KEY",
+            target_id=key_id
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/api-keys/health")
+async def get_api_key_health(
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get health status of all API keys
+    
+    **Authorization:** Admin only
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    return AdminOperationsService.get_api_key_health(db)
+
+
+@router.post("/bulk/delete")
+async def bulk_delete_items(
+    item_type: str,
+    ids: str,  # Comma-separated IDs
+    reason: str,
+    hard: bool = False,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Bulk delete items
+    
+    **Authorization:** Admin only
+    
+    Args:
+        item_type: Type of items (notes, tasks, users)
+        ids: Comma-separated list of item IDs to delete
+        reason: Reason for deletion
+        hard: If True, permanently delete; if False, soft delete
+    
+    Returns:
+        Deletion result with count
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    # Split comma-separated IDs
+    id_list = [id.strip() for id in ids.split(',') if id.strip()]
+    
+    try:
+        result = AdminOperationsService.bulk_delete(
+            db, item_type, id_list, admin_user.id, reason, hard
+        )
+        
+        AdminManager.log_admin_action(db, admin_user.id, "BULK_DELETE", None, details={"type": item_type, "count": len(id_list), "hard": hard}
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/bulk/restore")
+async def bulk_restore_items(
+    item_type: str,
+    ids: str,  # Comma-separated IDs
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Bulk restore soft-deleted items
+    
+    **Authorization:** Admin only
+    
+    Args:
+        item_type: Type of items (notes, tasks, users)
+        ids: Comma-separated list of item IDs to restore
+    
+    Returns:
+        Restoration result with count
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    # Split comma-separated IDs
+    id_list = [id.strip() for id in ids.split(',') if id.strip()]
+    
+    try:
+        result = AdminOperationsService.bulk_restore(
+            db, item_type, id_list, admin_user.id
+        )
+        
+        AdminManager.log_admin_action(db, admin_user.id, "BULK_RESTORE", None, details={"type": item_type, "count": len(id_list)}
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/wallets")
+async def list_wallets(
+    limit: int = Query(20, ge=1, le=100),
+    skip: int = Query(0, ge=0),
+    is_frozen: Optional[bool] = None,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    List all wallets
+    
+    **Authorization:** Admin only
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    return AdminOperationsService.list_wallets(db, limit, skip, is_frozen)
+
+
+@router.post("/wallets/{user_id}/credit")
+async def credit_wallet(
+    user_id: str,
+    amount: int,
+    reason: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Credit a user's wallet
+    
+    **Authorization:** Admin only
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    try:
+        result = AdminOperationsService.credit_wallet(
+            db, user_id, amount, admin_user.id, reason
+        )
+        
+        AdminManager.log_admin_action(
+            db, admin_user.id, "CREDIT_WALLET",
+            target_id=user_id,
+            details={"amount": amount, "reason": reason}
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/wallets/{user_id}/debit")
+async def debit_wallet(
+    user_id: str,
+    amount: int,
+    reason: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Debit a user's wallet
+    
+    **Authorization:** Admin only
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    try:
+        result = AdminOperationsService.debit_wallet(
+            db, user_id, amount, admin_user.id, reason
+        )
+        
+        AdminManager.log_admin_action(
+            db, admin_user.id, "DEBIT_WALLET",
+            target_id=user_id,
+            details={"amount": amount, "reason": reason}
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/wallets/{user_id}/freeze")
+async def freeze_wallet(
+    user_id: str,
+    reason: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Freeze a user's wallet
+    
+    **Authorization:** Admin only
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    try:
+        result = AdminOperationsService.freeze_wallet(
+            db, user_id, admin_user.id, reason
+        )
+        
+        AdminManager.log_admin_action(
+            db, admin_user.id, "FREEZE_WALLET",
+            target_id=user_id,
+            details={"reason": reason}
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/wallets/{user_id}/unfreeze")
+async def unfreeze_wallet(
+    user_id: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Unfreeze a user's wallet
+    
+    **Authorization:** Admin only
+    """
+    from app.services.admin_operations_service import AdminOperationsService
+    
+    try:
+        result = AdminOperationsService.unfreeze_wallet(
+            db, user_id, admin_user.id
+        )
+        
+        AdminManager.log_admin_action(
+            db, admin_user.id, "UNFREEZE_WALLET",
+            target_id=user_id
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ============================================================================
+# PHASE 3: ANALYTICS ENDPOINTS (NEW)
+# ============================================================================
+
+
+@router.get("/analytics/usage")
+async def get_usage_analytics(
+    start_date: int = Query(..., description="Start timestamp (ms)"),
+    end_date: int = Query(..., description="End timestamp (ms)"),
+    group_by: str = Query("day", pattern="^(day|week|month)$"),
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get usage analytics for date range
+    
+    **Authorization:** Admin only
+    
+    Args:
+        start_date: Start timestamp in milliseconds
+        end_date: End timestamp in milliseconds
+        group_by: Group by day, week, or month
+    
+    Returns:
+        Usage analytics including audio minutes, API calls, notes, tasks, active users
+    """
+    from app.services.admin_analytics_service import AdminAnalyticsService
+    
+    return AdminAnalyticsService.get_usage_analytics(db, start_date, end_date, group_by)
+
+
+@router.get("/analytics/growth")
+async def get_growth_analytics(
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get growth trends and metrics
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        Growth analytics including signups, tier distribution, retention, churn
+    """
+    from app.services.admin_analytics_service import AdminAnalyticsService
+    
+    return AdminAnalyticsService.get_growth_analytics(db)
+
+
+@router.get("/reports/revenue")
+async def get_revenue_report(
+    start_date: int = Query(..., description="Start timestamp (ms)"),
+    end_date: int = Query(..., description="End timestamp (ms)"),
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get revenue report for date range
+    
+    **Authorization:** Admin only
+    
+    Args:
+        start_date: Start timestamp in milliseconds
+        end_date: End timestamp in milliseconds
+    
+    Returns:
+        Revenue report including total revenue, expenses, net revenue, ARPU
+    """
+    from app.services.admin_analytics_service import AdminAnalyticsService
+    
+    return AdminAnalyticsService.get_revenue_report(db, start_date, end_date)
+
+
+@router.get("/analytics/user-behavior")
+async def get_user_behavior_analytics(
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get user behavior insights
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        User behavior analytics including top users, averages, peak hours, feature usage
+    """
+    from app.services.admin_analytics_service import AdminAnalyticsService
+    
+    return AdminAnalyticsService.get_user_behavior_analytics(db)
+
+
+@router.get("/analytics/system-metrics")
+async def get_system_metrics(
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get overall system metrics
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        System metrics including storage usage and database statistics
+    """
+    from app.services.admin_analytics_service import AdminAnalyticsService
+    
+    return AdminAnalyticsService.get_system_metrics(db)
+
+
+# ============================================================================
+# PHASE 4: CELERY & JOBS ENDPOINTS (NEW)
+# ============================================================================
+
+
+@router.get("/celery/tasks/active")
+async def get_active_celery_tasks(
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """
+    Get all currently active Celery tasks
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        List of active tasks with worker info
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    return CeleryMonitorService.get_active_tasks()
+
+
+@router.get("/celery/tasks/pending")
+async def get_pending_celery_tasks(
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """
+    Get all pending Celery tasks
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        List of pending/scheduled tasks
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    return CeleryMonitorService.get_pending_tasks()
+
+
+@router.get("/celery/tasks/{task_id}/status")
+async def get_celery_task_status(
+    task_id: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """
+    Get status of a specific Celery task
+    
+    **Authorization:** Admin only
+    
+    Args:
+        task_id: Celery task ID
+    
+    Returns:
+        Task status, state, result
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    return CeleryMonitorService.get_task_status(task_id)
+
+
+@router.post("/celery/tasks/{task_id}/retry")
+async def retry_celery_task(
+    task_id: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Retry a failed Celery task
+    
+    **Authorization:** Admin only
+    
+    Args:
+        task_id: Celery task ID to retry
+    
+    Returns:
+        Retry result
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    result = CeleryMonitorService.retry_task(task_id)
+    
+    AdminManager.log_admin_action(
+        db, admin_user.id, "RETRY_CELERY_TASK",
+        target_id=task_id
+    )
+    
+    return result
+
+
+@router.post("/celery/tasks/{task_id}/cancel")
+async def cancel_celery_task(
+    task_id: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Cancel a pending or running Celery task
+    
+    **Authorization:** Admin only
+    
+    Args:
+        task_id: Celery task ID to cancel
+    
+    Returns:
+        Cancellation result
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    result = CeleryMonitorService.cancel_task(task_id)
+    
+    AdminManager.log_admin_action(
+        db, admin_user.id, "CANCEL_CELERY_TASK",
+        target_id=task_id
+    )
+    
+    return result
+
+
+@router.get("/celery/workers/stats")
+async def get_worker_stats(
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """
+    Get statistics for all Celery workers
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        Worker stats including pool info, concurrency, processes
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    return CeleryMonitorService.get_worker_stats()
+
+
+@router.get("/celery/workers/tasks")
+async def get_registered_tasks(
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """
+    Get all registered Celery tasks
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        List of registered task names
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    return CeleryMonitorService.get_registered_tasks()
+
+
+@router.post("/celery/workers/{worker_name}/shutdown")
+async def shutdown_worker(
+    worker_name: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Shutdown a specific Celery worker
+    
+    **Authorization:** Admin only
+    
+    Args:
+        worker_name: Name of worker to shutdown
+    
+    Returns:
+        Shutdown result
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    result = CeleryMonitorService.shutdown_worker(worker_name)
+    
+    AdminManager.log_admin_action(db, admin_user.id, "SHUTDOWN_WORKER", None, details={"worker": worker_name}
+    )
+    
+    return result
+
+
+@router.post("/celery/workers/pool-restart")
+async def restart_worker_pool(
+    worker_name: Optional[str] = None,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Restart worker pool
+    
+    **Authorization:** Admin only
+    
+    Args:
+        worker_name: Optional specific worker to restart (all if not provided)
+    
+    Returns:
+        Restart result
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    result = CeleryMonitorService.pool_restart(worker_name)
+    
+    AdminManager.log_admin_action(db, admin_user.id, "RESTART_WORKER_POOL", None, details={"worker": worker_name or "all"}
+    )
+    
+    return result
+
+
+@router.get("/celery/queues")
+async def get_queue_info(
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """
+    Get information about all Celery queues
+    
+    **Authorization:** Admin only
+    
+    Returns:
+        Queue information including workers and routing
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    return CeleryMonitorService.get_queue_lengths()
+
+
+@router.post("/celery/queues/{queue_name}/purge")
+async def purge_queue(
+    queue_name: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Purge all tasks from a queue
+    
+    **Authorization:** Admin only
+    
+    Args:
+        queue_name: Name of queue to purge
+    
+    Returns:
+        Purge result
+    """
+    from app.services.celery_monitor_service import CeleryMonitorService
+    
+    result = CeleryMonitorService.purge_queue(queue_name)
+    
+    AdminManager.log_admin_action(db, admin_user.id, "PURGE_QUEUE", None, details={"queue": queue_name}
+    )
+    
+    return result
+
+
+# ============================================================================
+# PHASE 5: USER MANAGEMENT ENDPOINTS (NEW)
+# ============================================================================
+
+
+@router.get("/users/search")
+async def search_users(
+    query: Optional[str] = None,
+    tier: Optional[str] = None,
+    is_admin: Optional[bool] = None,
+    is_deleted: Optional[bool] = False,
+    limit: int = Query(20, ge=1, le=100),
+    skip: int = Query(0, ge=0),
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Search and filter users
+    
+    **Authorization:** Admin only
+    
+    Args:
+        query: Search by name or email
+        tier: Filter by subscription tier
+        is_admin: Filter by admin status
+        is_deleted: Filter by deleted status
+        limit: Results per page
+        skip: Results to skip
+    
+    Returns:
+        Filtered user list with pagination
+    """
+    from app.services.admin_user_management_service import AdminUserManagementService
+    
+    return AdminUserManagementService.search_users(
+        db, query, tier, is_admin, is_deleted, limit, skip
+    )
+
+
+@router.get("/users/{user_id}/detail")
+async def get_user_detail(
+    user_id: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get detailed user information
+    
+    **Authorization:** Admin only
+    
+    Args:
+        user_id: User ID to get details for
+    
+    Returns:
+        User details with statistics
+    """
+    from app.services.admin_user_management_service import AdminUserManagementService
+    
+    try:
+        return AdminUserManagementService.get_user_detail(db, user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.patch("/users/{user_id}/tier")
+async def update_user_tier(
+    user_id: str,
+    new_tier: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Update user's subscription tier
+    
+    **Authorization:** Admin only
+    
+    Args:
+        user_id: User ID to update
+        new_tier: New subscription tier
+    
+    Returns:
+        Update result
+    """
+    from app.services.admin_user_management_service import AdminUserManagementService
+    
+    try:
+        result = AdminUserManagementService.update_user_tier(
+            db, user_id, new_tier, admin_user.id
+        )
+        
+        AdminManager.log_admin_action(
+            db, admin_user.id, "UPDATE_USER_TIER",
+            target_id=user_id,
+            details={"new_tier": new_tier}
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/users/{user_id}/sessions")
+async def get_user_sessions(
+    user_id: str,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get all active sessions for a user
+    
+    **Authorization:** Admin only
+    
+    Args:
+        user_id: User ID to get sessions for
+    
+    Returns:
+        List of active sessions
+    """
+    from app.services.admin_user_management_service import AdminUserManagementService
+    
+    return AdminUserManagementService.get_user_sessions(db, user_id)
+
+
+@router.post("/users/{user_id}/force-logout")
+async def force_logout_user(
+    user_id: str,
+    session_id: Optional[str] = None,
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Force logout user by revoking sessions
+    
+    **Authorization:** Admin only
+    
+    Args:
+        user_id: User ID to logout
+        session_id: Optional specific session to revoke (all if None)
+    
+    Returns:
+        Logout result with sessions revoked count
+    """
+    from app.services.admin_user_management_service import AdminUserManagementService
+    
+    try:
+        result = AdminUserManagementService.force_logout(
+            db, user_id, admin_user.id, session_id
+        )
+        
+        AdminManager.log_admin_action(
+            db, admin_user.id, "FORCE_LOGOUT",
+            target_id=user_id,
+            details={"session_id": session_id}
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/users/{user_id}/activity")
+async def get_user_activity(
+    user_id: str,
+    days: int = Query(30, ge=1, le=365),
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get user activity for the last N days
+    
+    **Authorization:** Admin only
+    
+    Args:
+        user_id: User ID to get activity for
+        days: Number of days to look back (1-365)
+    
+    Returns:
+        User activity statistics
+    """
+    from app.services.admin_user_management_service import AdminUserManagementService
+    
+    return AdminUserManagementService.get_user_activity(db, user_id, days)
+
+
+# ============================================================================
+# AUDIT & ACTIVITY LOG ENDPOINTS (ENHANCED)
+# ============================================================================
+
+
+@router.get("/activity/recent")
+async def get_recent_activity(
+    hours: int = Query(24, ge=1, le=168),
+    limit: int = Query(20, ge=1, le=100),
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get recent admin activity for dashboard
+    
+    **Authorization:** Admin only
+    
+    Args:
+        hours: Number of hours to look back (1-168)
+        limit: Maximum activities to return (1-100)
+    
+    Returns:
+        Recent activity feed with human-readable messages
+    """
+    from app.services.admin_audit_service import AdminAuditService
+    
+    return AdminAuditService.get_recent_activity(db, hours, limit)
+
+
+@router.get("/activity/stats")
+async def get_admin_action_stats(
+    days: int = Query(30, ge=1, le=365),
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get statistics on admin actions
+    
+    **Authorization:** Admin only
+    
+    Args:
+        days: Number of days to analyze (1-365)
+    
+    Returns:
+        Admin action statistics including counts by action type and top admins
+    """
+    from app.services.admin_audit_service import AdminAuditService
+    
+    return AdminAuditService.get_admin_action_stats(db, days)
+
+
+@router.get("/activity/timeline")
+async def get_activity_timeline(
+    days: int = Query(7, ge=1, le=30),
+    admin_user: models.User = Depends(get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    """
+    Get activity timeline for visualization
+    
+    **Authorization:** Admin only
+    
+    Args:
+        days: Number of days to include (1-30)
+    
+    Returns:
+        Activity timeline grouped by hour
+    """
+    from app.services.admin_audit_service import AdminAuditService
+    
+    return AdminAuditService.get_activity_timeline(db, days)
