@@ -135,7 +135,7 @@ export default function AnalyticsPage() {
                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                                     <span className="text-xs text-slate-300 font-medium">{item.name}</span>
                                 </div>
-                                <span className="text-xs font-bold text-slate-100">{item.value}</span>
+                                <span className="text-xs font-bold text-slate-100">{String(item.value)}</span>
                             </div>
                         ))}
                     </div>

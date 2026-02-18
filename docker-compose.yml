@@ -385,24 +385,6 @@ services:
       timeout: 10s
       retries: 3
 
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-  pgadmin_data:
-    driver: local
-  prometheus_data:
-    driver: local
-  grafana_data:
-    driver: local
-  minio_data:
-    driver: local
-
-networks:
-  voicenote_network:
-    driver: bridge
-
   # Dashboard Frontend
   dashboard:
     build:
@@ -424,3 +406,21 @@ networks:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  voicenote_network:
+    driver: bridge
