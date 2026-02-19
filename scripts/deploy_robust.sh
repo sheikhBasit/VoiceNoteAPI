@@ -19,16 +19,42 @@ echo "📥 Pulling latest code..."
 git pull origin main
 
 # 3. Shutdown and Clean
+echo "Sweep for accidental directories..."
+[ -d scripts/init.sql ] && echo "Removing accidental directory scripts/init.sql" && rm -rf scripts/init.sql
+[ -d scripts/seed.sql ] && echo "Removing accidental directory scripts/seed.sql" && rm -rf scripts/seed.sql
+
 echo "🧹 Cleaning up old containers..."
-# Use compose down to be safe, avoid aggressive system prune unless requested
 docker compose down -v --remove-orphans
 
 # 4. Pull latest images
 echo "📥 Pulling latest images from registry..."
 docker compose pull
 
-# 5. Start Services
-echo "🎬 Starting services..."
+# 5. Start Core Services First (Staged Startup)
+echo "🎬 Starting core services (db, redis)..."
+docker compose up -d db redis
+
+echo "⏳ Waiting for core services to stabilize..."
+for i in {1..30}; do
+    DB_STATUS=$(docker inspect --format='{{.State.Health.Status}}' voicenote_db 2>/dev/null || echo "not-found")
+    REDIS_STATUS=$(docker inspect --format='{{.State.Health.Status}}' voicenote_redis 2>/dev/null || echo "not-found")
+    
+    if [[ "$DB_STATUS" == "healthy" && "$REDIS_STATUS" == "healthy" ]]; then
+        echo "✅ Core services are ready!"
+        break
+    fi
+    echo "   [$i/30] DB: $DB_STATUS | Redis: $REDIS_STATUS"
+    sleep 2
+done
+
+if [[ "$(docker inspect --format='{{.State.Health.Status}}' voicenote_db 2>/dev/null)" != "healthy" ]]; then
+    echo "❌ Database failed to become healthy. Dumping DB logs..."
+    docker compose logs db
+    exit 1
+fi
+
+# 6. Start Remaining Services
+echo "🎬 Starting remaining services..."
 docker compose up -d
 
 # 6. Advanced Health Check Loop
