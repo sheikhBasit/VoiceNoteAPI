@@ -76,6 +76,8 @@ services:
       WEB_CONCURRENCY: "1"
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
+      HF_HOME: "/root/.cache/huggingface"
+      SENTENCE_TRANSFORMERS_HOME: "/root/.cache/torch/sentence_transformers"
     ports:
       - "8000:8000"
     depends_on:
@@ -90,6 +92,7 @@ services:
       - ./uploads:/app/uploads
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
+      - hf_cache:/root/.cache
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 15s
@@ -127,6 +130,8 @@ services:
       MINIO_ROOT_PASSWORD: "minioadmin"
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
+      HF_HOME: "/root/.cache/huggingface"
+      SENTENCE_TRANSFORMERS_HOME: "/root/.cache/torch/sentence_transformers"
     depends_on:
       db:
         condition: service_healthy
@@ -139,6 +144,7 @@ services:
       - ./uploads:/app/uploads
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
+      - hf_cache:/root/.cache
     networks:
       - voicenote_network
     restart: unless-stopped
@@ -408,6 +414,8 @@ services:
         max-file: "3"
 
 volumes:
+  hf_cache:
+    driver: local
   postgres_data:
     driver: local
   redis_data:

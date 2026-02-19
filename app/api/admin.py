@@ -233,13 +233,12 @@ async def list_all_notes(
         )
 
     try:
-        notes = db.query(models.Note).offset(skip).limit(limit).all()
-        total = db.query(models.Note).count()
+        notes_query = db.query(models.Note)
+        total = notes_query.count()
+        notes = notes_query.offset(skip).limit(limit).all()
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"❌ DB QUERY ERROR: {e}")
-        raise HTTPException(status_code=500, detail=f"Database Query Error: {e}")
+        JLogger.error(f"DB QUERY ERROR in list_all_notes: {e}", traceback=True)
+        raise HTTPException(status_code=500, detail=f"Database Query Error: {str(e)}")
     
     # Manual serialization to avoid Pydantic/SQLAlchemy issues
     serialized_notes = []
@@ -256,8 +255,8 @@ async def list_all_notes(
                 "is_archived": bool(n.is_archived)
             })
     except Exception as e:
-        print(f"❌ SERIALIZATION ERROR: {e}")
-        raise HTTPException(status_code=500, detail=f"Serialization Error: {e}")
+        JLogger.error(f"SERIALIZATION ERROR in list_all_notes: {e}", traceback=True)
+        raise HTTPException(status_code=500, detail=f"Serialization Error: {str(e)}")
     
     return {"total": total, "skip": skip, "limit": limit, "notes": serialized_notes}
 
