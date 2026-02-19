@@ -194,6 +194,12 @@ class User(Base):
     )
     owned_teams = relationship("Team", back_populates="owner")
     teams = relationship("Team", secondary=team_members, back_populates="members")
+    tasks = relationship(
+        "Task",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class RefreshToken(Base):
@@ -399,6 +405,7 @@ class Task(Base):
     #   "ai_prompt": {"model": "...", "prompt": "...", "chat_url": "..."}
     # }
 
+    user = relationship("User", back_populates="tasks")
     note = relationship("Note", back_populates="tasks")
     team = relationship("Team", back_populates="tasks")
 

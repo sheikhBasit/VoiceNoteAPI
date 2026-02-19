@@ -14,8 +14,8 @@ ALEMBIC_LOG="/tmp/alembic_output.log"
 alembic -c /app/alembic.ini upgrade head 2>&1 | tee "$ALEMBIC_LOG"
 ALEMBIC_EXIT=$?
 
-# Check if migration failed due to missing revision
-if grep -q "Can't locate revision" "$ALEMBIC_LOG"; then
+# Check if migration failed due to missing revision or existing schema elements
+if grep -qE "Can't locate revision|DuplicateTable|DuplicateColumn|already exists" "$ALEMBIC_LOG"; then
     echo "========================================="
     echo "⚠️ Detected missing migration history (likely due to squash)."
     echo "Attempting to recover by resetting alembic_version table..."
@@ -40,9 +40,9 @@ async def reset_alembic():
 asyncio.run(reset_alembic())
 " 2>&1 || echo "⚠️ Could not drop alembic_version (might not exist)"
     
-    # Now stamp with the current head
-    echo "📍 Stamping database with current head: b891cb8863b5"
-    alembic -c /app/alembic.ini stamp b891cb8863b5
+    # Now stamp with head to align with current schema
+    echo "📍 Stamping database with head to align with models..."
+    alembic -c /app/alembic.ini stamp head
     
     if [ $? -eq 0 ]; then
         echo "✅ Stamp successful. Running upgrade..."
