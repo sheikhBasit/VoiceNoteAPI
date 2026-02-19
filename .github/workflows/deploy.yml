@@ -135,6 +135,9 @@ jobs:
             set -e
             cd /home/${{ secrets.SERVER_USER }}/voicenote-project/VoiceNoteAPI
             
+            # Pull latest code (Must happen before running the script)
+            git pull origin main
+            
             # Make script executable
             chmod +x scripts/deploy_robust.sh
             
