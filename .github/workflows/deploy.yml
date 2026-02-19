@@ -132,83 +132,12 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           command_timeout: 30m
           script: |
-            set -e  # Exit on error
-            
-            # Login to Docker Hub to fix rate limit
-            echo "$DOCKER_PASSWORD" | sudo docker login -u "$DOCKER_USERNAME" --password-stdin
-            
+            set -e
             cd /home/${{ secrets.SERVER_USER }}/voicenote-project/VoiceNoteAPI
             
-            # Pull latest code
-            git pull origin main
+            # Make script executable
+            chmod +x scripts/deploy_robust.sh
             
-            # Stop containers and REMOVE VOLUMES (Reset DB)
-            sudo docker compose down -v
-            
-            # Reclaim disk space and remove old volumes (Aggressive prune)
-            sudo docker system prune -af
-            
-            # Force remove potentially conflicting containers (Fix for name conflict)
-            sudo docker rm -f voicenote_node_exporter voicenote_api voicenote_db voicenote_redis || true
-
-            sudo docker volume prune -f
-            
-            # Pull latest images
-            sudo docker compose pull
-            
-            # Start all services with fresh state (allow to fail gracefully)
-            sudo docker compose up -d --no-build || true
-            
-            # Give containers a moment to initialize
-            sleep 5
-            
-            # Robust targeted health check
-            echo "Waiting for core services (db, redis, api) to be healthy..."
-            for i in {1..200}; do
-              DB_HEALTH=$(sudo docker inspect --format='{{.State.Health.Status}}' voicenote_db 2>/dev/null || echo "not-found")
-              REDIS_HEALTH=$(sudo docker inspect --format='{{.State.Health.Status}}' voicenote_redis 2>/dev/null || echo "not-found")
-              API_HEALTH=$(sudo docker inspect --format='{{.State.Health.Status}}' voicenote_api 2>/dev/null || echo "not-found")
-              API_STATE=$(sudo docker inspect --format='{{.State.Status}}' voicenote_api 2>/dev/null || echo "not-found")
-              
-               echo "   Status ($i/200): DB=$DB_HEALTH, Redis=$REDIS_HEALTH, API=$API_HEALTH (State=$API_STATE)"
-              
-              if echo "$DB_HEALTH" | grep -q "healthy" && echo "$REDIS_HEALTH" | grep -q "healthy" && echo "$API_HEALTH" | grep -q "healthy"; then
-                echo "✅ All core services are healthy!"
-                break
-              fi
-              
-              # Force restart API if dependencies are healthy but API is not running/restarting
-              if echo "$DB_HEALTH" | grep -q "healthy" && echo "$REDIS_HEALTH" | grep -q "healthy"; then
-                if ! echo "$API_STATE" | grep -q "running" && ! echo "$API_STATE" | grep -q "starting"; then
-                  echo "⚠️ API service in state '$API_STATE'. Force starting API..."
-                  sudo docker compose up -d api
-                fi
-              fi
-              
-              sleep 3
-              if [ $i -eq 200 ]; then
-                echo "❌ Timeout waiting for services to be healthy."
-                sudo docker compose ps
-                sudo docker compose logs db
-                sudo docker compose logs api
-                exit 1
-              fi
-            done
-            
-            # Run migrations (Fail loudly if this errors)
-            echo "Running database migrations..."
-            sudo docker compose exec -T api alembic -c /app/alembic.ini upgrade head
-            
-            # Verify migration status
-            echo "Verifying migration state..."
-            sudo docker compose exec -T api alembic current
-            
-            # Verify deployment
-            sudo docker compose ps
-            
-            # Run tests and dump logs on failure
-            if ! sudo bash scripts/test/test_api.sh; then
-              echo "❌ Tests failed. Dumping API logs for debugging:"
-              sudo docker compose logs api --tail=500
-              exit 1
-            fi
+            # Use the robust deployment script
+            # Passing DOCKER_USERNAME and DOCKER_PASSWORD as env vars to the script
+            sudo -E ./scripts/deploy_robust.sh
