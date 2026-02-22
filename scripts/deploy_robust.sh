@@ -6,6 +6,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
+# Source .env so docker-compose can interpolate required variables
+# (needed when running under sudo where auto .env loading is skipped)
+if [ -f ".env" ]; then
+    echo "📋 Loading environment from .env..."
+    set -a
+    # shellcheck source=/dev/null
+    source .env
+    set +a
+else
+    echo "⚠️  Warning: .env file not found at $PROJECT_DIR/.env"
+fi
+
 echo "🚀 Starting Robust Deployment for VoiceNoteAPI..."
 
 # 1. Login to Docker Hub (if credentials provided)
