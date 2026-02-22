@@ -58,3 +58,10 @@ Thumbs.db
 .docker/
 docker-compose.override.yml
 
+# Test output artifacts
+*_output.txt
+dashboard/playwright-report/
+dashboard/test-results/
+AUDIT_REPORT*.md
+PROJECT_ANALYSIS.md
+
