@@ -62,6 +62,7 @@ class TestNoteCreation:
             json={
                 "title": "Test Note",
                 "summary": "This is a test note created manually",
+                "transcript": "Test transcript content",
                 "priority": "HIGH",
             },
         )
@@ -82,7 +83,7 @@ class TestNoteCreation:
     def test_create_note_minimal(self, headers):
         """Test note creation with minimal data"""
         response = client.post(
-            "/api/v1/notes/create", headers=headers, json={"title": "Minimal Note"}
+            "/api/v1/notes/create", headers=headers, json={"title": "Minimal Note", "transcript": "Minimal transcript"}
         )
         assert response.status_code == 201
         data = response.json()
@@ -93,7 +94,7 @@ class TestNoteCreation:
         response = client.post(
             "/api/v1/notes/create",
             headers=headers,
-            json={"summary": "Note without title"},
+            json={"summary": "Note without title", "transcript": "Note without title transcript"},
         )
         assert response.status_code == 201
         data = response.json()
@@ -112,9 +113,10 @@ class TestWhatsAppDraft:
             json={
                 "title": "Meeting Notes",
                 "summary": "Discussed project timeline and deliverables",
-                "priority": "MEDIUM",
+                "transcript": "Meeting transcript",
             },
         )
+        assert response.status_code == 201, f"Note creation failed: {response.text}"
         return response.json()["id"]
 
     def test_get_whatsapp_draft(self, headers, test_note_id):
@@ -147,11 +149,10 @@ class TestSemanticAnalysis:
                     "title": "Product Launch Discussion",
                     "summary": "Discussed marketing strategy, target audience, and launch timeline",
                     "transcript": "We need to focus on digital marketing channels...",
-                    "priority": "HIGH",
                 },
             )
-            if response.status_code == 200:
-                return response.json()["id"]
+            assert response.status_code == 201, f"Note creation for semantic analysis failed: {response.text}"
+            return response.json()["id"]
         except Exception:
             pass
         return None
@@ -192,7 +193,7 @@ class TestTaskCreation:
     def test_note_id(self, headers):
         """Create a test note for task creation"""
         response = client.post(
-            "/api/v1/notes/create", headers=headers, json={"title": "Project Planning"}
+            "/api/v1/notes/create", headers=headers, json={"title": "Project Planning", "transcript": "Planning transcript"}
         )
         return response.json()["id"]
 
@@ -233,7 +234,7 @@ class TestTaskCreation:
             print(
                 f"Task empty desc failed validation check: {response.status_code} - {response.text}"
             )
-        assert response.status_code == 400  # Manual validation returns 400
+        assert response.status_code == 422  # Pydantic validation returns 422
 
 
 class TestTaskFiltering:
@@ -306,8 +307,9 @@ class TestTaskDuplication:
         note_response = client.post(
             "/api/v1/notes/create",
             headers=headers,
-            json={"title": "Test Note for Task"},
+            json={"title": "Test Note for Task", "transcript": "Task note transcript"},
         )
+        assert note_response.status_code == 201, f"Note creation for task failed: {note_response.text}"
         note_id = note_response.json()["id"]
 
         # Then create a task
@@ -320,6 +322,7 @@ class TestTaskDuplication:
                 "priority": "MEDIUM",
             },
         )
+        assert task_response.status_code == 201, f"Task creation failed: {task_response.text}"
         return task_response.json()["id"]
 
     def test_duplicate_task(self, headers, test_task_id):

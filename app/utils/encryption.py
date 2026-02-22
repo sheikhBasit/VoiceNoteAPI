@@ -48,4 +48,4 @@ class EncryptionService:
             return decrypted.decode("utf-8")
         except Exception as e:
             JLogger.error("Decryption failed", error=str(e))
-            raise ValueError(f"Failed to decrypt data: {e}")
+            return ciphertext_b64

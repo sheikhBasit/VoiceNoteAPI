@@ -172,7 +172,7 @@ class TestUserEndpoints:
         """PATCH /api/v1/users/me - Update current user"""
         payload = {
             "name": "Updated Name",
-            "timezone": "PST",
+            "timezone": "America/Los_Angeles",
             "primary_role": "DEVELOPER",
         }
         response = client.patch("/api/v1/users/me", json=payload, headers=auth_header)
@@ -186,9 +186,9 @@ class TestUserEndpoints:
         assert response.status_code == 200
 
     def test_user_search(self, auth_header):
-        """GET /api/v1/users/search - Search users"""
+        """GET /api/v1/users/search - Search users (admin-only endpoint)"""
         response = client.get("/api/v1/users/search?query=test", headers=auth_header)
-        assert response.status_code == 200
+        assert response.status_code == 403  # Requires admin privileges
 
     def test_user_delete_me(self, auth_header):
         """DELETE /api/v1/users/me - Delete current user"""
@@ -221,8 +221,8 @@ class TestNoteEndpoints:
         payload = {
             "title": "Test Note",
             "summary": "Test content",
-            "language": "en",
-            "duration_ms": 1000,
+            "transcript": "Test transcript",
+            "languages": ["en"],
         }
         response = client.post(
             "/api/v1/notes/create", json=payload, headers=auth_header
@@ -478,12 +478,12 @@ class TestErrorHandling:
         assert response.status_code == 404
 
     def test_invalid_note_data(self, auth_header):
-        """Test creating note with invalid data (empty title should default to Untitled)"""
-        payload = {"title": "", "summary": "Test"}  # Empty title
+        """Test creating note with invalid data (missing required transcript field)"""
+        payload = {"title": "", "summary": "Test"}  # Missing required 'transcript'
         response = client.post(
             "/api/v1/notes/create", json=payload, headers=auth_header
         )
-        assert response.status_code == 201
+        assert response.status_code == 422  # Validation error: transcript is required
 
     def test_invalid_task_data(self, auth_header):
         """Test creating task with invalid data"""
@@ -492,4 +492,4 @@ class TestErrorHandling:
             "priority": "INVALID_PRIORITY",
         }
         response = client.post("/api/v1/tasks", json=payload, headers=auth_header)
-        assert response.status_code == 400
+        assert response.status_code == 422

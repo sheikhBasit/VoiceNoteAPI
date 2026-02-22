@@ -9,6 +9,10 @@ Tests:
 5. Legacy upload compatibility
 6. Queue routing
 7. Error handling
+
+NOTE: These tests require the full Docker stack to be running.
+They will be automatically skipped when the API is unreachable.
+Run with: docker exec voicenote_api python -m pytest tests/enterprise/test_minio_architecture.py -v
 """
 
 import os
@@ -20,10 +24,12 @@ import pytest
 import requests
 
 
-# Auto-detect if running inside Docker container
+# ---------------------------------------------------------------------------
+# Environment detection
+# ---------------------------------------------------------------------------
+
 def get_base_url():
     """Detect environment and return appropriate base URL"""
-    # Check if we're inside a Docker container
     if os.path.exists("/.dockerenv") or os.environ.get("RUNNING_IN_DOCKER"):
         return "http://api:8000/api/v1"
     return os.environ.get("API_BASE_URL", "http://localhost:8000/api/v1")
@@ -39,6 +45,30 @@ def get_minio_url():
 BASE_URL = get_base_url()
 MINIO_URL = get_minio_url()
 TEST_AUDIO_PATH = "/tmp/pytest_test_audio.wav"
+
+
+# ---------------------------------------------------------------------------
+# Module-level skip guard — skip everything when the live API is not up
+# ---------------------------------------------------------------------------
+
+def _api_is_up() -> bool:
+    """Return True if the API server is reachable."""
+    try:
+        health_url = BASE_URL.replace("/api/v1", "") + "/health"
+        requests.get(health_url, timeout=2)
+        return True
+    except Exception:
+        return False
+
+
+_LIVE_API_AVAILABLE = _api_is_up()
+
+# Applied to every test class in this file
+_live_api_mark = pytest.mark.skipif(
+    not _LIVE_API_AVAILABLE,
+    reason="Live API not reachable — start the Docker stack first: docker compose up -d",
+)
+
 
 
 @pytest.fixture(scope="module")
@@ -133,6 +163,7 @@ def authenticated_user():
     }
 
 
+@_live_api_mark
 class TestMinIOArchitecture:
     """Test suite for MinIO Privacy-First architecture."""
 
@@ -417,13 +448,17 @@ class TestMinIOArchitecture:
         assert "queue" in data or "status" in data or "note_id" in data
 
 
+@_live_api_mark
 class TestMinIOConfiguration:
     """Test MinIO configuration and connectivity."""
 
     def test_minio_health(self):
         """Test MinIO health endpoint."""
-        response = requests.get(f"{MINIO_URL}/minio/health/live")
-        assert response.status_code == 200
+        try:
+            response = requests.get(f"{MINIO_URL}/minio/health/live", timeout=3)
+            assert response.status_code == 200
+        except requests.exceptions.ConnectionError:
+            pytest.skip(f"MinIO not reachable at {MINIO_URL}")
 
     def test_bucket_exists(self):
         """Test that 'incoming' bucket exists."""
@@ -434,12 +469,18 @@ class TestMinIOConfiguration:
         result = subprocess.run(
             ["docker", "exec", "voicenote_mc", "/usr/bin/mc", "ls", "myminio/incoming"],
             capture_output=True,
+            text=True,
         )
 
-        # Should not error (bucket exists)
-        assert result.returncode == 0
+        # Gracefully skip when the container is stopped/missing
+        stderr = result.stderr or ""
+        if result.returncode != 0:
+            if "not running" in stderr or "No such container" in stderr:
+                pytest.skip(f"voicenote_mc container not running: {stderr.strip()}")
+            pytest.fail(f"mc ls failed (rc={result.returncode}): {stderr.strip()}")
 
 
+@_live_api_mark
 class TestCeleryQueues:
     """Test Celery queue configuration."""
 
@@ -463,6 +504,13 @@ class TestCeleryQueues:
             capture_output=True,
             text=True,
         )
+
+        # Gracefully skip when the worker container is absent or stopped
+        stderr = result.stderr or ""
+        if result.returncode != 0:
+            if "not running" in stderr or "No such container" in stderr:
+                pytest.skip(f"voicenote_celery_worker container not running: {stderr.strip()}")
+            pytest.fail(f"celery inspect failed (rc={result.returncode}): {stderr.strip()}")
 
         assert "short" in result.stdout
         assert "long" in result.stdout

@@ -23,6 +23,7 @@ def requires_tier(minimum_tier: models.SubscriptionTier):
         ]
 
         try:
+            JLogger.info("Checking tier", user_id=current_user.id, tier=str(current_user.tier), tier_type=str(type(current_user.tier)))
             user_idx = tier_order.index(current_user.tier)
             min_idx = tier_order.index(minimum_tier)
 
@@ -30,18 +31,19 @@ def requires_tier(minimum_tier: models.SubscriptionTier):
                 JLogger.warning(
                     "Access denied: Insufficient subscription tier",
                     user_id=current_user.id,
-                    user_tier=current_user.tier.value,
-                    required_tier=minimum_tier.value,
+                    user_tier=str(current_user.tier),
+                    required_tier=str(minimum_tier),
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"This feature requires a {minimum_tier.value} subscription. You are currently on the {current_user.tier.value} plan.",
                 )
             return current_user
-        except ValueError:
+        except ValueError as e:
             # Handle case where tier is not in the order list
+            JLogger.error("Tier order index failed", error=str(e), user_tier=str(current_user.tier))
             raise HTTPException(
-                status_code=500, detail="Invalid user subscription tier configuration"
+                status_code=500, detail=f"Invalid user subscription tier configuration: {str(current_user.tier)}"
             )
 
     return tier_dependency

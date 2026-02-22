@@ -113,7 +113,7 @@ class TestNotesRestoration:
     def test_restore_note(self, client, db_session, auth_headers):
         # 1. Create Note
         note = client.post(
-            "/api/v1/notes/create", headers=auth_headers, json={"title": "To Delete"}
+            "/api/v1/notes/create", headers=auth_headers, json={"title": "To Delete", "transcript": "To delete transcript"}
         ).json()
         note_id = note["id"]
 
@@ -139,10 +139,10 @@ class TestNotesRestoration:
 
     def test_bulk_delete_notes(self, client, db_session, auth_headers):
         n1 = client.post(
-            "/api/v1/notes/create", headers=auth_headers, json={"title": "Bulk 1"}
+            "/api/v1/notes/create", headers=auth_headers, json={"title": "Bulk 1", "transcript": "Bulk 1 transcript"}
         ).json()["id"]
         n2 = client.post(
-            "/api/v1/notes/create", headers=auth_headers, json={"title": "Bulk 2"}
+            "/api/v1/notes/create", headers=auth_headers, json={"title": "Bulk 2", "transcript": "Bulk 2 transcript"}
         ).json()["id"]
 
         # BULK DELETE with Body

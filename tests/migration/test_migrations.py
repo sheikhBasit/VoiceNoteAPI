@@ -2,18 +2,57 @@
 Alembic migration tests.
 
 These tests verify that database migrations can be applied and rolled back cleanly.
-Marked as integration tests since they require a real PostgreSQL database.
+They require a live PostgreSQL database (the Docker DB on port 5433).
 
 Run with: pytest tests/migration/ -v -m integration
+      OR: docker exec voicenote_api python -m pytest tests/migration/ -v
 """
 
+import os
 import subprocess
 import sys
 
 import pytest
 
 
-pytestmark = pytest.mark.integration
+# ---------------------------------------------------------------------------
+# Module-level skip guard — skip when PostgreSQL is not reachable
+# ---------------------------------------------------------------------------
+
+def _postgres_is_up() -> bool:
+    """Return True if the project's PostgreSQL instance is reachable."""
+    try:
+        import sqlalchemy
+
+        # Honour a custom DATABASE_URL if set, but never run on SQLite
+        url = os.environ.get(
+            "DATABASE_URL",
+            "postgresql://postgres:password@localhost:5433/voicenote",
+        )
+        if "sqlite" in url:
+            return False
+
+        engine = sqlalchemy.create_engine(
+            url, connect_args={"connect_timeout": 3}
+        )
+        with engine.connect():
+            pass
+        engine.dispose()
+        return True
+    except Exception:
+        return False
+
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not _postgres_is_up(),
+        reason=(
+            "PostgreSQL not reachable — start the Docker DB first: "
+            "docker compose up -d db"
+        ),
+    ),
+]
 
 
 class TestAlembicMigrations:

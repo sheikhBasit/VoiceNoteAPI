@@ -67,7 +67,7 @@ def db_session():
 def client(db_session):
     from fastapi import HTTPException, Request  # Ensure imports
 
-    from app.services.auth_service import get_current_user
+    from app.services.auth_service import get_current_user, get_current_active_admin
     from app.utils.security import verify_device_signature
 
     def override_get_db():
@@ -86,10 +86,12 @@ def client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[get_current_active_admin] = override_get_current_user  # Treat impersonated user as admin for simplicity in these tests
     app.dependency_overrides[verify_device_signature] = lambda: True
     yield TestClient(app)
     del app.dependency_overrides[get_db]
     del app.dependency_overrides[get_current_user]
+    del app.dependency_overrides[get_current_active_admin]
     del app.dependency_overrides[verify_device_signature]
 
 
@@ -176,7 +178,7 @@ class TestEndpointCascadeIntegration:
         db_session.commit()
 
         # 2. Restore
-        response = client.patch(f"/api/v1/users/{user_id}/restore")
+        response = client.patch(f"/api/v1/users/{user_id}/restore", headers={"X-Test-User-ID": user_id})
         assert response.status_code == 200
 
         # 3. Verify

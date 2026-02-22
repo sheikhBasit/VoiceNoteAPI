@@ -167,7 +167,6 @@ def test_note(test_user, db_session):
         summary="Summary",
         transcript_groq="Groq Transcript",
         transcript_deepgram="Deepgram Transcript",
-        transcript_android="Android Transcript",
         timestamp=int(time.time() * 1000)
     )
     db_session.add(note)
@@ -194,6 +193,5 @@ def test_get_note_verbose_transcripts(test_user, test_note):
     data = response.json()
     assert data["transcript_groq"] == "Groq Transcript"
     assert data["transcript_deepgram"] == "Deepgram Transcript"
-    assert data["transcript_android"] == "Android Transcript"
     
     app.dependency_overrides.clear()

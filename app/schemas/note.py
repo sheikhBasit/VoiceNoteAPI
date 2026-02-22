@@ -11,7 +11,7 @@ class ExternalLink(BaseModel):
 
 
 class NoteBase(BaseModel):
-    title: str
+    title: Optional[str] = None
     summary: str = ""
     folder_id: Optional[str] = None
     priority: Priority = Priority.MEDIUM

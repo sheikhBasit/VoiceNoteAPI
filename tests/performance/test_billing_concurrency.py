@@ -1,14 +1,58 @@
+"""
+Billing concurrency tests.
+
+Verifies that wallet deductions are atomic and overdraft prevention works
+under concurrent load.
+
+IMPORTANT: These tests require PostgreSQL because SQLite silently ignores
+SELECT … FOR UPDATE, making the lock tests meaningless. They are automatically
+skipped when PostgreSQL is not reachable.
+
+Run with: pytest tests/performance/ -v -m load
+      OR: docker exec voicenote_api python -m pytest tests/performance/ -v
+"""
 
 import concurrent.futures
-import pytest
-import sys
 import os
 
-# Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
+import pytest
 
 from app.db import models
 from app.services.billing_service import BillingService
+
+
+# ---------------------------------------------------------------------------
+# Module-level skip guard — skip when PostgreSQL is not reachable
+# (SQLite does not support SELECT … FOR UPDATE; locking tests are meaningless)
+# ---------------------------------------------------------------------------
+
+_PG_URL = "postgresql://postgres:password@localhost:5433/voicenote"
+
+
+def _postgres_is_up() -> bool:
+    """Return True if the project's PostgreSQL instance is reachable."""
+    try:
+        import sqlalchemy
+
+        engine = sqlalchemy.create_engine(
+            _PG_URL, connect_args={"connect_timeout": 3}
+        )
+        with engine.connect():
+            pass
+        engine.dispose()
+        return True
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _postgres_is_up(),
+    reason=(
+        "Billing concurrency tests require PostgreSQL (FOR UPDATE support). "
+        "SQLite is not supported. Start the Docker DB: docker compose up -d db"
+    ),
+)
+
 
 class TestBillingConcurrency:
     """Test concurrent billing operations."""
@@ -18,18 +62,16 @@ class TestBillingConcurrency:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         from app.db.session import Base
-        
-        # Use a separate DB file
-        engine = create_engine("sqlite:///./billing_test.db", connect_args={"check_same_thread": False})
+
+        # Always use PostgreSQL — SQLite ignores FOR UPDATE
+        engine = create_engine(_PG_URL)
         Base.metadata.create_all(bind=engine)
         TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        
+
         yield TestingSessionLocal
-        
-        # Cleanup
-        import os
-        if os.path.exists("./billing_test.db"):
-            os.remove("./billing_test.db")
+
+        engine.dispose()
+
 
     @pytest.mark.load
     def test_concurrent_wallet_deduction(self, custom_db):

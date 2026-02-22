@@ -351,7 +351,7 @@ services:
 
   # MinIO Object Storage
   minio:
-    image: minio/minio:RELEASE.2024-01-31T20-20-41Z
+    image: minio/minio:latest
     container_name: voicenote_minio
     ports:
       - "9000:9000"
@@ -373,7 +373,7 @@ services:
 
   # Auto-create bucket for MinIO
   createbuckets:
-    image: minio/mc:RELEASE.2024-01-28T22-35-53Z
+    image: minio/mc:latest
     container_name: voicenote_mc
     depends_on:
       minio:

@@ -54,7 +54,7 @@ class TestAnalyticsEndpoints:
             f"/api/v1/admin/analytics/usage?start_date={start_date}&end_date={end_date}&group_by=invalid",
             headers=admin_token
         )
-        assert response.status_code == 400  # Bad request for invalid group_by
+        assert response.status_code == 422  # FastAPI validation error for invalid pattern
 
     def test_growth_analytics(self, admin_token):
         """GET /api/v1/admin/analytics/growth"""
