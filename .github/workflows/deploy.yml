@@ -125,8 +125,15 @@ jobs:
         env:
           DOCKER_USERNAME: ab745
           DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
+          MINIO_ROOT_USER: ${{ secrets.MINIO_ROOT_USER }}
+          MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          DEVICE_SECRET_KEY: ${{ secrets.DEVICE_SECRET_KEY }}
+          PGADMIN_DEFAULT_PASSWORD: ${{ secrets.PGADMIN_DEFAULT_PASSWORD }}
+          GF_SECURITY_ADMIN_PASSWORD: ${{ secrets.GF_SECURITY_ADMIN_PASSWORD }}
         with:
-          envs: DOCKER_USERNAME,DOCKER_PASSWORD
+          envs: DOCKER_USERNAME,DOCKER_PASSWORD,MINIO_ROOT_USER,MINIO_ROOT_PASSWORD,POSTGRES_USER,POSTGRES_PASSWORD,DEVICE_SECRET_KEY,PGADMIN_DEFAULT_PASSWORD,GF_SECURITY_ADMIN_PASSWORD
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_KEY }}
@@ -134,13 +141,13 @@ jobs:
           script: |
             set -e
             cd /home/${{ secrets.SERVER_USER }}/voicenote-project/VoiceNoteAPI
-            
+
             # Pull latest code (Must happen before running the script)
             git pull origin main
-            
+
             # Make script executable
             chmod +x scripts/deploy_robust.sh
-            
+
             # Use the robust deployment script
-            # Passing DOCKER_USERNAME and DOCKER_PASSWORD as env vars to the script
+            # All required env vars are forwarded via -E (preserves environment)
             sudo -E ./scripts/deploy_robust.sh
