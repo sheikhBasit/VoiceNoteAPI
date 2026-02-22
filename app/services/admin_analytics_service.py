@@ -194,13 +194,13 @@ class AdminAnalyticsService:
             )
         ).all()
         
-        # Calculate revenue (credits)
-        credits = [t for t in transactions if t.transaction_type == "CREDIT"]
+        # Calculate revenue (deposits/refunds = positive inflow)
+        credits = [t for t in transactions if t.type in ("DEPOSIT", "REFUND", "BONUS")]
         total_revenue = sum(t.amount for t in credits)
-        
-        # Calculate expenses (debits)
-        debits = [t for t in transactions if t.transaction_type == "DEBIT"]
-        total_expenses = sum(t.amount for t in debits)
+
+        # Calculate expenses (usage = negative outflow)
+        debits = [t for t in transactions if t.type == "USAGE"]
+        total_expenses = sum(abs(t.amount) for t in debits)
         
         # Net revenue
         net_revenue = total_revenue - total_expenses
@@ -213,7 +213,7 @@ class AdminAnalyticsService:
             
             tier_revenue = sum(
                 t.amount for t in credits 
-                if t.user_id in tier_user_ids
+                if t.wallet_id in tier_user_ids
             )
             revenue_by_tier[tier.name] = tier_revenue
         
