@@ -143,8 +143,8 @@ class User(Base):
     # AI Context & Roles
     primary_role = Column(Enum(UserRole), default=UserRole.GENERIC)
     secondary_role = Column(Enum(UserRole), nullable=True)
-    custom_role_description = Column(Text)
-    system_prompt = Column(Text)
+    custom_role_description = Column(Text, nullable=True, default="")
+    system_prompt = Column(Text, nullable=True, default="")
     jargons = Column(JSONB, default=list)  # Custom vocabulary for Whisper/Llama
 
     # Admin System (NEW)
@@ -254,6 +254,10 @@ class Team(Base):
 
 class Note(Base):
     __tablename__ = "notes"
+    __table_args__ = (
+        Index("idx_notes_user_timestamp", "user_id", "timestamp"),
+        Index("idx_notes_team_timestamp", "team_id", "timestamp"),
+    )
 
     id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
@@ -269,7 +273,6 @@ class Note(Base):
     # Transcripts from different engines for comparison
     transcript_groq = Column(Text)
     transcript_deepgram = Column(Text)
-    transcript_android = Column(Text)  # Fallback
 
     # Audio Storage
     audio_url = Column(String, nullable=True)  # Enhanced version
@@ -326,11 +329,10 @@ class Note(Base):
 
     @property
     def transcript(self):
-        """Returns the best available transcript."""
+        """Returns the best available transcript. Priority: Whisper (Groq) > Nova (Deepgram)."""
         return (
-            self.transcript_deepgram
-            or self.transcript_groq
-            or self.transcript_android
+            self.transcript_groq
+            or self.transcript_deepgram
             or ""
         )
 
@@ -349,6 +351,9 @@ Index(
 
 class Task(Base):
     __tablename__ = "tasks"
+    __table_args__ = (
+        Index("idx_tasks_note_priority", "note_id", "priority"),
+    )
 
     id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
@@ -498,6 +503,18 @@ class ServicePlan(Base):
     can_use_rag = Column(Boolean, default=True)
     max_storage_mb = Column(Integer, default=500)
 
+    # Mobile billing
+    google_play_product_id = Column(String, nullable=True)  # e.g. "voicenote_pro_monthly"
+    description = Column(Text, nullable=True)
+
+    # Usage limits (-1 = unlimited)
+    monthly_note_limit = Column(Integer, default=10)
+    monthly_task_limit = Column(Integer, default=20)
+
+    # Feature flags
+    features = Column(JSON, default=lambda: {})  # {"semantic_search": true, "note_chat": true, ...}
+    is_active = Column(Boolean, default=True)
+
     created_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
     updated_at = Column(BigInteger, default=lambda: int(time.time() * 1000))
 
@@ -514,8 +531,8 @@ class Wallet(Base):
         String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
     balance = Column(
-        Integer, default=0
-    )  # Stored in smallest currency unit (e.g., cents or credits) or tokens
+        Integer, default=100
+    )  # 100 free credits on signup — matches BillingService.get_or_create_wallet()
     currency = Column(String(3), default="USD")
     is_frozen = Column(Boolean, default=False)  # If payment fails
 

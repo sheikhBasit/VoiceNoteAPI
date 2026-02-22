@@ -1,23 +1,30 @@
+import json
 import logging
 import os
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.utils import get_openapi
 from prometheus_fastapi_instrumentator import Instrumentator
+import re
+
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.utils.exceptions import VoiceNoteError
 from app.api import (
     admin,
+    admin_ws,
     ai,
+    billing,
     folders,
     integrations,
     notes,
@@ -74,11 +81,26 @@ app = FastAPI(
     swagger_ui_parameters={"persistAuthorization": True},
 )
 
-# Apply Request Body Caching (Required for device signature verification)
-app.add_middleware(RequestBodyCacheMiddleware)
+# Parse CORS origins — supports both JSON array and comma-separated formats
+_cors_raw = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3003")
+try:
+    _allowed_origins = json.loads(_cors_raw) if _cors_raw.strip().startswith("[") else []
+except (json.JSONDecodeError, ValueError):
+    _allowed_origins = []
+if not _allowed_origins:
+    _allowed_origins = [o.strip().strip('"').strip("'") for o in _cors_raw.split(",") if o.strip()]
 
-# Apply Compression (Speeds up large JSON responses like notes lists)
+# Middleware order: last added = outermost. CORS must be outermost
+# so preflight/error responses always get CORS headers.
+app.add_middleware(RequestBodyCacheMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.exception_handler(VoiceNoteError)
 async def voicenote_exception_handler(request: Request, exc: VoiceNoteError):
@@ -108,12 +130,37 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Standardize Pydantic validation errors."""
     return JSONResponse(
-        status_code=400,
+        status_code=422,
         content={
             "error": "Validation failed",
             "code": "VALIDATION_ERROR",
             "detail": exc.errors()
         },
+    )
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError):
+    """Translate DB constraint violations into friendly API errors."""
+    msg = str(exc.orig) if exc.orig else str(exc)
+    JLogger.warning(f"IntegrityError: {msg}")
+
+    # Foreign key violation — return generic message without exposing table names
+    if "is not present in table" in msg or "foreign key" in msg.lower():
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Referenced resource not found", "code": "NOT_FOUND", "detail": "A referenced resource does not exist."},
+        )
+
+    # Unique constraint violation
+    if "unique" in msg.lower() or "duplicate key" in msg.lower():
+        return JSONResponse(
+            status_code=409,
+            content={"error": "Duplicate entry", "code": "CONFLICT", "detail": "A record with that value already exists."},
+        )
+
+    return JSONResponse(
+        status_code=400,
+        content={"error": "Data integrity error", "code": "INTEGRITY_ERROR", "detail": "The request conflicts with existing data."},
     )
 
 @app.exception_handler(Exception)
@@ -158,6 +205,7 @@ def custom_openapi():
         "/api/v1/users/login": ["post"],
         "/api/v1/users/verify-device": ["get"],
         "/api/v1/users/request-device-auth": ["post"],
+        "/api/v1/billing/plans": ["get"],
     }
 
     # Replace all HTTPBearer references with BearerAuth
@@ -306,9 +354,11 @@ app.state.limiter = limiter
 app.include_router(users.router)
 app.include_router(notes.router)
 app.include_router(tasks.router)
+app.include_router(billing.router)
 app.include_router(sync.router)
 app.include_router(ai.router)
 app.include_router(admin.router)  # NEW: Admin endpoints
+app.include_router(admin_ws.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(folders.router)  # NEW: Folders management
 app.include_router(integrations.router)
 app.include_router(webhooks.router)

@@ -1,9 +1,11 @@
 import os
 import time
 import uuid
+from datetime import datetime
 from typing import List, Optional, Tuple, Dict, Any
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
+from fastapi import HTTPException
 
 from app.db import models
 from app.schemas import note as note_schema
@@ -14,8 +16,44 @@ from app.services.analytics_service import AnalyticsService
 from app.utils.security import verify_note_ownership
 from app.worker.task import generate_note_embeddings_task, analyze_note_semantics_task, note_process_pipeline
 from app.utils.encryption import EncryptionService
+from app.core.config import ai_config
 
 class NoteService:
+    @staticmethod
+    def check_monthly_note_limit(db: Session, user: models.User):
+        """
+        Enforce monthly note creation limit based on user's plan.
+        Raises 402 if limit is reached. -1 means unlimited.
+        """
+        plan = None
+        if user.plan_id:
+            plan = db.query(models.ServicePlan).filter(
+                models.ServicePlan.id == user.plan_id
+            ).first()
+
+        limit = getattr(plan, "monthly_note_limit", None)
+        if limit is None:
+            limit = 10  # Default for FREE users with no plan assigned
+
+        if limit == -1:
+            return  # Unlimited
+
+        start_of_month = datetime.now().replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        start_ts = int(start_of_month.timestamp() * 1000)
+
+        count = db.query(models.Note).filter(
+            models.Note.user_id == user.id,
+            models.Note.timestamp >= start_ts,
+            models.Note.is_deleted == False,
+        ).count()
+
+        if count >= limit:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Monthly limit reached ({limit} notes). Upgrade your plan.",
+            )
     @staticmethod
     def verify_note_access(db: Session, user: models.User, note_id: str) -> models.Note:
         """
@@ -56,26 +94,41 @@ class NoteService:
 
     @classmethod
     def create_note_record(
-        cls, 
-        db: Session, 
-        user: models.User, 
+        cls,
+        db: Session,
+        user: models.User,
         data: Dict[str, Any],
         is_pending: bool = False
     ) -> models.Note:
         """
         Handles core note creation logic.
         """
+        cls.check_monthly_note_limit(db, user)
         note_id = data.get("id") or str(uuid.uuid4())
-        
+
+        # Validate foreign keys before insert
+        folder_id = data.get("folder_id")
+        if folder_id:
+            folder = db.query(models.Folder).filter(models.Folder.id == folder_id).first()
+            if not folder:
+                raise NotFoundError("Folder", folder_id)
+            if folder.user_id != user.id and not user.is_admin:
+                raise PermissionDeniedError("You do not have permission to use this folder")
+
+        team_id = data.get("team_id")
+        if team_id:
+            team = db.query(models.Team).filter(models.Team.id == team_id).first()
+            if not team:
+                raise NotFoundError("Team", team_id)
+
         status = models.NoteStatus.PENDING if is_pending else models.NoteStatus.DONE
-        
+
         db_note = models.Note(
             id=note_id,
             user_id=user.id,
             title=data.get("title") or "Untitled Note",
             summary=data.get("summary") or "",
             transcript_groq=data.get("transcript") or data.get("transcript_groq") or "",
-            transcript_android=data.get("transcript_android") or "", # Fallback
             priority=data.get("priority") or models.Priority.MEDIUM,
             status=status,
             raw_audio_url=data.get("audio_url") or data.get("raw_audio_url"),
@@ -94,18 +147,19 @@ class NoteService:
         if db_note.is_encrypted:
             db_note.summary = EncryptionService.encrypt(db_note.summary)
             db_note.transcript_groq = EncryptionService.encrypt(db_note.transcript_groq)
-            db_note.transcript_android = EncryptionService.encrypt(db_note.transcript_android)
         
         db.add(db_note)
         db.commit()
         db.refresh(db_note)
         
-        # Async hooks
+        # Team broadcast via sync Celery helper (avoids async/sync boundary issue)
         if db_note.team_id:
-            from app.services.broadcaster import broadcaster
-            # Note: broadcaster is usually async, but this is a sync service method
-            # We will handle the async push in the API layer or using a background task helper
-            pass
+            from app.worker.task import broadcast_team_update
+            broadcast_team_update(
+                db_note.team_id,
+                "NOTE_CREATED",
+                {"note_id": note_id, "user_id": user.id, "status": str(status)},
+            )
             
         if not is_pending:
             generate_note_embeddings_task.delay(note_id)
@@ -125,8 +179,15 @@ class NoteService:
         """
         Retrieve paginated notes accessible to the user.
         """
-        team_ids = [t.id for t in user.teams] + [t.id for t in user.owned_teams]
-        
+        # Use subqueries to avoid N+1 lazy loads on user.teams/user.owned_teams
+        from app.db.models import team_members
+        member_team_ids = db.query(team_members.c.team_id).filter(
+            team_members.c.user_id == user.id
+        ).subquery()
+        owned_team_ids = db.query(models.Team.id).filter(
+            models.Team.owner_id == user.id
+        ).subquery()
+
         notes = (
             db.query(models.Note)
             .options(joinedload(models.Note.tasks))
@@ -134,7 +195,8 @@ class NoteService:
                 models.Note.is_deleted == False,
                 or_(
                     models.Note.user_id == user.id,
-                    models.Note.team_id.in_(team_ids)
+                    models.Note.team_id.in_(member_team_ids),
+                    models.Note.team_id.in_(owned_team_ids)
                 )
             )
             .order_by(models.Note.timestamp.desc())
@@ -181,7 +243,6 @@ class NoteService:
         if not verbose:
             note.transcript_groq = None
             note.transcript_deepgram = None
-            note.transcript_android = None
             
         # Decrypt if encrypted
         if note.is_encrypted:
@@ -189,7 +250,6 @@ class NoteService:
             if verbose:
                 note.transcript_groq = EncryptionService.decrypt(note.transcript_groq)
                 note.transcript_deepgram = EncryptionService.decrypt(note.transcript_deepgram)
-                note.transcript_android = EncryptionService.decrypt(note.transcript_android)
             
         return note
 
@@ -314,6 +374,7 @@ class NoteService:
         """
         Comprehensive handler for note audio upload and processing.
         """
+        cls.check_monthly_note_limit(db, user)
         note_id = note_id_override if note_id_override else str(uuid.uuid4())
         temp_path = None
         
@@ -323,15 +384,37 @@ class NoteService:
                 os.makedirs("uploads")
             temp_path = f"uploads/{note_id}_{file.filename}"
             total_size = 0
-            MAX_FILE_SIZE = 50 * 1024 * 1024
+            MAX_FILE_SIZE = ai_config.MAX_AUDIO_SIZE_MB * 1024 * 1024
             
             with open(temp_path, "wb") as buffer:
                 while chunk := await file.read(1024 * 1024):
                     total_size += len(chunk)
                     if total_size > MAX_FILE_SIZE:
-                        os.remove(temp_path)
-                        raise VoiceNoteError("File too large", code="FILE_TOO_LARGE", status_code=413)
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+                        raise VoiceNoteError(
+                            f"File too large. Maximum size is {ai_config.MAX_AUDIO_SIZE_MB}MB", 
+                            code="FILE_TOO_LARGE", 
+                            status_code=413
+                        )
                     buffer.write(chunk)
+            
+            # 1.1 Optional: Duration Validation (Requires pydub/ffprobe)
+            try:
+                from pydub import AudioSegment
+                audio = AudioSegment.from_file(temp_path)
+                duration_sec = len(audio) / 1000.0
+                if duration_sec > ai_config.MAX_AUDIO_DURATION_SEC:
+                    os.remove(temp_path)
+                    raise VoiceNoteError(
+                        f"Audio too long. Maximum duration is {ai_config.MAX_AUDIO_DURATION_SEC // 60} minutes",
+                        code="AUDIO_TOO_LONG",
+                        status_code=400
+                    )
+            except ImportError:
+                JLogger.warning("pydub not installed, skipping duration validation")
+            except Exception as e:
+                JLogger.warning(f"Duration check failed: {str(e)}")
         elif not storage_key:
             raise VoiceNoteError("Missing audio sources", code="MISSING_SOURCE", status_code=400)
             

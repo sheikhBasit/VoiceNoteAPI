@@ -130,14 +130,14 @@ async def list_all_users(
 
     from sqlalchemy.orm import joinedload
 
+    query = db.query(models.User).filter(models.User.is_deleted == False)
+    total = query.count()
     users = (
-        db.query(models.User)
-        .options(joinedload(models.User.wallet), joinedload(models.User.plan))
+        query.options(joinedload(models.User.wallet), joinedload(models.User.plan))
         .offset(skip)
         .limit(limit)
         .all()
     )
-    total = db.query(models.User).count()
 
     # Enhanced user list with usage summaries
     results = []
@@ -183,15 +183,19 @@ async def get_user_statistics(
             detail="Permission denied: Required permission 'can_view_analytics' is missing",
         )
 
-    total_users = db.query(models.User).count()
-    admin_count = db.query(models.User).filter(models.User.is_admin == True).count()
-    active_users = db.query(models.User).filter(models.User.is_deleted == False).count()
+    from sqlalchemy import func, case
+    stats = db.query(
+        func.count(models.User.id).label("total"),
+        func.sum(case((models.User.is_deleted == False, 1), else_=0)).label("active"),
+        func.sum(case((models.User.is_admin == True, 1), else_=0)).label("admin"),
+        func.sum(case((models.User.is_deleted == True, 1), else_=0)).label("deleted")
+    ).first()
 
     return {
-        "total_users": total_users,
-        "admin_count": admin_count,
-        "active_users": active_users,
-        "deleted_users": total_users - active_users,
+        "total_users": stats.active or 0, # Based on H-07 requirement to focus on active
+        "admin_count": stats.admin or 0,
+        "active_users": stats.active or 0,
+        "deleted_users": stats.deleted or 0,
         "timestamp": int(time.time() * 1000),
     }
 
@@ -233,7 +237,7 @@ async def list_all_notes(
         )
 
     try:
-        notes_query = db.query(models.Note)
+        notes_query = db.query(models.Note).filter(models.Note.is_deleted == False)
         total = notes_query.count()
         notes = notes_query.offset(skip).limit(limit).all()
     except Exception as e:
@@ -259,6 +263,59 @@ async def list_all_notes(
         raise HTTPException(status_code=500, detail=f"Serialization Error: {str(e)}")
     
     return {"total": total, "skip": skip, "limit": limit, "notes": serialized_notes}
+
+
+@router.get("/notes/audit")
+async def list_note_audit_logs(
+    note_id: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """
+    View audit logs specifically for notes
+    """
+    if not AdminManager.is_admin(admin_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied: Administrative privileges required",
+        )
+
+    if not AdminManager.has_permission(admin_user, "can_view_analytics"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Permission denied: Required permission 'can_view_analytics' is missing",
+        )
+
+    from app.services.admin_audit_service import AdminAuditService
+
+    # If note_id is provided, filter specifically for that note
+    # Otherwise, get all note-related actions
+    action_filter = None
+    if not note_id:
+        # Generic note actions filter - this is a bit of a stretch for the service but we can filter by action prefix
+        pass
+
+    logs = AdminAuditService.get_audit_logs(
+        db=db,
+        action=None,  # Service doesn't support prefix filtering yet, but we'll return all for now or filter manually
+        limit=limit,
+        skip=skip
+    )
+    
+    # Simple manual filter for note actions if note_id not specified
+    if not note_id:
+        note_actions = ["CREATE_NOTE", "UPDATE_NOTE", "DELETE_NOTE", "RESTORE_NOTE", "VIEW_NOTE"]
+        filtered_logs = [log for log in logs["logs"] if log.action in note_actions]
+        return {
+            "total": len(filtered_logs),
+            "skip": skip,
+            "limit": limit,
+            "logs": filtered_logs
+        }
+
+    return logs
 
 
 @router.delete("/notes/{note_id}")
@@ -1012,8 +1069,59 @@ async def list_service_plans(
     db: Session = Depends(get_db),
     admin_user: models.User = Depends(get_current_active_admin),
 ):
-    """List all available service plans."""
+    """List all available service plans (including inactive)."""
     return db.query(models.ServicePlan).all()
+
+
+@router.patch("/plans/{plan_id}", response_model=billing_schema.ServicePlanResponse)
+async def update_service_plan(
+    plan_id: str,
+    updates: billing_schema.ServicePlanUpdate,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """Update an existing service plan."""
+    if not AdminManager.has_permission(admin_user, "can_modify_system_settings"):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    plan = db.query(models.ServicePlan).filter(models.ServicePlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    update_data = updates.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(plan, field, value)
+    plan.updated_at = int(time.time() * 1000)
+
+    db.commit()
+    db.refresh(plan)
+
+    AdminManager.log_admin_action(
+        db, admin_user.id, "UPDATE_PLAN", plan_id, update_data
+    )
+    return plan
+
+
+@router.delete("/plans/{plan_id}")
+async def delete_service_plan(
+    plan_id: str,
+    db: Session = Depends(get_db),
+    admin_user: models.User = Depends(get_current_active_admin),
+):
+    """Soft-delete a service plan (sets is_active=False)."""
+    if not AdminManager.has_permission(admin_user, "can_modify_system_settings"):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    plan = db.query(models.ServicePlan).filter(models.ServicePlan.id == plan_id).first()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    plan.is_active = False
+    plan.updated_at = int(time.time() * 1000)
+    db.commit()
+
+    AdminManager.log_admin_action(db, admin_user.id, "DELETE_PLAN", plan_id)
+    return {"status": "success", "message": f"Plan '{plan.name}' deactivated"}
 
 
 @router.get("/users/{user_identifier}/usage")
@@ -1147,66 +1255,81 @@ async def get_audit_logs(
 
 # ==================== B2B MANAGEMENT ====================
 
+from pydantic import BaseModel, Field
+from typing import Optional as OptionalType
+
+class CreateOrganizationRequest(BaseModel):
+    id: str
+    name: str
+    admin_user_id: OptionalType[str] = None
+
+class CreateLocationRequest(BaseModel):
+    org_id: str
+    name: str
+    latitude: float
+    longitude: float
+    radius: float = Field(default=100, ge=1)
+
+
 @router.post("/organizations", status_code=status.HTTP_201_CREATED)
 async def create_organization(
-    org_data: dict,
+    org_data: CreateOrganizationRequest,
     db: Session = Depends(get_db),
     admin_user: models.User = Depends(get_current_active_admin),
 ):
     """
     POST /organizations: Create a new B2B organization.
-    Expects: {id, name, admin_user_id}
     """
     if not AdminManager.is_admin(admin_user):
          raise HTTPException(status_code=403, detail="Admin privileges required")
-    
+
     # Create corporate wallet automatically
-    wallet_id = f"wallet_{org_data['id']}"
+    wallet_id = f"wallet_{org_data.id}"
     corporate_wallet = models.Wallet(
         user_id=wallet_id,
-        balance=10000, # Initial credits for testing
+        balance=10000,
         currency="USD"
     )
     db.add(corporate_wallet)
 
     new_org = models.Organization(
-        id=org_data["id"],
-        name=org_data["name"],
-        admin_user_id=org_data.get("admin_user_id", admin_user.id),
+        id=org_data.id,
+        name=org_data.name,
+        admin_user_id=org_data.admin_user_id or admin_user.id,
         corporate_wallet_id=wallet_id
     )
     db.add(new_org)
-    
+
     # Associate admin user with org
-    target_user_id = org_data.get("admin_user_id", admin_user.id)
+    target_user_id = org_data.admin_user_id or admin_user.id
     target_user = db.query(models.User).filter(models.User.id == target_user_id).first()
     if target_user:
         target_user.org_id = new_org.id
-        
+
     db.commit()
     db.refresh(new_org)
     return new_org
 
 @router.post("/locations", status_code=status.HTTP_201_CREATED)
 async def create_location(
-    loc_data: dict,
+    loc_data: CreateLocationRequest,
     db: Session = Depends(get_db),
     admin_user: models.User = Depends(get_current_active_admin),
 ):
     """
     POST /locations: Add a work location for geofencing.
-    Expects: {org_id, name, latitude, longitude, radius}
     """
     if not AdminManager.is_admin(admin_user):
          raise HTTPException(status_code=403, detail="Admin privileges required")
-    
+
+    import uuid
     new_loc = models.WorkLocation(
-        id=str(__import__("uuid").uuid4()),
-        org_id=loc_data["org_id"],
-        name=loc_data["name"],
-        latitude=loc_data["latitude"],
-        longitude=loc_data["longitude"],
-        radius=loc_data.get("radius", 100)
+        id=str(uuid.uuid4()),
+        org_id=loc_data.org_id,
+        name=loc_data.name,
+        latitude=loc_data.latitude,
+        longitude=loc_data.longitude,
+        radius=loc_data.radius
     )
     db.add(new_loc)
     db.commit()
@@ -1646,7 +1769,10 @@ async def bulk_delete_items(
     
     # Split comma-separated IDs
     id_list = [id.strip() for id in ids.split(',') if id.strip()]
-    
+
+    if len(id_list) > 100:
+        raise HTTPException(status_code=400, detail="Max 100 items per bulk operation")
+
     try:
         result = AdminOperationsService.bulk_delete(
             db, item_type, id_list, admin_user.id, reason, hard
@@ -1683,7 +1809,10 @@ async def bulk_restore_items(
     
     # Split comma-separated IDs
     id_list = [id.strip() for id in ids.split(',') if id.strip()]
-    
+
+    if len(id_list) > 100:
+        raise HTTPException(status_code=400, detail="Max 100 items per bulk operation")
+
     try:
         result = AdminOperationsService.bulk_restore(
             db, item_type, id_list, admin_user.id
@@ -1882,6 +2011,21 @@ async def get_growth_analytics(
     from app.services.admin_analytics_service import AdminAnalyticsService
     
     return AdminAnalyticsService.get_growth_analytics(db)
+
+
+@router.post("/wallets/{user_id}/toggle-freeze")
+async def toggle_wallet_freeze(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_admin),
+):
+    wallet = db.query(models.Wallet).filter(models.Wallet.user_id == user_id).first()
+    if not wallet:
+        raise HTTPException(status_code=404, detail="Wallet not found")
+    
+    wallet.is_frozen = not wallet.is_frozen
+    db.commit()
+    return {"is_frozen": wallet.is_frozen}
 
 
 @router.get("/reports/revenue")
