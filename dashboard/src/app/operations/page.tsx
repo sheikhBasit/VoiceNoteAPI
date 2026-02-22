@@ -87,7 +87,8 @@ export default function OperationsPage() {
                                 </div>
                             ))
                         )}
-                        <button className="w-full py-2 text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-medium border-t border-slate-800 mt-2 pt-4">
+                        {/* TODO: implement View All Transactions */}
+                        <button disabled className="w-full py-2 text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-medium border-t border-slate-800 mt-2 pt-4 disabled:opacity-50 disabled:cursor-not-allowed">
                             View All Transactions
                         </button>
                     </div>

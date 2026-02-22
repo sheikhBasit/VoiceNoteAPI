@@ -20,6 +20,25 @@ from app.utils.ai_service_utils import (
 from app.utils.json_logger import JLogger
 
 
+
+@lru_cache(maxsize=100)
+def _get_embedding_cached(text: str) -> List[float]:
+    """Module-level cached method for embedding generation to avoid method-level memory leaks."""
+    from sentence_transformers import SentenceTransformer
+    
+    # Simple singleton pattern for the model
+    if not hasattr(_get_embedding_cached, "_model"):
+        try:
+            JLogger.info("Loading local embedding model: all-MiniLM-L6-v2")
+            _get_embedding_cached._model = SentenceTransformer("all-MiniLM-L6-v2")
+        except Exception as e:
+            JLogger.error("Failed to load local embedding model", error=str(e))
+            return []
+            
+    embedding = _get_embedding_cached._model.encode(text)
+    return embedding.tolist()
+
+
 class AIService:
     _local_embedding_model = None  # Class-level singleton
     _groq_client = None
@@ -126,17 +145,6 @@ class AIService:
                 "deepgram_model": ai_config.DEEPGRAM_MODEL,
             }
 
-    @lru_cache(maxsize=100)
-    def _generate_embedding_cached(self, text: str) -> List[float]:
-        """Internal cached method for embedding generation."""
-        model = self._get_local_embedding_model()
-        if not model:
-            return []
-
-        # CPU-bound computation
-        embedding = model.encode(text)
-        return embedding.tolist()
-
     def generate_embedding_sync(self, text: str) -> List[float]:
         """
         Synchronous wrapper that uses LRU cache.
@@ -144,7 +152,7 @@ class AIService:
         if not text or not text.strip():
             return [0.0] * 384
 
-        emb = self._generate_embedding_cached(text)
+        emb = _get_embedding_cached(text)
         return emb if emb else [0.0] * 384
 
     async def generate_embedding(self, text: str) -> List[float]:
@@ -235,8 +243,6 @@ class AIService:
                             
                             return "\n".join(transcript_parts)
 
-                            return "\n".join(transcript_parts)
-
                     return resp.results.channels[0].alternatives[0].transcript
             except Exception as e:
                 JLogger.error("Deepgram transcription failed", error=str(e))
@@ -291,8 +297,6 @@ class AIService:
                 engine_used = "groq" if groq_t else "failed"
                 if groq_t:
                     results["groq"] = groq_t
-                primary_transcript = groq_t or ""
-                engine_used = "groq" if groq_t else "failed"
 
         JLogger.info("STT pipeline execution complete", engine=engine_used)
         if not primary_transcript:
@@ -415,7 +419,7 @@ Use this temporal context to intelligently assign task priorities based on urgen
             except Exception as e:
                 JLogger.warning(f"Failed to add temporal context: {e}")
 
-        user_content = f"Instruction: {user_instruction or 'Analyze the transcript.'}\n\nTranscript:\n{transcript}"
+        user_content = f"Instruction: {user_instruction or 'Analyze the transcript.'}\n\n<transcript>\n{transcript}\n</transcript>"
         settings = self._get_dynamic_settings()
 
         try:
@@ -684,16 +688,16 @@ Use this temporal context to intelligently assign task priorities based on urgen
         if not is_admin:
             query_obj = query_obj.filter(models.Note.user_id == user_id)
             
+        distance_label = models.Note.embedding.cosine_distance(query_vector).label("distance")
         results = (
-            query_obj.order_by(models.Note.embedding.cosine_distance(query_vector))
+            query_obj.add_columns(distance_label)
+            .order_by(distance_label)
             .limit(limit)
             .all()
         )
         
         search_results = []
-        for note in results:
-            # Calculate score (1 - distance)
-            distance = db.query(models.Note.embedding.cosine_distance(query_vector)).filter(models.Note.id == note.id).scalar()
+        for note, distance in results:
             search_results.append({
                 "note": note,
                 "score": 1.0 - (distance or 0.0)

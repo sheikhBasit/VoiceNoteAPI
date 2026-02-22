@@ -14,6 +14,8 @@ isort==5.13.2
 flake8==6.1.0
 pylint==3.0.3
 mypy==1.7.1
+ruff>=0.4.0
+pyright>=1.1.350
 
 # Security
 bandit==1.7.5

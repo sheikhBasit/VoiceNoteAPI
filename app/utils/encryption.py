@@ -38,8 +38,8 @@ class EncryptionService:
             return ""
         try:
             data = base64.b64decode(ciphertext_b64)
-            if len(data) < 13: # Nonce (12) + at least 1 byte tag/data
-                return ciphertext_b64
+            if len(data) < 13:  # Nonce (12) + at least 1 byte tag/data
+                raise ValueError("Encrypted data is too short to be valid")
                 
             nonce = data[:12]
             ciphertext = data[12:]
@@ -47,6 +47,5 @@ class EncryptionService:
             decrypted = aesgcm.decrypt(nonce, ciphertext, None)
             return decrypted.decode("utf-8")
         except Exception as e:
-            # If decryption fails, it might be plaintext or wrong key
-            JLogger.debug("Decryption failed, returning as-is", error=str(e))
-            return ciphertext_b64
+            JLogger.error("Decryption failed", error=str(e))
+            raise ValueError(f"Failed to decrypt data: {e}")

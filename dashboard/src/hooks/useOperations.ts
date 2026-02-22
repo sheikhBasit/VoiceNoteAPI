@@ -33,6 +33,9 @@ export const useRefundTransaction = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['transactions'] });
-        }
+        },
+        onError: (error: Error) => {
+            console.error('Failed to refund transaction:', error.message);
+        },
     });
 };

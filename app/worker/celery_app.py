@@ -40,6 +40,7 @@ celery_app.conf.update(
     task_eager_propagates=True,
     task_track_started=True,
     task_time_limit=600,
+    task_acks_late=True,
     worker_prefetch_multiplier=1,
     broker_connection_retry_on_startup=True,
     broker_url=broker_url,
@@ -50,6 +51,11 @@ celery_app.conf.update(
         "celery": {"exchange": "celery", "routing_key": "celery"},
     },
     task_default_queue="celery",
+    task_routes={
+        "app.worker.task.note_process_pipeline": {"queue": "long"},
+        "app.worker.task.analyze_note_semantics_task": {"queue": "short"},
+        "app.worker.task.generate_note_embeddings_task": {"queue": "short"},
+    },
     imports=["app.worker.task"],  # Explicit import
 )
 
@@ -77,5 +83,9 @@ celery_app.conf.beat_schedule = {
     "weekly-productivity-report": {
         "task": "generate_productivity_report_task",
         "schedule": crontab(day_of_week=1, hour=9, minute=0),
+    },
+    "cleanup-expired-tokens-daily": {
+        "task": "cleanup_expired_tokens_task",
+        "schedule": crontab(hour=4, minute=0),
     },
 }

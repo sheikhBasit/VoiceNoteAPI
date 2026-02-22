@@ -95,7 +95,7 @@ class SearchService:
                 "id": note.id,
                 "title": note.title,
                 "summary": note.summary,
-                "transcript": note.transcript_deepgram or note.transcript_groq or note.transcript_android or "",
+                "transcript": note.transcript_groq or note.transcript_deepgram or "",
                 "timestamp": note.timestamp,
                 "similarity_score": round(item["score"] * 10, 3) # Scaled for UI visibility
             })

@@ -92,12 +92,15 @@ async def process_note(
     response_model=note_schema.NoteResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@limiter.limit("10/minute")
 async def create_note(
-    note_data: note_schema.NoteUpdate,
+    request: Request,
+    note_data: note_schema.NoteCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(requires_tier(models.SubscriptionTier.FREE)),
+    _balance: bool = Depends(check_credit_balance(5)),
 ):
-    """POST /create: Manually create a note record."""
+    """POST /create: Manually create a note record (requires FREE tier+)."""
     note_dict = note_data.model_dump()
     return NoteService.create_note_record(db, current_user, note_dict)
 
@@ -136,7 +139,7 @@ def bulk_move_notes(
 def list_notes(
     request: Request,
     skip: int = Query(0, ge=0),
-    limit: int = Query(10, ge=1, le=500),
+    limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -174,6 +177,11 @@ async def delete_note(
 ):
     """DELETE /{note_id}: Delete a note."""
     if hard:
+        if not current_user.is_admin:
+             raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied: Only administrators can permanently delete notes",
+            )
         return DeletionService.hard_delete_note(db, note_id)
     
     NoteService.soft_delete_note(db, current_user, note_id)

@@ -3,11 +3,12 @@ import os
 import time
 import uuid
 import requests
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Request
 from sqlalchemy.orm import Session
 from app.db import models
 from app.db.session import get_db
 from app.services.auth_service import get_current_user
+from app.core.limiter import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/integrations", tags=["Integrations"])
@@ -41,10 +42,10 @@ def list_integrations(
 
 
 @router.post("/google/connect")
+@limiter.limit("5/minute")
 def connect_google(
-    payload: dict = Body(...), # Expects {"code": "..."} or {"access_token": "..."}
-    # In some mobile flows, the client gets the access token directly.
-    # We support 'code' for server-side exchange (preferred) or 'access_token' for client-side flow.
+    request: Request,
+    payload: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -128,7 +129,9 @@ def connect_google(
 
 
 @router.post("/notion/connect")
+@limiter.limit("5/minute")
 def connect_notion(
+    request: Request,
     payload: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),

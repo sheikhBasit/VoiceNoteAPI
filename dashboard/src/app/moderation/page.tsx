@@ -33,7 +33,8 @@ export default function ModerationPage() {
                     <p className="text-slate-400 mt-1">Review, flag, and manage user-generated content for platform safety.</p>
                 </div>
                 <div className="flex space-x-3 text-xs">
-                    <button className="flex items-center space-x-2 px-3 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 rounded-md hover:text-slate-200 transition-colors">
+                    {/* TODO: implement Filter by Flag */}
+                    <button disabled className="flex items-center space-x-2 px-3 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 rounded-md hover:text-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                         <Filter className="w-3.5 h-3.5" />
                         <span>Filter by Flag</span>
                     </button>
@@ -67,7 +68,7 @@ export default function ModerationPage() {
                                     </tr>
                                 ))
                             ) : (
-                                data?.items.map((note: any) => (
+                                data?.notes?.map((note: any) => (
                                     <tr key={note.id} className="hover:bg-slate-800/10 transition-colors group">
                                         <td className="px-6 py-6 max-w-md">
                                             <p className="text-sm text-slate-200 line-clamp-2 leading-relaxed">
@@ -91,17 +92,20 @@ export default function ModerationPage() {
                                         </td>
                                         <td className="px-6 py-6 text-right">
                                             <div className="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-indigo-400 transition-colors" title="Review Context">
+                                                {/* TODO: implement Review Context */}
+                                                <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-indigo-400 transition-colors disabled:opacity-30" title="Review Context" disabled>
                                                     <Eye className="w-4 h-4" />
                                                 </button>
                                                 <button
                                                     onClick={() => deleteMutation.mutate(note.id)}
-                                                    className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                                                    disabled={deleteMutation.isPending}
+                                                    className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-red-400 transition-colors disabled:opacity-30"
                                                     title="Delete Content"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
-                                                <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-emerald-400 transition-colors" title="Mark as Safe">
+                                                {/* TODO: implement Mark as Safe */}
+                                                <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-emerald-400 transition-colors disabled:opacity-30" title="Mark as Safe" disabled>
                                                     <CheckCircle className="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -113,7 +117,7 @@ export default function ModerationPage() {
                     </table>
                 </div>
 
-                {!isLoading && (!data?.items || data.items.length === 0) && (
+                {!isLoading && (!data?.notes || data.notes.length === 0) && (
                     <div className="py-20 flex flex-col items-center justify-center text-slate-600">
                         <ShieldAlert className="w-12 h-12 mb-4 opacity-10" />
                         <p className="text-sm">Moderation queue is empty. Content safe.</p>

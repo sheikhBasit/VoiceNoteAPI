@@ -74,6 +74,13 @@ from sqlalchemy.types import JSON
 
 sqlalchemy.dialects.postgresql.JSONB = JSON
 
+# Mock fastapi_mail (may not be installed in dev/test environments)
+mock_fm = mock_package("fastapi_mail")
+mock_fm.ConnectionConfig = MagicMock()
+mock_fm.FastMail = MagicMock()
+mock_fm.MessageSchema = MagicMock()
+mock_fm.MessageType = MagicMock()
+
 # Heavy/External AI mocks - Only mock if absolutely necessary
 # For now, let's keep sentence_transformers and transformers mocked as they are very heavy
 mock_package("sentence_transformers")

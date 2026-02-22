@@ -4,7 +4,7 @@ import tempfile
 import time
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import redis
 import requests
@@ -22,7 +22,6 @@ from app.db.models import Note, NoteStatus, Priority, Task, User
 from app.db.session import SessionLocal
 from app.services.ai_service import AIService
 from app.services.billing_service import BillingService
-from app.services.calendar_service import CalendarService  # New
 from app.services.image_service import ImageService
 from app.utils.ai_service_utils import AIServiceError
 from app.utils.json_logger import JLogger
@@ -32,7 +31,12 @@ from app.worker.celery_app import celery_app
 try:
     _redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
     if _redis_url.startswith("redis://") or _redis_url.startswith("rediss://"):
-        redis_client = redis.from_url(_redis_url)
+        redis_client = redis.from_url(
+            _redis_url, 
+            max_connections=20, 
+            decode_responses=True,
+            health_check_interval=30
+        )
     else:
         # Fallback for memory:// or other testing schemes
         redis_client = None
@@ -40,7 +44,7 @@ except Exception:
     redis_client = None
 
 
-def broadcast_team_update(team_id: str, event_type: str, data: any, trigger_id: str = None):
+def broadcast_team_update(team_id: str, event_type: str, data: Any, trigger_id: str = None):
     """Publish a real-time update for a team via Redis (SSE compatible)."""
     payload = {
         "type": event_type,
@@ -55,7 +59,7 @@ def broadcast_team_update(team_id: str, event_type: str, data: any, trigger_id: 
             JLogger.warning("Failed to publish team update to Redis", error=str(e))
 
 
-def broadcast_user_update(user_id: str, event_type: str, data: any, trigger_id: str = None):
+def broadcast_user_update(user_id: str, event_type: str, data: Any, trigger_id: str = None):
     """Publish a real-time update for a specific user via Redis (SSE compatible)."""
     payload = {
         "type": event_type,
@@ -73,7 +77,7 @@ def broadcast_user_update(user_id: str, event_type: str, data: any, trigger_id: 
             JLogger.warning("Failed to publish user update to Redis", error=str(e))
 
 
-def broadcast_ws_update(user_id: str, event_type: str, data: any):
+def broadcast_ws_update(user_id: str, event_type: str, data: Any):
     """Legacy helper, redirects to broadcast_user_update."""
     broadcast_user_update(user_id, event_type, data)
 
@@ -84,7 +88,7 @@ def ping_task(message: str):
     return {"status": "pong", "message": message, "timestamp": time.time()}
 
 
-@celery_app.task(bind=True, name="process_voice_note_pipeline")
+@celery_app.task(bind=True, name="process_voice_note_pipeline", max_retries=3)
 def note_process_pipeline(
     self,
     note_id: str,
@@ -99,6 +103,7 @@ def note_process_pipeline(
     is_storage_key = not local_file_path.startswith("uploads/")
     actual_local_path = local_file_path
     note_owner_id = None  # Initialize for broadcast_ws_update in case of early failure
+    temp_files_to_clean = []
 
     with SessionLocal() as db:
         ai_service = AIService()
@@ -118,6 +123,7 @@ def note_process_pipeline(
             # Notify UI immediately
             note = db.query(Note).filter(Note.id == note_id).first()
             if note and note.user_id:
+                note_owner_id = note.user_id
                 broadcast_user_update(
                     note.user_id,
                     "NOTE_STATUS",
@@ -154,6 +160,7 @@ def note_process_pipeline(
                 )
                 storage_service.download_file(local_file_path, local_tmp_path)
                 actual_local_path = local_tmp_path
+                temp_files_to_clean.append(actual_local_path)
                 JLogger.info(
                     "Worker: Downloaded file from MinIO",
                     note_id=note_id,
@@ -221,6 +228,7 @@ def note_process_pipeline(
                     )
 
             processed_path = preprocess_audio_pipeline(actual_local_path)
+            temp_files_to_clean.append(processed_path)
 
             # 3. Update audio_url with processed path (as a local URL)
             audio_url = f"/{processed_path}"
@@ -329,7 +337,6 @@ def note_process_pipeline(
             elif stt_model == "nova" and not note.transcript_deepgram:
                 note.transcript_deepgram = analysis.transcript
 
-            note.transcript_android = analysis.transcript
             note.audio_url = audio_url
             note.embedding = embedding
             note.tags = analysis.tags
@@ -386,11 +393,11 @@ def note_process_pipeline(
                     flag_modified(user, "usage_stats")
                     db.commit()
             except Exception as e:
-                JLogger.error("Failed to process charging logic", error=str(e))
+                JLogger.critical("CRITICAL: Failed to process charging logic for completed note",
+                                note_id=note_id, user_id=note.user_id, error=str(e))
 
             # 8. Map & Save Tasks with Smart Actions
             from app.services.action_suggestion_service import ActionSuggestionService
-            extracted_tasks = []
             extracted_tasks = []
             for t_data in analysis.tasks:
                 # Helper to normalize access
@@ -510,33 +517,18 @@ def note_process_pipeline(
             all_conflicts = []
             user = db.query(Note).filter(Note.id == note_id).first().user
             if user and extracted_tasks:
-                from concurrent.futures import ThreadPoolExecutor
+                # Only Note-based Factual Conflicts remain
+                similar_notes = db.query(Note).filter(
+                    Note.user_id == user.id, Note.id != note_id, Note.is_deleted.is_(False)
+                ).order_by(Note.embedding.cosine_distance(embedding)).limit(5).all()
+                
+                note_conflicts = ai_service.detect_conflicts_sync(
+                    analysis.summary,
+                    [f"Title: {n.title}\nSummary: {n.summary}" for n in similar_notes],
+                    context_type="previous_notes",
+                )
 
-                def check_schedule():
-                    events = CalendarService.get_user_events(user.id)
-                    return ai_service.detect_conflicts_sync(
-                        analysis.summary,
-                        [str(e.get("title", "")) for e in events],
-                        context_type="schedule",
-                    )
-
-                def check_notes():
-                    similar_notes = db.query(Note).filter(
-                        Note.user_id == user.id, Note.id != note_id, Note.is_deleted.is_(False)
-                    ).order_by(Note.embedding.cosine_distance(embedding)).limit(5).all()
-                    return ai_service.detect_conflicts_sync(
-                        analysis.summary,
-                        [f"Title: {n.title}\nSummary: {n.summary}" for n in similar_notes],
-                        context_type="previous_notes",
-                    )
-
-                with ThreadPoolExecutor(max_workers=2) as executor:
-                    schedule_conflicts = executor.submit(check_schedule).result()
-                    note_conflicts = executor.submit(check_notes).result()
-
-                all_conflicts = [{"type": "SCHEDULE", **c} for c in schedule_conflicts] + [
-                    {"type": "FACTUAL", **c} for c in note_conflicts
-                ]
+                all_conflicts = [{"type": "FACTUAL", **c} for c in note_conflicts]
                 
                 # Persist conflicts for UI display
                 note.conflicts = all_conflicts
@@ -545,7 +537,7 @@ def note_process_pipeline(
                     device_token = "mock_token"
                     if user.authorized_devices:
                         device_token = user.authorized_devices[0].get("biometric_token", "mock_token")
-                    msg_prefix = "📅 Schedule" if conflict["type"] == "SCHEDULE" else "⚠️ Factual"
+                    msg_prefix = "⚠️ Factual"
                     send_push_notification.delay(
                         device_token,
                         title=f"{msg_prefix} Conflict Alert!",
@@ -554,8 +546,6 @@ def note_process_pipeline(
                     )
 
             JLogger.info("Worker: Note processing pipeline finished successfully", note_id=note_id)
-            if os.path.exists(local_file_path):
-                os.remove(local_file_path)
 
             return {
                 "status": "success",
@@ -575,13 +565,35 @@ def note_process_pipeline(
             db.commit()
             broadcast_ws_update(note_owner_id, "NOTE_STATUS", {"note_id": note_id, "status": "DONE", "message": str(e)})
 
-        except Exception as exc:
-            JLogger.exception("Worker: Note processing pipeline failed", note_id=note_id)
+        except (ConnectionError, TimeoutError, OSError, IOError) as exc:
+            # Transient errors — worth retrying
+            JLogger.exception("Worker: Transient error in pipeline, retrying", note_id=note_id)
             db.rollback()
-            if self.request.retries >= self.max_retries:
-                if os.path.exists(local_file_path):
-                    os.remove(local_file_path)
             self.retry(exc=exc, countdown=60)
+
+        except Exception as exc:
+            # Non-transient errors (validation, permission, data issues) — don't retry
+            JLogger.exception("Worker: Note processing pipeline failed permanently", note_id=note_id)
+            db.rollback()
+            db.query(Note).filter(Note.id == note_id).update(
+                {"status": NoteStatus.DELAYED, "summary": f"Processing failed: {str(exc)[:200]}"}
+            )
+            db.commit()
+        finally:
+            # CLEANUP: Ensure all temp files are removed regardless of success/error
+            for f_path in temp_files_to_clean:
+                try:
+                    if os.path.exists(f_path):
+                        os.remove(f_path)
+                except Exception as cleanup_err:
+                    JLogger.warning(f"Failed to cleanup temp file: {f_path}", error=str(cleanup_err))
+            
+            # Special case for local_file_path if it was a direct upload (not storage key)
+            if not is_storage_key and os.path.exists(local_file_path):
+                 try:
+                     os.remove(local_file_path)
+                 except Exception:
+                     pass
 
 
 @celery_app.task(name="process_task_image_pipeline")
@@ -962,89 +974,108 @@ def generate_note_embeddings_task(self, note_id: str):
 @celery_app.task(name="generate_productivity_report_task")
 def generate_productivity_report_task():
     """Scheduled task to generate weekly reports for all active users."""
-    db = SessionLocal()
     from app.db.models import User
     from app.services.analytics_service import AnalyticsService
 
     analytics = AnalyticsService()
-    try:
-        # 1. Get all active users
-        users = db.query(User).filter(User.is_deleted.is_(False)).all()
+    with SessionLocal() as db:
+        try:
+            # 1. Get all active users
+            users = db.query(User).filter(User.is_deleted.is_(False)).all()
 
-        for user in users:
-            try:
-                # 2. Get productivity pulse for the week
-                pulse = analytics.get_productivity_pulse(db, user.id)
+            for user in users:
+                try:
+                    # 2. Get productivity pulse for the week
+                    pulse = analytics.get_productivity_pulse(db, user.id)
 
-                # 3. Format a summary message
-                report_body = f"Hello {user.name or 'User'}! Here is your weekly productivity pulse:\n\n"
-                report_body += (
-                    f"📊 Active Notes: {pulse.get('total_notes_this_week', 0)}\n"
-                )
-                report_body += (
-                    f"✅ Tasks Completed: {pulse.get('tasks_completed', 0)}\n"
-                )
-                report_body += (
-                    f"💡 Insight: {pulse.get('suggestion', 'Keep up the great work!')}"
-                )
-
-                # 4. Trigger pushing notification (Real-world: Email or Push)
-                device_token = None
-                if user.authorized_devices:
-                    device_token = user.authorized_devices[0].get("biometric_token")
-
-                if device_token:
-                    send_push_notification.delay(
-                        device_token,
-                        title="📈 Your Weekly Pulse is Ready!",
-                        body="Tap to see your productivity summary for the last 7 days.",
-                        data={"type": "WEEKLY_REPORT", "pulse": pulse},
+                    # 3. Format a summary message
+                    report_body = f"Hello {user.name or 'User'}! Here is your weekly productivity pulse:\n\n"
+                    report_body += (
+                        f"📊 Active Notes: {pulse.get('total_notes_this_week', 0)}\n"
                     )
-            except Exception as e:
-                JLogger.error(
-                    f"Failed to generate report for user {user.id}", error=str(e)
-                )
-                continue
+                    report_body += (
+                        f"✅ Tasks Completed: {pulse.get('tasks_completed', 0)}\n"
+                    )
+                    report_body += (
+                        f"💡 Insight: {pulse.get('suggestion', 'Keep up the great work!')}"
+                    )
 
-        return {"status": "success", "users_processed": len(users)}
-    finally:
-        db.close()
+                    # 4. Trigger pushing notification (Real-world: Email or Push)
+                    device_token = None
+                    if user.authorized_devices:
+                        device_token = user.authorized_devices[0].get("biometric_token")
+
+                    if device_token:
+                        send_push_notification.delay(
+                            device_token,
+                            title="📈 Your Weekly Pulse is Ready!",
+                            body="Tap to see your productivity summary for the last 7 days.",
+                            data={"type": "WEEKLY_REPORT", "pulse": pulse},
+                        )
+                except Exception as e:
+                    JLogger.error(
+                        f"Failed to generate report for user {user.id}", error=str(e)
+                    )
+                    continue
+
+            return {"status": "success", "users_processed": len(users)}
+        except Exception as e:
+            JLogger.error("Weekly report task failed", error=str(e))
+            raise
 
 
 @celery_app.task(name="sync_external_service_task")
 def sync_external_service_task(task_id: str, service_name: str, user_id: str):
     """
-    Background worker for third-party integrations (Google Calendar, Notion).
+    Background worker for third-party integrations (Notion, Trello).
     Requirement: "Prepare a json draft... do not execute until user sends is_action_approved=True"
     """
-    db = SessionLocal()
-    try:
-        from app.services.calendar_service import CalendarService
-        from app.services.productivity_service import ProductivityService
+    with SessionLocal() as db:
+        try:
+            from app.services.productivity_service import ProductivityService
 
-        task = db.query(Task).filter(Task.id == task_id).first()
-        if not task:
-            return {"error": f"Task {task_id} not found"}
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task:
+                return {"error": f"Task {task_id} not found"}
 
-        task_data = {
-            "title": task.title,
-            "description": task.description,
-            "deadline": task.deadline,
-        }
+            task_data = {
+                "title": task.title,
+                "description": task.description,
+                "deadline": task.deadline,
+            }
 
-        if service_name.lower() == "google_calendar":
-            CalendarService.create_event(user_id, task_data)
-        elif service_name.lower() == "notion":
-            ProductivityService.export_to_notion(user_id, task_data)
-        elif service_name.lower() == "trello":
-            ProductivityService.export_to_trello(user_id, task_data)
+            if service_name.lower() == "notion":
+                ProductivityService.export_to_notion(user_id, task_data)
+            elif service_name.lower() == "trello":
+                ProductivityService.export_to_trello(user_id, task_data)
 
-        return {"status": "success", "service": service_name, "task_id": task_id}
-    except Exception as e:
-        JLogger.error(f"External sync failed: {e}", task_id=task_id, service=service_name)
-        return {"error": str(e)}
-    finally:
-        db.close()
+            return {"status": "success", "service": service_name, "task_id": task_id}
+        except Exception as e:
+            JLogger.error(f"External sync failed: {e}", task_id=task_id, service=service_name)
+            return {"error": str(e)}
+
+
+@celery_app.task(name="cleanup_expired_tokens_task")
+def cleanup_expired_tokens_task():
+    """
+    Periodic task to clean up expired or revoked refresh tokens.
+    Keeps the refresh_tokens table from growing indefinitely.
+    """
+    with SessionLocal() as db:
+        try:
+            now_ms = int(time.time() * 1000)
+            # Delete tokens that are either revoked OR expired
+            from app.db.models import RefreshToken
+            deleted_count = db.query(RefreshToken).filter(
+                (RefreshToken.expires_at < now_ms) | (RefreshToken.is_revoked == True)
+            ).delete()
+            db.commit()
+            JLogger.info("Cleaned up expired/revoked refresh tokens", count=deleted_count)
+            return {"status": "success", "deleted_count": deleted_count}
+        except Exception as e:
+            JLogger.error("Failed to cleanup refresh tokens", error=str(e))
+            db.rollback()
+            return {"error": str(e)}
 
 
 @worker_ready.connect

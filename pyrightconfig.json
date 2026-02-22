@@ -1,0 +1,19 @@
+{
+    "typeCheckingMode": "basic",
+    "pythonVersion": "3.11",
+    "include": ["app/"],
+    "exclude": [
+        "tests/",
+        "alembic/",
+        "venv/",
+        ".venv/",
+        "scripts/",
+        "**/__pycache__"
+    ],
+    "reportMissingTypeStubs": false,
+    "reportMissingImports": true,
+    "reportUndefinedVariable": true,
+    "reportGeneralTypeIssues": true,
+    "reportOptionalMemberAccess": false,
+    "reportAttributeAccessIssue": false
+}

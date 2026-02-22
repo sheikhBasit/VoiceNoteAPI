@@ -103,15 +103,14 @@ class DeletionService:
                     .all()
                 )
                 for t in tasks_of_note:
-                    if not t.is_deleted:
-                        t.is_deleted = True
-                        t.deleted_at = timestamp
-                        t.deleted_by = deleted_by
-                        t.deletion_reason = (
-                            f"Cascade from note deletion (User cascade): {user_id}"
-                        )
-                        t.can_restore = True
-                        tasks_count += 1
+                    t.is_deleted = True
+                    t.deleted_at = timestamp
+                    t.deleted_by = deleted_by
+                    t.deletion_reason = (
+                        f"Cascade from note deletion (User cascade): {user_id}"
+                    )
+                    t.can_restore = True
+                    tasks_count += 1
 
                 note.is_deleted = True
                 note.deleted_at = timestamp
@@ -316,18 +315,15 @@ class DeletionService:
                     )
 
             # --- 2. STORAGE SERVICE (MINIO) CLEANUP ---
-            # MinIO keys follow user_id/note_id format, usually don't have 'uploads/' prefix
-            if raw_url and "/" in raw_url and "uploads/" not in raw_url:
-                try:
-                    from app.services.storage_service import StorageService
-
-                    storage = StorageService()
-                    storage.delete_file(raw_url)
-                    JLogger.info("Deleted file from MinIO storage", key=raw_url)
-                except Exception as e:
-                    JLogger.error(
-                        "Failed to delete from MinIO", key=raw_url, error=str(e)
-                    )
+            try:
+                from app.services.storage_service import StorageService
+                storage = StorageService()
+                # Clean up all files under user_id/note_id prefix
+                storage.delete_note_files(note.user_id, note_id)
+            except Exception as e:
+                JLogger.error(
+                    "Failed to clean up MinIO files", note_id=note_id, error=str(e)
+                )
 
             # --- 3. DATABASE PURGE ---
             db.delete(note)

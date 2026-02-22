@@ -14,12 +14,12 @@ export interface User {
     last_login: number;
 }
 
-export const useUsers = (page = 0, limit = 20) => {
+export const useUsers = (page = 0, limit = 20, search = '') => {
     return useQuery({
-        queryKey: ['users', page, limit],
+        queryKey: ['users', page, limit, search],
         queryFn: async () => {
             const { data } = await api.get('/admin/users', {
-                params: { skip: page * limit, limit },
+                params: { skip: page * limit, limit, q: search },
             });
             return data;
         },
@@ -38,6 +38,9 @@ export const usePromoteUser = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
         },
+        onError: (error: Error) => {
+            console.error('Failed to promote user:', error.message);
+        },
     });
 };
 
@@ -50,6 +53,9 @@ export const useRevokeAdmin = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
+        },
+        onError: (error: Error) => {
+            console.error('Failed to revoke admin:', error.message);
         },
     });
 };

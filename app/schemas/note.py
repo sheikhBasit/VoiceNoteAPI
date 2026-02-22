@@ -12,19 +12,14 @@ class ExternalLink(BaseModel):
 
 class NoteBase(BaseModel):
     title: str
-    summary: str
+    summary: str = ""
     folder_id: Optional[str] = None
     priority: Priority = Priority.MEDIUM
     status: NoteStatus = NoteStatus.PENDING
 
 
 class NoteCreate(NoteBase):
-    user_id: str
     transcript: str
-    transcript_groq: str = ""
-    transcript_deepgram: str = ""
-    transcript_elevenlabs: str = ""
-    transcript_android: str = ""
     audio_url: Optional[str] = None
     raw_audio_url: Optional[str] = None
     document_uris: List[str] = []  # Client-side URIs
@@ -100,8 +95,6 @@ class NoteResponse(NoteBase):
     related_notes: List[NoteResponseSummary] = []  # NEW: Top 3 semantic links
     # Comparison Fields (NEW: populated only if verbose=true)
     transcript_groq: Optional[str] = None
-    transcript_deepgram: Optional[str] = None
-    transcript_android: Optional[str] = None
     folder_id: Optional[str] = None
     team_id: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)

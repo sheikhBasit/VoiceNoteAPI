@@ -15,12 +15,17 @@ from app.db.session import get_db
 from app.utils.json_logger import JLogger
 
 # Configuration
-# Configuration
-SECRET_KEY = os.getenv("DEVICE_SECRET_KEY", "your-secret-key-keep-it-safe")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60  # Short-lived access token for security
-REFRESH_TOKEN_EXPIRE_DAYS = 30  # Long lived for mobile
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-keep-it-safe")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
 SECRET_KEY_REFRESH = os.getenv("REFRESH_SECRET_KEY", "refresh-secret-key-change-me")
+
+if os.getenv("ENVIRONMENT") == "production":
+    if SECRET_KEY == "your-secret-key-keep-it-safe":
+        raise RuntimeError("FATAL: Default JWT_SECRET_KEY in production. Set JWT_SECRET_KEY env var.")
+    if SECRET_KEY_REFRESH == "refresh-secret-key-change-me":
+        raise RuntimeError("FATAL: Default REFRESH_SECRET_KEY in production. Set REFRESH_SECRET_KEY env var.")
 
 # pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # Removed passlib
 # Use HTTPBearer instead of OAuth2PasswordBearer for proper Swagger UI integration
@@ -146,6 +151,34 @@ def verify_device_token(token: str) -> dict:
         return None
 
 
+def create_password_reset_token(email: str) -> str:
+    """Generates a short-lived token (30 mins) for password reset."""
+    expire = datetime.now(UTC) + timedelta(minutes=30)
+    to_encode = {
+        "sub": email,
+        "type": "password_reset",
+        "exp": expire,
+    }
+    token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    if isinstance(token, bytes):
+        return token.decode('utf-8')
+    return token
+
+
+def verify_password_reset_token(token: str) -> Optional[str]:
+    """
+    Decodes and validates a password reset token.
+    Returns the email if valid, else None.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "password_reset":
+            return None
+        return payload.get("sub")
+    except Exception:
+        return None
+
+
 def mock_send_verification_email(email: str, link: str):
     """
     Mocks sending an email. In production, use SMTP or SendGrid.
@@ -190,6 +223,10 @@ async def get_current_user(
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
 
+    # Support token in Cookies (for Dashboard security hardening)
+    if not token:
+        token = request.cookies.get("access_token")
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -226,8 +263,8 @@ async def get_current_user(
 
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if user is None:
-        if is_dev_bypass(token):
-            # Auto-create dev user
+        if is_dev_bypass(token) and os.getenv("ENVIRONMENT") != "production":
+            # Auto-create dev user (Non-production only)
             user = models.User(
                 id=user_id,
                 name=f"Dev User ({user_id})",
@@ -255,11 +292,6 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account has been deactivated",
         )
-
-    # Security check: Biometric token consistency for App Users
-    if not user.is_admin:
-        # Biometric validation removed as per refactor to Email/Password auth
-        pass
 
     return user
 

@@ -58,8 +58,8 @@ sync_engine = create_engine(
     SYNC_DATABASE_URL,
     echo=False,
     connect_args=connect_args if "sqlite" in SYNC_DATABASE_URL else {},
-    pool_size=20,  # Increased from default 5
-    max_overflow=10,
+    pool_size=50,
+    max_overflow=30,
     pool_pre_ping=True,  # Verify connection health before use
     pool_recycle=3600,  # Prevent stale connections
 )

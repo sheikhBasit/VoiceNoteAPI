@@ -66,6 +66,7 @@ class JsonLogger:
 
     def __init__(self, name="app"):
         self._logger = logging.getLogger(name)
+        self.listeners = []
 
         # Avoid duplicate handlers if re-imported
         if not self._logger.handlers:
@@ -75,6 +76,15 @@ class JsonLogger:
 
         self._logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
+    def add_listener(self, callback):
+        """Add a callback to receive all log entries."""
+        self.listeners.append(callback)
+
+    def remove_listener(self, callback):
+        """Remove a callback."""
+        if callback in self.listeners:
+            self.listeners.remove(callback)
+
     def _log(self, level, message, **fields):
         """Internal logging method with structured fields."""
         self._logger.log(
@@ -83,6 +93,21 @@ class JsonLogger:
             extra={"structured_data": fields},
             stacklevel=3,
         )
+
+        # Notify listeners for real-time streaming
+        if self.listeners:
+            # We use a simplified version of JsonFormatter.format logic here
+            log_entry = {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "level": logging.getLevelName(level),
+                "message": message,
+                **fields
+            }
+            for listener in self.listeners:
+                try:
+                    listener(log_entry)
+                except Exception:
+                    pass
 
     def info(self, message, **fields):
         """Log info level message with optional structured fields."""

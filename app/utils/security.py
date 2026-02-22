@@ -16,13 +16,17 @@ def is_dev_bypass(token: str) -> bool:
     if token and token.startswith("dev_"):
         if os.getenv("ENVIRONMENT") == "production":
             JLogger.warning(
-                "DEVELOPMENT BYPASS USED IN PRODUCTION ENVIRONMENT", token=token
+                "DEVELOPMENT BYPASS ATTEMPTED IN PRODUCTION - BLOCKED", token=token
             )
+            return False
         return True
     return False
 
+
 # Secret key for device signature verification
 DEVICE_SECRET_KEY = os.getenv("DEVICE_SECRET_KEY", "default_secret_for_dev_only")
+if os.getenv("ENVIRONMENT") == "production" and DEVICE_SECRET_KEY == "default_secret_for_dev_only":
+    raise RuntimeError("FATAL: Default DEVICE_SECRET_KEY in production. Set DEVICE_SECRET_KEY env var.")
 
 
 async def verify_device_signature(request: Request, db: Session = Depends(get_db)):
@@ -33,8 +37,9 @@ async def verify_device_signature(request: Request, db: Session = Depends(get_db
     Exemption: Admins (identified by Bearer token) bypass this check.
     Exemption: Testing environment.
     """
-    # 0. Check for Testing Environment
-    if os.getenv("ENVIRONMENT") == "testing" and not request.headers.get("X-Force-Signature-Check"):
+    # 0. Check for Testing/Development Environment
+    env = os.getenv("ENVIRONMENT", "")
+    if env in ("testing", "development") and not request.headers.get("X-Force-Signature-Check"):
         return True
 
     # 1. Check for Admin or Dev Bypass (Token-based)
@@ -55,7 +60,7 @@ async def verify_device_signature(request: Request, db: Session = Depends(get_db
                 user = db.query(models.User).filter(models.User.id == user_id).first()
                 if user and user.is_admin:
                     return True
-        except Exception:
+        except (jwt.InvalidTokenError, jwt.ExpiredSignatureError, KeyError):
             pass  # Invalid token for bypass check, proceed to signature check
 
     signature = request.headers.get("X-Device-Signature")
@@ -110,8 +115,6 @@ async def verify_device_signature(request: Request, db: Session = Depends(get_db
 
     return True
 
-    return True
-
 
 def is_admin(user: Session) -> bool:
     """Utility to check if the current user has an admin role."""
@@ -162,8 +165,6 @@ def verify_note_ownership(db: Session, user: Any, note_id: str):
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Permission denied: You do not own this voice note and it is not in a shared folder you participate in.",
     )
-
-    return note
 
 
 def verify_task_ownership(db: Session, user: Any, task_id: str):
@@ -217,4 +218,3 @@ def verify_task_ownership(db: Session, user: Any, task_id: str):
         detail="Permission denied: You do not have authority over this task.",
     )
 
-    return task

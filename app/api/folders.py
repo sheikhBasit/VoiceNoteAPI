@@ -140,15 +140,21 @@ def update_folder(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """Update folder details."""
-    folder = (
-        db.query(models.Folder)
-        .filter(models.Folder.id == folder_id, models.Folder.user_id == current_user.id)
-        .first()
-    )
-
+    """Update folder details. Requires OWNER or EDITOR role."""
+    folder = db.query(models.Folder).filter(models.Folder.id == folder_id).first()
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
+
+    # Check ownership or editor role
+    is_owner = folder.user_id == current_user.id
+    if not is_owner:
+        participant = db.query(models.folder_participants).filter(
+            models.folder_participants.c.folder_id == folder_id,
+            models.folder_participants.c.user_id == current_user.id,
+            models.folder_participants.c.role.in_(["OWNER", "EDITOR"]),
+        ).first()
+        if not participant:
+            raise HTTPException(status_code=403, detail="Not authorized to edit this folder")
 
     for key, value in update_data.model_dump(exclude_unset=True).items():
         setattr(folder, key, value)

@@ -76,9 +76,14 @@ def _handle_invoice_payment(invoice, billing_service: BillingService):
     amount_paid = invoice.get("amount_paid", 0)
     customer_id = invoice.get("customer")
 
-    if not customer_id or amount_paid <= 0:
-        logger.warning(f"Invalid invoice payload: {invoice.get('id')}")
-        return
+    if customer_id:
+        import uuid
+        try:
+            # Confirm it's a valid UUID string
+            uuid.UUID(customer_id)
+        except ValueError:
+            logger.warning(f"Invalid UUID customer_id in webhook: {customer_id}")
+            return
 
     # Look up wallet by stripe_customer_id
     wallet = (

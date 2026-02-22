@@ -16,7 +16,8 @@ import {
 
 export default function UsersPage() {
     const [page, setPage] = useState(0);
-    const { data, isLoading, error } = useUsers(page);
+    const [search, setSearch] = useState('');
+    const { data, isLoading, error } = useUsers(page, 20, search);
     const promoteMutation = usePromoteUser();
     const revokeMutation = useRevokeAdmin();
 
@@ -46,10 +47,19 @@ export default function UsersPage() {
                         <input
                             type="text"
                             placeholder="Search users..."
+                            value={search}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                setPage(0);
+                            }}
                             className="pl-10 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-64"
                         />
                     </div>
-                    <button className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors">
+                    {/* TODO: implement Add Internal User */}
+                    <button
+                        disabled
+                        className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                         <UserPlus className="w-4 h-4" />
                         <span>Add Internal User</span>
                     </button>
@@ -105,13 +115,15 @@ export default function UsersPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-indigo-400 transition-colors" title="View Detail">
+                                                {/* TODO: implement View Detail */}
+                                                <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-indigo-400 transition-colors disabled:opacity-30" title="View Detail" disabled>
                                                     <Info className="w-4 h-4" />
                                                 </button>
                                                 {user.is_admin ? (
                                                     <button
                                                         onClick={() => revokeMutation.mutate(user.id)}
-                                                        className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-amber-400 transition-colors"
+                                                        disabled={revokeMutation.isPending}
+                                                        className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-amber-400 transition-colors disabled:opacity-30"
                                                         title="Revoke Admin"
                                                     >
                                                         <ShieldOff className="w-4 h-4" />
@@ -119,13 +131,15 @@ export default function UsersPage() {
                                                 ) : (
                                                     <button
                                                         onClick={() => promoteMutation.mutate({ userId: user.id, level: 'full' })}
-                                                        className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-emerald-400 transition-colors"
+                                                        disabled={promoteMutation.isPending}
+                                                        className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-emerald-400 transition-colors disabled:opacity-30"
                                                         title="Make Admin"
                                                     >
                                                         <ShieldCheck className="w-4 h-4" />
                                                     </button>
                                                 )}
-                                                <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors">
+                                                {/* TODO: implement more actions menu */}
+                                                <button className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-30" disabled>
                                                     <MoreVertical className="w-4 h-4" />
                                                 </button>
                                             </div>

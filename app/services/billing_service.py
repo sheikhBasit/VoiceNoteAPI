@@ -79,34 +79,27 @@ class BillingService:
             final_cost = 0
 
         # Atomic Update: Decrease balance only if sufficient funds
-        # This prevents race conditions better than SELECT FOR UPDATE in SQLite
-        updated_count = self.db.query(Wallet).filter(
-            Wallet.user_id == target_wallet_id,
-            Wallet.balance >= final_cost
-        ).update(
-            {"balance": Wallet.balance - final_cost},
-            synchronize_session=False
-        )
+        # We use SELECT ... FOR UPDATE to prevent race conditions on PostgreSQL
+        wallet = self.db.query(Wallet).filter(
+            Wallet.user_id == target_wallet_id
+        ).with_for_update().first()
 
-        if updated_count == 0:
-            # Check if it was insufficient funds or missing wallet
+        if not wallet:
+            # Create wallet if missing and try again
             wallet = self.get_or_create_wallet(target_wallet_id)
-            if wallet.balance < final_cost:
-                logger.warning(
-                    f"Insufficient funds for wallet {target_wallet_id} (charged for user {user_id}): Needs {final_cost}, has {wallet.balance}"
-                )
-                return False
-            else:
-                # Should ensure wallet exists, then retry? 
-                # Ideally get_or_create above handles creation, so if count=0 and balance is enough, something weird happened.
-                # But get_or_create was just called to check.
-                # Let's assume Insufficient Funds is the main reason if wallet exists.
-                return False
-        
-        # Determine new balance for logging
-        # We need to fetch it again or calculate it. Fetching is safer.
-        updated_wallet = self.db.query(Wallet).filter(Wallet.user_id == target_wallet_id).first()
-        current_balance = updated_wallet.balance if updated_wallet else 0
+            # Re-fetch with lock
+            wallet = self.db.query(Wallet).filter(
+                Wallet.user_id == target_wallet_id
+            ).with_for_update().first()
+
+        if wallet.balance < final_cost:
+            logger.warning(
+                f"Insufficient funds for wallet {target_wallet_id} (charged for user {user_id}): Needs {final_cost}, has {wallet.balance}"
+            )
+            return False
+
+        wallet.balance -= final_cost
+        current_balance = wallet.balance
 
         # Update User Usage Stats (Cache) - always attributed to the person who did it
         if not user.usage_stats:

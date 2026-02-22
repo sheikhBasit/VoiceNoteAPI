@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Providers from "./providers";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,9 +20,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={inter.className}>
-        <Providers>
-          <DashboardLayout>{children}</DashboardLayout>
-        </Providers>
+        <ErrorBoundary>
+          <Providers>
+            <DashboardLayout>{children}</DashboardLayout>
+          </Providers>
+        </ErrorBoundary>
       </body>
     </html>
   );

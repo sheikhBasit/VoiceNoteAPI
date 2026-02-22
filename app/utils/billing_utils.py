@@ -50,6 +50,8 @@ def requires_tier(minimum_tier: models.SubscriptionTier):
 def check_credit_balance(estimated_cost: int):
     """
     Dependency that ensures a user has enough credits for an operation.
+    Uses FOR UPDATE lock to prevent race conditions where concurrent
+    requests both pass the balance check before either deducts.
     """
 
     async def balance_dependency(
@@ -57,11 +59,10 @@ def check_credit_balance(estimated_cost: int):
         current_user: models.User = Depends(get_current_user),
     ):
         billing_service = BillingService(db)
-        if not billing_service.check_balance(current_user.id, estimated_cost):
+        if not billing_service.check_balance(current_user.id, estimated_cost, for_update=True):
             JLogger.warning(
                 "Access denied: Insufficient credits",
                 user_id=current_user.id,
-                balance=billing_service.get_or_create_wallet(current_user.id).balance,
                 cost=estimated_cost,
             )
             raise HTTPException(

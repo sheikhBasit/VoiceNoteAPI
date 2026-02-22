@@ -10,9 +10,11 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     UploadFile,
     status,
 )
+from pydantic import BaseModel
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
@@ -23,10 +25,14 @@ from app.services.auth_service import (
     create_access_token,
     create_refresh_token,
     get_current_user,
+    get_current_active_admin,
     refresh_access_token,
     get_password_hash,
-    verify_password
+    verify_password,
+    create_password_reset_token,
+    verify_password_reset_token
 )
+from app.services.email_service import EmailService
 from app.services.deletion_service import DeletionService
 from app.utils.json_logger import JLogger
 from app.utils.security import verify_device_signature
@@ -79,7 +85,7 @@ def register_user(
         email=validated_email,
         password_hash=get_password_hash(user_data.password),
         authorized_devices=[initial_device],
-        tier=models.SubscriptionTier.GUEST,
+        tier=models.SubscriptionTier.FREE,
         primary_role=models.UserRole.GENERIC,
         work_days=[1, 2, 3, 4, 5],
         timezone=user_data.timezone or "UTC",
@@ -106,7 +112,7 @@ def register_user(
 @router.post("/login", response_model=user_schema.SyncResponse)
 @limiter.limit("10/minute")
 def login_user(
-    request: Request, user_data: user_schema.UserLogin, db: Session = Depends(get_db)
+    request: Request, response: Response, user_data: user_schema.UserLogin, db: Session = Depends(get_db)
 ):
     """
     POST /login: Authenticate with Email/Password.
@@ -141,6 +147,18 @@ def login_user(
     access_token = create_access_token(data={"sub": db_user.id})
     refresh_token = create_refresh_token(db_user.id, db)
 
+    # 5. Set HttpOnly Cookie for Dashboard (Admin only for security hardening)
+    if db_user.is_admin:
+        from app.services.auth_service import ACCESS_TOKEN_EXPIRE_MINUTES
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        )
+
     return {
         "user": db_user,
         "access_token": access_token,
@@ -150,168 +168,30 @@ def login_user(
     }
 
 
-@router.post("/login", response_model=user_schema.SyncResponse)
-@limiter.limit("20/minute")  # Stricter limit for auth
-def sync_user(
-    request: Request, user_data: user_schema.UserCreate, db: Session = Depends(get_db)
-):
-    """
-    POST /sync: Email-First Authentication.
-    - If Email New: Account created, device authorized.
-    - If Email Exists + Device New: Returns 403 + Email Sent.
-    - If Email Exists + Device Authorized: Login Success.
-    """
-    import traceback
-    try:
-        try:
-            validated_email = ValidationService.validate_email(user_data.email)
-            validated_device_id = ValidationService.validate_device_id(user_data.device_id)
-            # validated_token = validate_token(user_data.token) # Biometric token checks
-        except ValidationError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-        # 1. Find User by Email
-        db_user = db.query(models.User).filter(models.User.email == validated_email).first()
-
-        # 2. Check Password if user exists and password is provided in request
-        if db_user and user_data.password and db_user.password_hash:
-            if not verify_password(user_data.password, db_user.password_hash):
-                JLogger.warning("Incorrect password attempt", user_id=db_user.id, email=validated_email)
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Incorrect password for this email address"
-                )
-
-        # 2. Case: New User (Auto-Register)
-        if not db_user:
-            import uuid
-
-            new_user_id = str(uuid.uuid4())
-
-            # Initialize authorized devices list
-            initial_device = {
-                "device_id": validated_device_id,
-                "device_model": user_data.device_model,
-                "biometric_token": user_data.token,
-                "authorized_at": int(time.time() * 1000),
-            }
-
-            db_user = models.User(
-                id=new_user_id,
-                name=user_data.name,
-                email=validated_email,
-                authorized_devices=[initial_device],  # PRIMARY CHANGE
-                current_device_id=validated_device_id,
-                tier=models.SubscriptionTier.GUEST,  # Free Trial Default
-                # Defaults
-                primary_role=models.UserRole.GENERIC,  # Job Role (e.g. DEVELOPER)
-                work_days=[2, 3, 4, 5, 6],
-                timezone=user_data.timezone or "UTC",
-                last_login=int(time.time() * 1000),
-                is_deleted=False,
-                password_hash=get_password_hash(user_data.password) if user_data.password else None
-            )
-            db.add(db_user)
-            db.commit()
-            db.refresh(db_user)
-
-            # Issue Tokens
-            access_token = create_access_token(data={"sub": db_user.id})
-            refresh_token = create_refresh_token(db_user.id, db)
-
-            return {
-                "user": db_user,
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "token_type": "bearer",
-                "is_new_user": True,
-            }
-
-        # 3. Case: Existing User - Security Check
-        if db_user.is_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account deactivated: This user account has been soft-deleted and must be restored by an admin.",
-            )
-
-        authorized_devices = db_user.authorized_devices or []
-
-        # Check if this device + token matches any authorized entry
-        is_authorized = False
-        for dev in authorized_devices:
-            if dev.get("device_id") == validated_device_id:
-                # Optional: Check biometric token match strictly?
-                # For now, if device_id matches, we assume it's valid,
-                # OR we can update the token if it rotated.
-                is_authorized = True
-
-                # Update metadata
-                dev["last_seen"] = int(time.time() * 1000)
-                dev["biometric_token"] = user_data.token  # Update latest token
-                break
-
-        if not is_authorized:
-            # Seamless Sync: Auto-authorize new devices for existing users
-            JLogger.info(
-                "Seamless Sync: Auto-authorizing new device",
-                user_id=db_user.id,
-                device_id=validated_device_id,
-            )
-            new_device = {
-                "device_id": validated_device_id,
-                "device_model": user_data.device_model,
-                "biometric_token": user_data.token,
-                "authorized_at": int(time.time() * 1000),
-                "last_seen": int(time.time() * 1000),
-            }
-            authorized_devices.append(new_device)
-            db_user.authorized_devices = authorized_devices
-
-        # Update current device and login time
-        db_user.current_device_id = validated_device_id
-        db_user.last_login = int(time.time() * 1000)
-
-        # Must flag modified for JSON updates in SQLAlchemy
-        from sqlalchemy.orm.attributes import flag_modified
-
-        flag_modified(db_user, "authorized_devices")
-
-        # Update timezone if provided during sync
-        if user_data.timezone:
-            db_user.timezone = user_data.timezone
-
-        db.commit()
-
-        # Issue Tokens
-        access_token = create_access_token(data={"sub": db_user.id})
-        refresh_token = create_refresh_token(db_user.id, db)
-
-        return {
-            "user": db_user,
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "is_new_user": False,
-        }
-    except Exception as e:
-        # Catch-all to log the actual error in production
-        JLogger.error("CRITICAL SYNC ERROR", error=str(e), traceback=traceback.format_exc())
-        raise e
-
 
 @router.post("/logout")
 def logout_user(
-    db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
     """
-    POST /logout: Terminates the session for the current device.
+    POST /logout: Terminates the session and revokes refresh tokens.
     """
-    # Simply clearing the current_device_id signals that the session is over.
-    # The client should discard the token.
+    # 1. Revoke all active refresh tokens for this user
+    db.query(models.RefreshToken).filter(
+        models.RefreshToken.user_id == current_user.id,
+        models.RefreshToken.is_revoked == False
+    ).update({"is_revoked": True})
+
+    # 2. Clear current device mapping
     current_user.current_device_id = None
     db.commit()
 
-    JLogger.info("User logged out", user_id=current_user.id)
+    # 3. Clear httpOnly cookie (dashboard sessions)
+    response.delete_cookie(key="access_token", httponly=True, secure=True, samesite="lax")
+
+    JLogger.info("User logged out and tokens revoked", user_id=current_user.id)
     return {"message": "Logged out successfully"}
 
 
@@ -394,6 +274,9 @@ def search_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+    current_admin: models.User = Depends(get_current_active_admin)
+
 ):
     """GET /search: Search users."""
     users_query = db.query(models.User).filter(models.User.is_deleted == False)
@@ -437,7 +320,9 @@ def search_users(
 @router.get("/{user_id}", response_model=user_schema.UserResponse)
 @limiter.limit("60/minute")
 def get_user_profile_by_id(
-    request: Request, user_id: str, db: Session = Depends(get_db)
+    request: Request, user_id: str, db: Session = Depends(get_db),
+    current_admin: models.User = Depends(get_current_active_admin)
+
 ):
     """
     GET /{user_id}: Get public user profile
@@ -460,7 +345,6 @@ def get_user_profile_by_id(
 
         return user
     except HTTPException:
-        # Re-raise HTTP exceptions (like 404) so they're not caught below
         raise
     except Exception as e:
         JLogger.error("Failed to fetch user profile", user_id=user_id, error=str(e))
@@ -468,6 +352,57 @@ def get_user_profile_by_id(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error: Failed to fetch user profile",
         )
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/hour")
+async def forgot_password(
+    request: Request,
+    data: user_schema.ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Triggers a password reset email.
+    """
+    user = db.query(models.User).filter(models.User.email == data.email).first()
+    if not user:
+        # For security reasons, don't reveal if user exists
+        return {"message": "If this email is registered, you will receive a reset link shortly."}
+
+    token = create_password_reset_token(user.email)
+    
+    # Send Email
+    await EmailService.send_password_reset_email(user.email, token, user.name)
+    
+    return {"message": "If this email is registered, you will receive a reset link shortly."}
+
+
+@router.post("/reset-password")
+@limiter.limit("5/hour")
+def reset_password(
+    request: Request,
+    data: user_schema.ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Consumes a reset token and updates the password.
+    """
+    email = verify_password_reset_token(data.token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password_hash = get_password_hash(data.new_password)
+    db.commit()
+    
+    JLogger.info("Password reset successful", user_id=user.id)
+    return {"status": "success", "message": "Password updated successfully"}
 
 
 @router.patch("/me", response_model=user_schema.UserResponse)
@@ -552,9 +487,13 @@ def delete_user_account(
 
 
 @router.patch("/{user_id}/restore")
-def restore_user_account(user_id: str, db: Session = Depends(get_db)):
+def restore_user_account(
+    user_id: str, 
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(get_current_active_admin)
+):
     """PATCH: Reactive a soft-deleted user via DeletionService."""
-    result = DeletionService.restore_user(db, user_id, restored_by=user_id)
+    result = DeletionService.restore_user(db, user_id, restored_by=current_admin.id)
     if not result["success"]:
         JLogger.error(
             "Failed to restore user account", user_id=user_id, error=result["error"]
@@ -564,27 +503,18 @@ def restore_user_account(user_id: str, db: Session = Depends(get_db)):
             detail=f"Restoration failed: {result['error']}",
         )
 
-    JLogger.info("User account restored", user_id=user_id)
+    JLogger.info("User account restored by admin", user_id=user_id, admin_id=current_admin.id)
     return result
 
 
 @router.patch("/{user_id}/role")
 def update_user_role(
-    user_id: str, role: str, admin_id: str, db: Session = Depends(get_db)
+    user_id: str, 
+    role: str, 
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(get_current_active_admin)
 ):
     """PATCH /{user_id}/role: Update only the user role (Admin only)."""
-    # Verify Admin
-    admin = (
-        db.query(models.User)
-        .filter(models.User.id == admin_id, models.User.is_admin == True)
-        .first()
-    )
-    if not admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permission denied: Administrative privileges are required for this operation",
-        )
-
     try:
         validated_user_id = ValidationService.validate_user_id(user_id)
         from app.db.models import UserRole
@@ -594,6 +524,8 @@ def update_user_role(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Validation failed: The provided role name is invalid",
             )
+    except HTTPException:
+        raise
     except Exception as e:
         JLogger.error("Admin user role update failed", user_id=user_id, error=str(e))
         raise HTTPException(
@@ -615,7 +547,7 @@ def update_user_role(
         "User role updated by admin",
         user_id=validated_user_id,
         new_role=role,
-        admin_id=admin_id,
+        admin_id=current_admin.id,
     )
     return user_schema.UserResponse.model_validate(user)
 
@@ -623,14 +555,19 @@ def update_user_role(
 from app.services.auth_service import refresh_access_token
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
 @router.post("/refresh")
 def refresh_token(
-    refresh_token: str = Query(..., alias="token"), db: Session = Depends(get_db)
+    body: RefreshTokenRequest,
+    db: Session = Depends(get_db),
 ):
     """
     Refresh Access Token using a valid Refresh Token.
     """
-    return refresh_access_token(refresh_token, db)
+    return refresh_access_token(body.refresh_token, db)
 
 
 @router.patch("/me/profile-picture", response_model=user_schema.UserResponse)

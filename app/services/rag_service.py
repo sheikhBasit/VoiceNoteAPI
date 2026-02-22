@@ -1,7 +1,10 @@
+import logging
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.db.models import Note
 from app.services.ai_service import AIService
+
+logger = logging.getLogger("VoiceNote.RAG")
 
 class RAGService:
     @staticmethod
@@ -57,6 +60,10 @@ class RAGService:
         Higher-level helper to get context directly from a transcript.
         """
         ai_service = AIService()
-        embedding = ai_service.generate_embedding_sync(transcript)
+        try:
+            embedding = ai_service.generate_embedding_sync(transcript)
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding for RAG context: {e}")
+            return ""
         similar_notes = cls.find_similar_notes(db, user_id, embedding, exclude_note_id=exclude_note_id)
         return cls.format_context_for_llm(similar_notes)

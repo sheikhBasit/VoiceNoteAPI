@@ -25,5 +25,8 @@ WORKDIR /usr/share/nginx/html
 # In Next.js with static export, the output is in 'out' directory
 COPY --from=builder /app/out .
 
+# Copy custom nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from celery import group
 
 from app.db.session import get_db
-from app.api.dependencies import get_current_user
+from app.services.auth_service import get_current_user
 from app.db import models
 from app.worker.task import note_process_pipeline
 from app.utils.json_logger import JLogger

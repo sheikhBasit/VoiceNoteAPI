@@ -89,5 +89,5 @@ else
     echo "   Final uvicorn worker count: $WORKERS"
     
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting FastAPI with uvicorn..."
-    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "$WORKERS" --proxy-headers
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers "$WORKERS" --proxy-headers --timeout-graceful-shutdown 30
 fi

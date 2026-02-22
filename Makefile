@@ -5,7 +5,7 @@ API_SERVICE=api
 WORKER_SERVICE=celery_worker
 BEAT_SERVICE=celery_beat
 
-.PHONY: help build up down restart logs test clean seed seed-sql seed-python db-shell db-reset health status run dev format lint test-quick test-fast install-hooks
+.PHONY: help build up down restart logs test clean seed seed-sql seed-python db-shell db-reset health status run dev format lint test-quick test-fast install-hooks lint-ruff lint-ruff-fix format-ruff typecheck test-regression test-migration test-curl test-playwright test-all
 
 help:
 	@echo "========================================="
@@ -44,13 +44,22 @@ help:
 	@echo "  make test-quick         - Run fast tests only (unit + quick integration)"
 	@echo "  make test-fast          - Run failed tests first"
 	@echo "  make test-admin         - Run admin system tests"
+	@echo "  make test-regression    - Run audit regression tests"
+	@echo "  make test-migration     - Run Alembic migration tests (needs PostgreSQL)"
+	@echo "  make test-curl          - Run full curl endpoint test suite"
+	@echo "  make test-playwright    - Run dashboard Playwright E2E tests"
 	@echo "  make test-coverage      - Run tests with coverage report"
 	@echo "  make test-watch         - Run tests in watch mode"
+	@echo "  make test-all           - Run full pipeline (lint, security, type, test, curl)"
 	@echo ""
 	@echo "✨ CODE QUALITY:"
 	@echo "  make format             - Auto-format code (Black + isort)"
 	@echo "  make lint               - Run code quality checks"
 	@echo "  make lint-fix           - Auto-fix linting issues"
+	@echo "  make lint-ruff          - Lint with ruff (fast)"
+	@echo "  make lint-ruff-fix      - Auto-fix with ruff"
+	@echo "  make format-ruff        - Format with ruff"
+	@echo "  make typecheck          - Run pyright type checker"
 	@echo "  make security-check     - Run security scan"
 	@echo ""
 	@echo "⚙️  DEVELOPMENT:"
@@ -235,6 +244,56 @@ security-check:
 	@echo "🔐 Running security scan..."
 	$(COMPOSE) run --rm -T $(API_SERVICE) bandit -r app/ -ll -ii
 	@echo "✅ Security check complete!"
+
+# Ruff (fast linter/formatter)
+lint-ruff:
+	@echo "🔍 Running ruff check..."
+	$(COMPOSE) run --rm -T $(API_SERVICE) python -m ruff check app/ tests/
+	@echo "✅ Ruff check complete!"
+
+lint-ruff-fix:
+	@echo "🔧 Auto-fixing with ruff..."
+	$(COMPOSE) run --rm -T $(API_SERVICE) python -m ruff check --fix app/ tests/
+	@echo "✅ Ruff auto-fix complete!"
+
+format-ruff:
+	@echo "📝 Formatting with ruff..."
+	$(COMPOSE) run --rm -T $(API_SERVICE) python -m ruff format app/ tests/
+	@echo "✅ Ruff format complete!"
+
+# Type checking
+typecheck:
+	@echo "🔎 Running pyright type checker..."
+	$(COMPOSE) run --rm -T $(API_SERVICE) python -m pyright app/
+	@echo "✅ Type check complete!"
+
+# Regression tests (audit fix verification)
+test-regression:
+	@echo "🧪 Running audit regression tests..."
+	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/regression/ -v
+	@echo "✅ Regression tests complete!"
+
+# Migration tests (requires real PostgreSQL)
+test-migration:
+	@echo "🧪 Running migration tests..."
+	$(COMPOSE) run --rm -T -e PYTHONPATH=/app $(API_SERVICE) python -m pytest tests/migration/ -v -m integration
+	@echo "✅ Migration tests complete!"
+
+# Curl endpoint test suite (requires running server)
+test-curl:
+	@echo "🧪 Running curl endpoint tests..."
+	@bash scripts/test/test_all_endpoints.sh
+	@echo "✅ Curl tests complete!"
+
+# Playwright E2E tests for dashboard
+test-playwright:
+	@echo "🧪 Running Playwright E2E tests..."
+	@cd dashboard && npx playwright test
+	@echo "✅ Playwright tests complete!"
+
+# Full test pipeline
+test-all: lint-ruff security-check typecheck test test-curl
+	@echo "✅ Full test pipeline complete!"
 
 # Health Check
 health:

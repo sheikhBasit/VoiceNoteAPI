@@ -25,6 +25,10 @@ from app.services.auth_service import get_current_user
 from app.services.deletion_service import DeletionService
 from app.services.task_service import TaskService
 from app.utils.json_logger import JLogger
+from app.utils.security import verify_note_ownership, verify_task_ownership
+from app.services.broadcaster import broadcaster
+from app.worker.task import broadcast_team_update, process_task_image_pipeline  # Sync helper
+
 
 async def check_task_lock(task_id: str, current_user_id: str):
     """Utility to check if a task is locked by someone else."""
@@ -35,9 +39,6 @@ async def check_task_lock(task_id: str, current_user_id: str):
             status_code=status.HTTP_423_LOCKED,
             detail="Task is currently being edited by another team member."
         )
-from app.utils.security import verify_note_ownership, verify_task_ownership
-from app.services.broadcaster import broadcaster
-from app.worker.task import broadcast_team_update, process_task_image_pipeline # Sync helper
 
 # Router initialization
 router = APIRouter(prefix="/api/v1/tasks", tags=["Tasks"])
@@ -61,12 +62,12 @@ def create_task(
     description = task_data.description.strip()
     if not description or len(description) < 1:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Validation failed: Task description cannot be empty",
         )
     if len(description) > 2000:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Validation failed: Task description exceeds maximum length of 2000 characters",
         )
 
@@ -83,6 +84,7 @@ def create_task(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
         note_id=task_data.note_id,
+        title=task_data.title,
         description=description,
         priority=task_data.priority,
         deadline=task_data.deadline,

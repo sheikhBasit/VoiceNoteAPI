@@ -121,7 +121,15 @@ def remove_team_member(
     
     team.members.remove(member_to_remove)
     db.commit()
-    
+
+    # Broadcast revocation so SSE/WebSocket clients disconnect this user
+    from app.worker.task import broadcast_team_update
+    broadcast_team_update(
+        team_id,
+        "MEMBER_REVOKED",
+        {"user_id": user_id, "team_id": team_id}
+    )
+
     return {"message": "Member removed successfully"}
 
 

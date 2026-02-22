@@ -1,0 +1,41 @@
+# Ruff configuration for VoiceNote API
+# Replaces flake8 + isort in a single, faster tool
+
+target-version = "py311"
+line-length = 127
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit
+    "A",   # flake8-builtins
+    "C4",  # flake8-comprehensions
+    "PT",  # flake8-pytest-style
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific rules
+]
+ignore = [
+    "B008",   # Do not perform function call in argument defaults (FastAPI Depends pattern)
+    "S101",   # Use of assert detected (needed in tests)
+    "S105",   # Possible hardcoded password (false positives on test fixtures)
+    "S106",   # Possible hardcoded password in function argument
+    "UP007",  # Use X | Y for union types (keep Optional for readability)
+]
+
+[lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S105", "S106", "S311"]
+"scripts/**/*.py" = ["S101", "S603", "S607"]
+"alembic/**/*.py" = ["E501"]
+
+[lint.isort]
+known-first-party = ["app"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

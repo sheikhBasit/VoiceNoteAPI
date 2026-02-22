@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import { useAuthStore } from "@/store/useAuthStore";
 import { useDashboardOverview } from "@/hooks/useDashboard";
 import { SystemComponent } from "@/components/system/SystemComponent";
 import {
@@ -15,6 +17,46 @@ import {
 
 export default function SystemPage() {
     const { data: metrics, isLoading, refetch, isFetching } = useDashboardOverview();
+    const { token } = useAuthStore();
+    const [logs, setLogs] = useState<any[]>([]);
+
+    useEffect(() => {
+        let ws: WebSocket;
+        let reconnectTimeout: any;
+
+        const connect = () => {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+            const host = apiUrl.replace('http://', '').replace('https://', '').replace(/\/api\/v1\/?$/, '');
+            const wsUrl = `${protocol}//${host}/admin/logs/stream`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onmessage = (event: MessageEvent) => {
+                try {
+                    const log = JSON.parse(event.data);
+                    setLogs((prev: any[]) => [log, ...prev].slice(0, 100));
+                } catch (e) {
+                    console.error("Failed to parse log", e);
+                }
+            };
+
+            ws.onclose = () => {
+                reconnectTimeout = setTimeout(connect, 3000);
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+        };
+
+        connect();
+
+        return () => {
+            ws.close();
+            clearTimeout(reconnectTimeout);
+        };
+    }, [token]);
 
     if (isLoading) {
         return (
@@ -61,13 +103,20 @@ export default function SystemPage() {
                             <Terminal className="w-5 h-5 mr-3 text-indigo-400" />
                             Live System Logs
                         </h3>
-                        <div className="bg-slate-950 rounded-lg p-4 font-mono text-xs space-y-2 overflow-y-auto max-h-80 border border-slate-800">
-                            <p className="text-emerald-500 text-[10px] uppercase font-bold">[INFO] 2026-02-18 01:52:12 - Celery worker heart-beat received</p>
-                            <p className="text-slate-400">[DEBUG] Connection established to postgresql://db:5432</p>
-                            <p className="text-slate-400">[INFO] Processing task: note_process_pipeline[7d1a2b]</p>
-                            <p className="text-amber-400 text-[10px] uppercase font-bold">[WARN] 2026-02-18 01:52:05 - Cache miss on key: analytics:usage_24h</p>
-                            <p className="text-slate-400">[INFO] Request completed: GET /api/v1/admin/dashboard/overview [200 OK]</p>
-                            <p className="text-emerald-500 text-[10px] uppercase font-bold">[INFO] 2026-02-18 01:51:42 - Celery worker heart-beat received</p>
+                        <div className="bg-slate-950 rounded-lg p-4 font-mono text-[10px] space-y-1.5 overflow-y-auto h-80 border border-slate-800 custom-scrollbar">
+                            {logs.length === 0 && (
+                                <p className="text-slate-600 italic">Waiting for telemetry stream...</p>
+                            )}
+                            {logs.map((log: any, i: number) => (
+                                <div key={i} className="flex space-x-3 items-start group">
+                                    <span className="text-slate-600 shrink-0">[{log.timestamp?.split('T')[1].split('.')[0]}]</span>
+                                    <span className={`uppercase font-bold shrink-0 ${log.level === 'INFO' ? 'text-emerald-500' :
+                                        log.level === 'ERROR' ? 'text-rose-500' :
+                                            'text-amber-500'
+                                        }`}>[{log.level}]</span>
+                                    <span className="text-slate-300 break-all">{log.message}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 </div>

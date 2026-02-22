@@ -90,10 +90,6 @@ def preprocess_audio_pipeline(input_path: str):
     output_path = f"{base_path}_refined.wav"
     final_audio.export(output_path, format="wav")
 
-    # Clean up temp file
-    if os.path.exists(temp_wav):
-        os.remove(temp_wav)
-
     # 9. Quality Audit
     analyzer = AudioQualityAnalyzer()
     quality_report = analyzer.analyze_audio_quality(output_path)
@@ -106,15 +102,12 @@ def preprocess_audio_pipeline(input_path: str):
         quality_category=quality_report.get("quality_category"),
     )
 
-    # Cleanup
-    if os.path.exists(temp_wav):
-        os.remove(temp_wav)
+    # Cleanup temp files
+    for temp_file in [temp_wav, locals().get("temp_wav_input")]:
+        if temp_file and os.path.exists(temp_file) and temp_file != output_path:
+            try:
+                os.remove(temp_file)
+            except OSError:
+                pass
 
     return output_path
-    # Cleanup converted/temp wav if it was created
-    if (
-        "temp_wav_input" in locals()
-        and os.path.exists(temp_wav_input)
-        and temp_wav_input != output_path
-    ):
-        os.remove(temp_wav_input)

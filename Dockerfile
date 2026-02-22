@@ -62,7 +62,7 @@ COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy pre-downloaded AI model cache from builder
-COPY --from=builder /root/.cache/huggingface /root/.cache/huggingface
+COPY --from=builder /root/.cache/huggingface /home/voicenote/.cache/huggingface
 
 # Copy application code
 COPY . .
@@ -74,10 +74,14 @@ RUN find /app -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true 
     find /app -type f -name "*.pyo" -delete 2>/dev/null || true && \
     echo "Python cache cleaned"
 
+# Create non-root user
+RUN useradd -m -u 1000 voicenote
+
 # Create necessary directories
 RUN mkdir -p uploads scripts logs && \
     chmod 777 uploads logs && \
-    chmod +x scripts/*.py scripts/*.sh 2>/dev/null || true
+    chmod +x scripts/*.py scripts/*.sh 2>/dev/null || true && \
+    chown -R voicenote:voicenote /app
 
 # Add a healthcheck script
 COPY <<EOF /app/healthcheck.py
@@ -90,6 +94,9 @@ except Exception as e:
     print(f"Health check failed: {e}")
     sys.exit(1)
 EOF
+
+# Switch to non-root user
+USER voicenote
 
 # Expose ports
 EXPOSE 8000

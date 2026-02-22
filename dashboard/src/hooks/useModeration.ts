@@ -5,7 +5,7 @@ export const useAuditNotes = (page = 0, limit = 20) => {
     return useQuery({
         queryKey: ['audit-notes', page, limit],
         queryFn: async () => {
-            const { data } = await api.get('/admin/content/notes', {
+            const { data } = await api.get('/admin/notes', {
                 params: { skip: page * limit, limit }
             });
             return data;
@@ -17,7 +17,7 @@ export const useAuditTasks = (page = 0, limit = 20) => {
     return useQuery({
         queryKey: ['audit-tasks', page, limit],
         queryFn: async () => {
-            const { data } = await api.get('/admin/content/tasks', {
+            const { data } = await api.get('/admin/tasks', {
                 params: { skip: page * limit, limit }
             });
             return data;
@@ -29,11 +29,14 @@ export const useDeleteNote = () => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: async (noteId: string) => {
-            const { data } = await api.delete(`/admin/content/notes/${noteId}`);
+            const { data } = await api.delete(`/admin/notes/${noteId}`);
             return data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['audit-notes'] });
-        }
+        },
+        onError: (error: Error) => {
+            console.error('Failed to delete note:', error.message);
+        },
     });
 };
