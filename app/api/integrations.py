@@ -9,6 +9,8 @@ from app.db import models
 from app.db.session import get_db
 from app.services.auth_service import get_current_user
 from app.core.limiter import limiter
+from app.utils.json_logger import JLogger
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/integrations", tags=["Integrations"])
