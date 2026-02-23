@@ -257,6 +257,7 @@ class Note(Base):
     __table_args__ = (
         Index("idx_notes_user_timestamp", "user_id", "timestamp"),
         Index("idx_notes_team_timestamp", "team_id", "timestamp"),
+        Index("ix_notes_tags", "tags", postgresql_using="gin"),
     )
 
     id = Column(String, primary_key=True)
@@ -313,8 +314,7 @@ class Note(Base):
     ai_responses = Column(JSONB, default=lambda: [])  # History of Q&A task results
     processing_time_ms = Column(BigInteger, nullable=True)  # New: Time taken for AI analysis
 
-    # Index for JSONB tags if we want to search by them effectively
-    __table_args__ = (Index("ix_notes_tags", tags, postgresql_using="gin"),)
+    # ix_notes_tags is included in __table_args__ above
 
     # Relationships with CASCADE deletion
     user = relationship("User", back_populates="notes")
