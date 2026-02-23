@@ -2,7 +2,7 @@ import os
 import time
 from typing import List
 
-from fastapi import APIRouter, Depends, Request, Body, HTTPException
+from fastapi import APIRouter, Depends, Request, Body, HTTPException, status
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
@@ -13,44 +13,38 @@ from app.services.ai_service import AIService
 from app.services.auth_service import get_current_user
 from app.utils.json_logger import JLogger
 from app.utils.user_roles import is_admin
+from app.core.limiter import limiter
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI & Insights"])
-# ai_service is instantiated inside endpoints to avoid module-level hangs
-# ai_service = AIService()
-
-from app.core.limiter import limiter
-ai_service = AIService()
-
 
 @router.post("/search", response_model=List[note_schema.NoteResponse])
-@limiter.limit("60/minute")
-async def semantic_search_handler(
+@limiter.limit("20/minute")
+async def semantic_search(
     request: Request,
-    query: str = Body(..., embed=True),
-    limit: int = Body(5, embed=True),
+    query: str = Body(None, embed=True),
+    limit: int = Body(10, embed=True),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
     """
-    Search endpoint using consolidated semantic search logic.
+    POST /api/v1/ai/search: Semantic RAG search across user's notes and tasks.
     """
-    results_with_scores = ai_service.perform_semantic_search(
-        db, 
-        current_user.id, 
-        query, 
-        limit=limit, 
-        is_admin=is_admin(current_user)
-    )
-    
-    # Return just the notes for this response model (NoteResponse)
-    return [r["note"] for r in results_with_scores]
+    if not query or not query.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Validation failed: Search query cannot be empty",
+        )
+    ai_service = AIService()
+    results = ai_service.perform_semantic_search(db, current_user.id, query, limit)
+    # Return just the notes for simplicity (or customize as needed)
+    return [r["note"] for r in results]
 
 
 @router.post("/ask")
 @limiter.limit("30/minute")
 async def ask_ai_custom(
     request: Request,
-    question: str = Body(..., embed=True),
+    question: str = Body(None, embed=True), # Make optional for validation
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -58,11 +52,18 @@ async def ask_ai_custom(
     POST /ask: Global AI assistant with RAG context.
     Uses unified AIService logic.
     """
+    if not question or not question.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Validation failed: Question cannot be empty",
+        )
+    ai_service = AIService()
     try:
         answer = ai_service.answer_question(db, current_user.id, question)
         return {"answer": answer}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        JLogger.error("Ask AI failed", error=str(e))
+        raise HTTPException(status_code=500, detail="AI service error")
 
 
 @router.get("/stats")

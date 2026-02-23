@@ -1,7 +1,8 @@
 import uuid
 import time
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db import models
@@ -10,13 +11,21 @@ from app.services.auth_service import get_current_user
 from app.utils.json_logger import JLogger
 from app.core.limiter import limiter
 
+from app.schemas import note as note_schema
+
 router = APIRouter(prefix="/api/v1/teams", tags=["Teams"])
+
+# --- Schemas ---
+class TeamCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = None
+
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def create_team(
     request: Request,
-    name: str = Query(..., min_length=1, max_length=100),
+    team_data: TeamCreate = Body(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -24,7 +33,7 @@ def create_team(
     team_id = str(uuid.uuid4())
     new_team = models.Team(
         id=team_id,
-        name=name,
+        name=team_data.name,
         owner_id=current_user.id,
         created_at=int(time.time() * 1000)
     )
@@ -72,11 +81,14 @@ def list_my_teams(
 @router.post("/{team_id}/members", status_code=status.HTTP_200_OK)
 def add_team_member(
     team_id: str,
-    user_email: str,
+    member_data: dict = Body(...),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
     """Add a member to the team by email. Only owner can add members."""
+    user_email = member_data.get("user_email")
+    if not user_email:
+        raise HTTPException(status_code=422, detail="user_email is required")
     team = db.query(models.Team).filter(models.Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -130,7 +142,8 @@ def remove_team_member(
         {"user_id": user_id, "team_id": team_id}
     )
 
-    return {"message": "Member removed successfully"}
+    from fastapi import Response
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete("/{team_id}", status_code=status.HTTP_200_OK)

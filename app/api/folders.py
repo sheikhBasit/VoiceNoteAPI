@@ -3,7 +3,7 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from sqlalchemy.orm import Session
 
 from app.db import models
@@ -35,6 +35,10 @@ class FolderResponse(BaseModel):
     created_at: int
     updated_at: int
     note_count: int = 0
+    model_config = {"from_attributes": True}
+class ParticipantCreate(BaseModel):
+    user_email: EmailStr
+    role: str = "MEMBER"
 
     model_config = {"from_attributes": True}
 
@@ -126,9 +130,17 @@ def list_folders(
             continue
         seen_ids.add(f.id)
         
-        resp = FolderResponse.model_validate(f)
-        resp.note_count = count or 0
-        response.append(resp)
+        # Manually construct to avoid Pydantic ORM validation issues if any
+        resp_data = {
+            "id": f.id,
+            "name": f.name,
+            "color": f.color,
+            "icon": f.icon,
+            "created_at": f.created_at,
+            "updated_at": f.updated_at,
+            "note_count": count or 0
+        }
+        response.append(resp_data)
 
     return response
 
@@ -200,12 +212,14 @@ def delete_folder(
 @router.post("/{folder_id}/participants", status_code=status.HTTP_200_OK)
 def add_folder_participant(
     folder_id: str,
-    user_email: str,
-    role: str = "MEMBER",
+    participant: ParticipantCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
     """Add a participant to a folder by email."""
+    if not participant.user_email:
+         raise HTTPException(status_code=422, detail="user_email is required")
+
     folder = (
         db.query(models.Folder)
         .filter(models.Folder.id == folder_id, models.Folder.user_id == current_user.id)
@@ -213,6 +227,9 @@ def add_folder_participant(
     )
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found or not authorized")
+
+    user_email = participant.user_email
+    role = participant.role
 
     new_participant = (
         db.query(models.User).filter(models.User.email == user_email).first()

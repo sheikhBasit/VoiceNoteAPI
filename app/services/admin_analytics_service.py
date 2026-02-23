@@ -53,7 +53,7 @@ class AdminAnalyticsService:
         ).all()
         
         # Calculate totals
-        total_audio_minutes = sum(log.audio_duration_ms / 60000 for log in usage_logs if log.audio_duration_ms)
+        total_audio_minutes = sum((log.duration_seconds or 0) / 60 for log in usage_logs)
         total_api_calls = len(usage_logs)
         
         # Get notes created in range
@@ -91,7 +91,7 @@ class AdminAnalyticsService:
                         "audio_minutes": 0,
                         "api_calls": 0
                     }
-                usage_by_period[day]["audio_minutes"] += (log.audio_duration_ms or 0) / 60000
+                usage_by_period[day]["audio_minutes"] += (log.duration_seconds or 0) / 60
                 usage_by_period[day]["api_calls"] += 1
         
         return {
@@ -274,21 +274,21 @@ class AdminAnalyticsService:
             hour = datetime.fromtimestamp(log.timestamp / 1000).hour
             hour_distribution[hour] = hour_distribution.get(hour, 0) + 1
         
-        # Most popular features (based on usage logs)
+        # Most popular features (based on usage logs endpoint field)
         feature_usage = {}
         for log in usage_logs:
-            if log.feature_used:
-                feature_usage[log.feature_used] = feature_usage.get(log.feature_used, 0) + 1
+            if log.endpoint:
+                feature_usage[log.endpoint] = feature_usage.get(log.endpoint, 0) + 1
         
         return {
             "top_users_by_notes": [
                 {
-                    "user_id": u.id,
-                    "name": u.name,
-                    "email": u.email,
-                    "note_count": u.note_count
+                    "user_id": row[0],
+                    "name": row[1],
+                    "email": row[2],
+                    "note_count": row[3]
                 }
-                for u in top_users_by_notes
+                for row in top_users_by_notes
             ],
             "averages": {
                 "notes_per_user": round(avg_notes_per_user, 2),

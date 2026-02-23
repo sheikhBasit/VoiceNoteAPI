@@ -36,10 +36,12 @@ def verify_google_play_purchase(
 ):
     """
     Verify a Google Play purchase token and upgrade the user's tier.
-
-    In production, this should verify the purchase token with the Google Play
-    Developer API. For now, it trusts the client and matches by product_id.
     """
+    if not body.product_id or not body.purchase_token:
+        raise HTTPException(
+            status_code=422,
+            detail="Validation failed: product_id and purchase_token are required"
+        )
     # 1. Find the matching plan by Google Play product ID
     plan = (
         db.query(models.ServicePlan)

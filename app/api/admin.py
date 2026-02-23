@@ -307,7 +307,12 @@ async def list_note_audit_logs(
     # Simple manual filter for note actions if note_id not specified
     if not note_id:
         note_actions = ["CREATE_NOTE", "UPDATE_NOTE", "DELETE_NOTE", "RESTORE_NOTE", "VIEW_NOTE"]
-        filtered_logs = [log for log in logs["logs"] if log.action in note_actions]
+        # logs["logs"] is a list of dicts — use dict access, not attribute access
+        raw_logs = logs.get("logs", []) if isinstance(logs, dict) else []
+        filtered_logs = [
+            log for log in raw_logs
+            if (log.get("action") if isinstance(log, dict) else getattr(log, "action", None)) in note_actions
+        ]
         return {
             "total": len(filtered_logs),
             "skip": skip,
@@ -480,16 +485,17 @@ async def get_user_details_admin(
                 "admin_permissions": user.admin_permissions if user.is_admin else None,
                 "is_deleted": user.is_deleted,
                 "deleted_at": user.deleted_at if user.is_deleted else None,
-                "created_at": user.created_at,
-                "updated_at": user.updated_at,
+                "admin_created_at": user.admin_created_at,
+                "admin_last_action": user.admin_last_action,
                 "last_login": user.last_login,
             },
             "subscription": {
                 "plan": user.plan.name if user.plan else "NONE",
                 "tier": user.tier.value if user.tier else "GUEST",
                 "balance": user.wallet.balance if user.wallet else 0,
-                "monthly_limit": user.wallet.monthly_limit if user.wallet else 0,
-                "used_this_month": user.wallet.used_this_month if user.wallet else 0,
+                "monthly_limit": getattr(user.wallet, "monthly_limit", 0) if user.wallet else 0,
+                "used_this_month": getattr(user.wallet, "used_this_month", 0) if user.wallet else 0,
+                "is_frozen": user.wallet.is_frozen if user.wallet else False,
             },
             "devices": user.authorized_devices or [],
             "content": {"notes_count": notes_count, "tasks_count": tasks_count},
@@ -1474,7 +1480,7 @@ async def list_admin_tasks(
 @router.delete("/tasks/{task_id}")
 async def delete_admin_task(
     task_id: str,
-    reason: str = Query(..., description="Reason for deletion"),
+    reason: str = Query("", description="Reason for deletion"),
     hard: bool = Query(False, description="Hard delete (permanent)"),
     admin_user: models.User = Depends(get_current_active_admin),
     db: Session = Depends(get_db),
@@ -1991,8 +1997,11 @@ async def get_usage_analytics(
         Usage analytics including audio minutes, API calls, notes, tasks, active users
     """
     from app.services.admin_analytics_service import AdminAnalyticsService
-    
-    return AdminAnalyticsService.get_usage_analytics(db, start_date, end_date, group_by)
+    try:
+        return AdminAnalyticsService.get_usage_analytics(db, start_date, end_date, group_by)
+    except Exception as e:
+        JLogger.error("Usage analytics failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Analytics error: {str(e)}")
 
 
 @router.get("/analytics/growth")
@@ -2066,8 +2075,11 @@ async def get_user_behavior_analytics(
         User behavior analytics including top users, averages, peak hours, feature usage
     """
     from app.services.admin_analytics_service import AdminAnalyticsService
-    
-    return AdminAnalyticsService.get_user_behavior_analytics(db)
+    try:
+        return AdminAnalyticsService.get_user_behavior_analytics(db)
+    except Exception as e:
+        JLogger.error("User behavior analytics failed", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Analytics error: {str(e)}")
 
 
 @router.get("/analytics/system-metrics")

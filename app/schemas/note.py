@@ -26,7 +26,6 @@ class NoteCreate(NoteBase):
     image_uris: List[str] = []  # Client-side image URIs
     links: List[ExternalLink] = []
     is_encrypted: bool = False
-    comparison_notes: str = ""
     team_id: Optional[str] = None
 
 

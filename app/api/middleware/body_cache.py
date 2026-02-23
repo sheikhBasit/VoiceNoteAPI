@@ -41,6 +41,8 @@ class RequestBodyCacheMiddleware:
                     if not message.get("more_body", False):
                         body_complete = True
                         scope["cached_body"] = b"".join(body_chunks)
+                elif message["type"] == "http.disconnect":
+                    body_complete = True # Stop looping on disconnect
                 return message
 
             # First, consume and cache the full body

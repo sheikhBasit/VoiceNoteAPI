@@ -209,8 +209,9 @@ class TestMinIOArchitecture:
             )
 
         # Upload file
+        headers = {"Host": "minio:9000"} if "minio:9000" in data["upload_url"] else {}
         with open(test_audio_file, "rb") as f:
-            upload_response = requests.put(upload_url, data=f)
+            upload_response = requests.put(upload_url, data=f, headers=headers)
 
         assert (
             upload_response.status_code == 200
@@ -233,7 +234,8 @@ class TestMinIOArchitecture:
             )
 
         with open(test_audio_file, "rb") as f:
-            upload_response = requests.put(upload_url, data=f)
+            headers = {"Host": "minio:9000"} if "minio:9000" in presigned_data["upload_url"] else {}
+            upload_response = requests.put(upload_url, data=f, headers=headers)
         assert upload_response.status_code == 200
 
         # Step 3: Trigger processing
@@ -276,7 +278,8 @@ class TestMinIOArchitecture:
             )
 
         with open(test_audio_file, "rb") as f:
-            upload_response = requests.put(upload_url, data=f)
+            headers = {"Host": "minio:9000"} if "minio:9000" in presigned_data["upload_url"] else {}
+            upload_response = requests.put(upload_url, data=f, headers=headers)
         assert upload_response.status_code == 200
 
         # Step 3: Trigger processing
@@ -338,8 +341,9 @@ class TestMinIOArchitecture:
                 "minio:9000", MINIO_URL.replace("http://", "")
             )
 
+        headers = {"Host": "minio:9000"} if "minio:9000" in presigned_data["upload_url"] else {}
         with open(test_audio_file, "rb") as f:
-            requests.put(upload_url, data=f)
+            requests.put(upload_url, data=f, headers=headers)
 
         requests.post(
             f"{BASE_URL}/notes/process",

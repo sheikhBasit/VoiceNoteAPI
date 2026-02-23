@@ -57,7 +57,8 @@ def connect_google(
     access_token = payload.get("access_token")
     
     if not code and not access_token:
-         raise HTTPException(status_code=400, detail="Missing authorization code or access token")
+        JLogger.error("Connect Google failed: Missing code or token", payload=payload)
+        raise HTTPException(status_code=400, detail="Missing authorization code or access token")
 
     tokens = {}
     

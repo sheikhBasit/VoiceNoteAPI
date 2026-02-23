@@ -79,7 +79,7 @@ class AnalyticsService:
                     {"role": "system", "content": "You are an expert project manager and progress analyst."},
                     {"role": "user", "content": prompt}
                 ],
-                model="llama-3.1-70b-versatile",
+                model="llama-3.3-70b-versatile",
                 temperature=0.5,
                 max_tokens=500
             )

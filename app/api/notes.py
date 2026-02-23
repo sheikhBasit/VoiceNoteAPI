@@ -228,7 +228,10 @@ async def semantic_analysis(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    """POST /{note_id}/semantic-analysis: Trigger analysis."""
+    """
+    POST /{note_id}/semantic-analysis: Trigger manual analysis.
+    Returns 202 Accepted as it offloads to Celery.
+    """
     return NoteService.trigger_semantic_analysis(db, current_user, note_id)
 
 

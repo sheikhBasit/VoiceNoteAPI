@@ -94,6 +94,7 @@ if not _allowed_origins:
 # so preflight/error responses always get CORS headers.
 app.add_middleware(RequestBodyCacheMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(UsageTrackingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,

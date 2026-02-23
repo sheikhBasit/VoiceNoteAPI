@@ -82,7 +82,7 @@ class TestFolderParticipantsDetailed:
         add_resp = client.post(
             f"/api/v1/folders/{folder_id}/participants",
             headers=headers,
-            params={"user_email": other_email, "role": "ADMIN"}
+            json={"user_email": other_email, "role": "ADMIN"}
         )
         assert add_resp.status_code == 200
         
@@ -99,7 +99,7 @@ class TestFolderParticipantsDetailed:
         resp = client.post(
             f"/api/v1/folders/{folder_id}/participants",
             headers=headers,
-            params={"user_email": "doesnotexist@example.com"}
+            json={"user_email": "doesnotexist@example.com"}
         )
         assert resp.status_code == 404
         assert "User not found" in resp.json()["error"]

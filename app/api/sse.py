@@ -5,7 +5,7 @@ from app.db import models
 from app.services.broadcaster import broadcaster
 import asyncio
 
-router = APIRouter(prefix="/sse", tags=["sse"])
+router = APIRouter(prefix="/api/v1/sse", tags=["sse"])
 
 @router.get("/events")
 async def sse_events(

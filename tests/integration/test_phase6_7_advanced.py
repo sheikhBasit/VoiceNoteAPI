@@ -56,7 +56,7 @@ class TestFolderSharing:
         share_resp = client.post(
             f"/api/v1/folders/{folder_id}/participants",
             headers=owner_headers,
-            params={"user_email": participant_auth["email"], "role": "EDITOR"}
+            json={"user_email": participant_auth["email"], "role": "EDITOR"}
         )
         assert share_resp.status_code == 200
         
@@ -87,7 +87,7 @@ class TestNoteEncryptionIntegration:
         client.post(
             f"/api/v1/folders/{folder_id}/participants",
             headers=owner_headers,
-            params={"user_email": participant_auth["email"]}
+            json={"user_email": participant_auth["email"]}
         )
 
         # 3. Owner creates an encrypted note

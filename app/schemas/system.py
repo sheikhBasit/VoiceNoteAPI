@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class AISettingsBase(BaseModel):
-    llm_model: str = "llama-3.1-70b-versatile"
+    llm_model: str = "llama-3.3-70b-versatile"
     llm_fast_model: str = "llama-3.1-8b-instant"
     temperature: int = Field(3, ge=0, le=10)
     max_tokens: int = Field(4096, ge=1, le=32768)

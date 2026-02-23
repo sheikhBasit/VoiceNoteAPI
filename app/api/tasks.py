@@ -497,7 +497,7 @@ async def unlock_task(
 async def add_task_multimedia(
     task_id: str,
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
+    file: UploadFile = File(None),  # Make optional to handle missing file manually
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -505,6 +505,12 @@ async def add_task_multimedia(
     POST: Upload image/doc and offload processing to background.
     Optimized: Immediate response to user while worker handles compression.
     """
+    if file is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Validation failed: Missing file in request",
+        )
+
     task = verify_task_ownership(db, current_user, task_id)
     await check_task_lock(task_id, current_user.id)
 
@@ -564,7 +570,8 @@ async def remove_multimedia(
     url_to_remove = payload.get("url_to_remove")
     if not url_to_remove:
         raise HTTPException(
-            status_code=400, detail="Missing url_to_remove in request body"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Validation failed: 'url_to_remove' is required"
         )
 
     task = verify_task_ownership(db, current_user, task_id)
@@ -623,16 +630,27 @@ def get_communication_options(
 @router.post("/{task_id}/external-links", status_code=status.HTTP_201_CREATED)
 def add_external_link(
     task_id: str,
-    link: task_schema.LinkEntity,
+    link: task_schema.LinkEntity = Body(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
     """POST /{task_id}/external-links: Add external link/reference to task."""
+    if not link:
+         raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Validation failed: Link details are required",
+        )
     task = verify_task_ownership(db, current_user, task_id)
 
     # Append to external_links array
     new_link = link.dict(exclude_unset=True)
-    task.external_links.append(new_link)
+    if "url" in new_link:
+        new_link["url"] = str(new_link["url"])
+        
+    task.external_links = list(task.external_links) + [new_link]
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(task, "external_links")
 
     db.commit()
     return {
@@ -656,6 +674,10 @@ def remove_external_link(
         raise HTTPException(status_code=400, detail="Invalid link index")
 
     removed_link = task.external_links.pop(link_index)
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(task, "external_links")
+    
     db.commit()
 
     return {
@@ -735,7 +757,7 @@ def restore_task(
 @router.patch("/{task_id}/complete", response_model=task_schema.TaskResponse)
 async def toggle_task_completion(
     task_id: str,
-    is_done: bool = Body(..., embed=True),
+    is_done: bool = Body(None, embed=True),  # Make optional for validation
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -743,6 +765,12 @@ async def toggle_task_completion(
     PATCH /{task_id}/complete: Toggle task completion status.
     Explicit endpoint for UI convenience.
     """
+    if is_done is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Validation failed: 'is_done' field is required",
+        )
+
     task = verify_task_ownership(db, current_user, task_id)
     await check_task_lock(task_id, current_user.id)
 

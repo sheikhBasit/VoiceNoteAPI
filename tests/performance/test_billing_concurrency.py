@@ -85,8 +85,9 @@ class TestBillingConcurrency:
         # 1. Setup User and Wallet
         db_session = custom_db()
         try:
-            user_id = "concurrent_user"
-            user = models.User(id=user_id, email="concurrent@test.com", name="Concurrent User")
+            import uuid
+            user_id = f"concurrent_user_{uuid.uuid4().hex[:8]}"
+            user = models.User(id=user_id, email=f"{user_id}@test.com", name="Concurrent User")
             db_session.add(user)
             
             # Create wallet with 100 credits
@@ -140,8 +141,9 @@ class TestBillingConcurrency:
         # 1. Setup User and Wallet
         db_session = custom_db()
         try:
-            user_id = "overdraft_user"
-            user = models.User(id=user_id, email="overdraft@test.com", name="Overdraft User")
+            import uuid
+            user_id = f"overdraft_user_{uuid.uuid4().hex[:8]}"
+            user = models.User(id=user_id, email=f"{user_id}@test.com", name="Overdraft User")
             db_session.add(user)
             
             # Create wallet with 50 credits
@@ -150,6 +152,7 @@ class TestBillingConcurrency:
             db_session.commit()
         finally:
             db_session.close()
+            
 
         # 2. Define concurrent operation
         def charge_wallet():

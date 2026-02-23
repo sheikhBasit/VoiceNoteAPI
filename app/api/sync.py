@@ -27,7 +27,10 @@ async def upload_batch(
     Docstring: Avoids N+1 queries by pre-creating note records and offloading processing.
     """
     if not files:
-        raise HTTPException(status_code=400, detail="No files provided")
+        raise HTTPException(
+            status_code=422,
+            detail="Validation failed: No files provided"
+        )
 
     JLogger.info(
         "Processing batch upload", user_id=current_user.id, count=len(files)

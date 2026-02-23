@@ -15,6 +15,8 @@ stripe.api_key = ai_config.STRIPE_SECRET_KEY
 
 @router.post("/webhooks/stripe")
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
+    if stripe_signature is None:
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
     """
     Handles Stripe webhooks for:
     - checkout.session.completed (Initial payment)

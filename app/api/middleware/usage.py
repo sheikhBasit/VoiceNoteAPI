@@ -69,17 +69,24 @@ class UsageTrackingMiddleware(BaseHTTPMiddleware):
             except Exception as e:
                 JLogger.debug("Middleware: Token decode failed", error=str(e))
 
-        # COST ESTIMATION
+        # COST ESTIMATION - Only charge for mutations
         cost_map = {
             "/api/v1/notes": 1,
             "/api/v1/transcribe": 10,
             "/api/v1/ai/analyze": 5,
         }
         estimated_cost = 0
-        for path, cost in cost_map.items():
-            if path in request.url.path:
-                estimated_cost = cost
-                break
+        if request.method in ["POST", "PATCH", "PUT"]:
+            for path, cost in cost_map.items():
+                # Use stricter matching for /api/v1/notes to avoid matching /api/v1/notes/{id} GET or DELETE
+                # if we only want to charge for creation/update
+                if request.url.path == path or request.url.path == f"{path}/":
+                    estimated_cost = cost
+                    break
+                elif path != "/api/v1/notes" and path in request.url.path:
+                    # Others like /transcribe can be partial match
+                    estimated_cost = cost
+                    break
 
         db = None
         try:
