@@ -117,9 +117,6 @@ services:
   # Celery Worker for background tasks
   celery_worker:
     image: ab745/voicenote-api:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: voicenote_celery_worker
     env_file:
       - .env
@@ -173,9 +170,6 @@ services:
   # Celery Beat for scheduled tasks
   celery_beat:
     image: ab745/voicenote-api:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: voicenote_celery_beat
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:password@db:5432/voicenote}
@@ -217,9 +211,6 @@ services:
   # Flower for real-time Celery monitoring
   flower:
     image: ab745/voicenote-api:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
     container_name: voicenote_flower
     env_file:
       - .env

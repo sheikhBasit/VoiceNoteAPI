@@ -38,6 +38,9 @@ echo "Sweep for accidental directories..."
 echo "🧹 Cleaning up old containers..."
 docker compose down -v --remove-orphans
 
+echo "♻️ Pruning unused docker images and resources to free up space..."
+docker system prune -af
+
 # 4. Pull latest images
 echo "📥 Pulling latest images from registry..."
 docker compose pull
