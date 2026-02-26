@@ -56,8 +56,12 @@ def create_task(
 ):
     """POST /: Create a new task directly (not from AI extraction)."""
     # ✅ Verify ownership if note_id provided
-    if task_data.note_id:
-        verify_note_ownership(db, current_user, task_data.note_id)
+    note_id = task_data.note_id
+    if note_id == "":
+        note_id = None
+
+    if note_id:
+        verify_note_ownership(db, current_user, note_id)
     # ✅ Validate description is not empty after strip
     description = task_data.description.strip()
     if not description or len(description) < 1:
@@ -72,18 +76,18 @@ def create_task(
         )
 
     # Verify the note exists if note_id is provided
-    if task_data.note_id:
-        note = db.query(models.Note).filter(models.Note.id == task_data.note_id).first()
+    if note_id:
+        note = db.query(models.Note).filter(models.Note.id == note_id).first()
         if not note:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Resource not found: Associated note with ID '{task_data.note_id}' missing or invalid",
+                detail=f"Resource not found: Associated note with ID '{note_id}' missing or invalid",
             )
 
     new_task = models.Task(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
-        note_id=task_data.note_id,
+        note_id=note_id,
         title=task_data.title,
         description=description,
         priority=task_data.priority,
@@ -108,7 +112,7 @@ def create_task(
             "Task created manually",
             task_id=new_task.id,
             user_id=current_user.id,
-            note_id=task_data.note_id,
+            note_id=note_id,
         )
     except Exception as e:
         db.rollback()
