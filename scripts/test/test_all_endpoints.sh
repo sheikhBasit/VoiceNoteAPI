@@ -166,6 +166,7 @@ U2_TOKEN=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin
 U2_ID=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('user',{}).get('id',''),end='')" 2>/dev/null || echo "")
 
 run_test "Login User1"        "POST" "/api/v1/users/login" "{\"email\":\"$U1_EMAIL\",\"password\":\"StrongPass123!\",\"device_id\":\"d1_login\"}" "200"
+run_test "Make Admin (Phase 2)" "POST" "/api/v1/test/make-admin?user_id=$U1_ID" "" "200|404|405"
 run_test "Refresh Token (bad)" "POST" "/api/v1/users/refresh" "{\"refresh_token\":\"invalid\"}" "400|401"
 run_test "Forgot Password"     "POST" "/api/v1/users/forgot-password" "{\"email\":\"nonexist@test.com\"}" "200|404"
 
