@@ -1289,20 +1289,16 @@ async def create_organization(
     if not AdminManager.is_admin(admin_user):
          raise HTTPException(status_code=403, detail="Admin privileges required")
 
-    # Create corporate wallet automatically
-    wallet_id = f"wallet_{org_data.id}"
-    corporate_wallet = models.Wallet(
-        user_id=wallet_id,
-        balance=10000,
-        currency="USD"
-    )
-    db.add(corporate_wallet)
+    # Use the admin user's wallet for the organization corporate wallet
+    # In a real system, this would be a separate corporate account creation process.
+    target_user_id = org_data.admin_user_id or admin_user.id
+    target_user_wallet = target_user_id # Wallet user_id matches user_id
 
     new_org = models.Organization(
         id=org_data.id,
         name=org_data.name,
-        admin_user_id=org_data.admin_user_id or admin_user.id,
-        corporate_wallet_id=wallet_id
+        admin_user_id=target_user_id,
+        corporate_wallet_id=target_user_id
     )
     db.add(new_org)
 

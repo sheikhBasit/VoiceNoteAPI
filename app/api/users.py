@@ -355,7 +355,7 @@ def get_user_profile_by_id(
 
 
 @router.post("/forgot-password")
-@limiter.limit("3/hour")
+@limiter.limit("30/hour")
 async def forgot_password(
     request: Request,
     data: user_schema.ForgotPasswordRequest,

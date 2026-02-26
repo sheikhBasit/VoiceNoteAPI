@@ -167,7 +167,6 @@ class AdminUserManagementService:
         for session in sessions:
             session_list.append({
                 "token_id": session.id,
-                "device_id": session.device_id,
                 "created_at": session.created_at,
                 "expires_at": session.expires_at
             })
