@@ -145,6 +145,6 @@ async def make_admin(user_id: str, db: Session = Depends(get_db)):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="User not found")
 
-    user.primary_role = "ADMIN"
+    user.is_admin = True
     db.commit()
-    return {"message": f"User {user_id} is now an ADMIN", "role": user.primary_role}
+    return {"message": f"User {user_id} is now an ADMIN", "is_admin": user.is_admin}
