@@ -17,7 +17,10 @@ test_router = APIRouter(prefix="/api/v1/test", tags=["Testing Lab"])
 # ai_service = AIService()
 from app.core.limiter import limiter
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from sqlalchemy.orm import Session
+from app.db import models
+from app.db.session import get_db
 
 
 @test_router.post("/stt-comparison")
