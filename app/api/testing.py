@@ -126,3 +126,22 @@ async def test_redis_connection():
         }
     except Exception as e:
         return {"status": "error", "details": str(e)}
+
+
+@test_router.post("/make-admin")
+async def make_admin(user_id: str, db: Session = Depends(get_db)):
+    """
+    POST /make-admin: Promote a user to ADMIN role.
+    Only available in non-production environments.
+    """
+    if os.getenv("ENVIRONMENT", "development") == "production":
+        raise HTTPException(status_code=404, detail="Not available in production")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.primary_role = "ADMIN"
+    db.commit()
+    return {"message": f"User {user_id} is now an ADMIN", "role": user.primary_role}
