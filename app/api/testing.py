@@ -17,7 +17,7 @@ test_router = APIRouter(prefix="/api/v1/test", tags=["Testing Lab"])
 # ai_service = AIService()
 from app.core.limiter import limiter
 
-from fastapi import APIRouter, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 
 
 @test_router.post("/stt-comparison")
